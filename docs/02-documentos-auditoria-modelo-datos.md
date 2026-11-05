@@ -339,6 +339,7 @@ confiable sin validación del servidor.
 
 ## 11. Próximo bloque
 
-El siguiente bloque definirá la arquitectura de la solución, la organización del
-repositorio, los ambientes y la estrategia de pruebas. Con eso se podrá cerrar el
-Módulo 0 y entrar al diseño detallado de Productos e Inventario.
+La arquitectura, organización del repositorio, ambientes y pruebas se encuentran
+en [Arquitectura, entornos y estrategia de pruebas](03-arquitectura-entornos-y-pruebas.md).
+Con este bloque se cierra la base de diseño del Módulo 0 y se puede entrar al
+diseño detallado de Productos e Inventario.
