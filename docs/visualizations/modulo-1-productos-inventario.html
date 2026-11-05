@@ -1,0 +1,933 @@
+<div id="la-ganga-erp-mockup">
+  <style>
+    #la-ganga-erp-mockup {
+      color-scheme: light dark;
+      --lg-navy: #173b4d;
+      --lg-navy-strong: #102e3d;
+      --lg-terra: #d95d3f;
+      --lg-mustard: #f2ac32;
+      --lg-cream: #fff5e5;
+      --lg-bg: light-dark(#f5f1e8, #0d1920);
+      --lg-surface: light-dark(#ffffff, #14252e);
+      --lg-surface-soft: light-dark(#fff9ef, #1b303a);
+      --lg-text: light-dark(#17323f, #f5eee2);
+      --lg-muted: light-dark(#64737a, #b9c5c9);
+      --lg-line: light-dark(#ded8cc, #34505c);
+      --lg-success: light-dark(#247451, #67c89b);
+      --lg-warning-bg: light-dark(#fff2cf, #473814);
+      --lg-warning-text: light-dark(#674a08, #ffe39a);
+      --lg-danger: light-dark(#a43d30, #ff9d8e);
+      --lg-shadow: light-dark(0 18px 40px rgba(23, 59, 77, .12), 0 18px 40px rgba(0, 0, 0, .28));
+      color: var(--lg-text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 100%;
+    }
+
+    #la-ganga-erp-mockup * { box-sizing: border-box; }
+    #la-ganga-erp-mockup [hidden] { display: none !important; }
+    #la-ganga-erp-mockup .lg-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    #la-ganga-erp-mockup button,
+    #la-ganga-erp-mockup input,
+    #la-ganga-erp-mockup select,
+    #la-ganga-erp-mockup textarea { font: inherit; }
+
+    #la-ganga-erp-mockup .lg-window {
+      background: var(--lg-bg);
+      border: 1px solid var(--lg-line);
+      border-radius: 18px;
+      box-shadow: var(--lg-shadow);
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 720px;
+      overflow: hidden;
+    }
+
+    #la-ganga-erp-mockup .lg-sidebar {
+      background: var(--lg-navy-strong);
+      color: #fff8eb;
+      padding: 22px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    #la-ganga-erp-mockup .lg-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px;
+    }
+
+    #la-ganga-erp-mockup .lg-brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--lg-terra);
+      color: #fff8eb;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+
+    #la-ganga-erp-mockup .lg-brand strong,
+    #la-ganga-erp-mockup .lg-brand span { display: block; }
+    #la-ganga-erp-mockup .lg-brand strong { font-weight: 500; }
+    #la-ganga-erp-mockup .lg-brand span { opacity: .72; margin-top: 2px; }
+
+    #la-ganga-erp-mockup .lg-nav {
+      display: grid;
+      gap: 6px;
+    }
+
+    #la-ganga-erp-mockup .lg-nav-button {
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: inherit;
+      min-height: 42px;
+      padding: 9px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: left;
+    }
+
+    #la-ganga-erp-mockup .lg-nav-button:hover,
+    #la-ganga-erp-mockup .lg-nav-button[aria-current="page"] {
+      background: rgba(255, 255, 255, .12);
+    }
+
+    #la-ganga-erp-mockup .lg-nav-button[aria-current="page"]::after {
+      content: "";
+      width: 6px;
+      height: 6px;
+      margin-left: auto;
+      border-radius: 50%;
+      background: var(--lg-mustard);
+    }
+
+    #la-ganga-erp-mockup .lg-sidebar-note {
+      margin-top: auto;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .08);
+      color: rgba(255, 248, 235, .82);
+    }
+
+    #la-ganga-erp-mockup .lg-main { min-width: 0; }
+
+    #la-ganga-erp-mockup .lg-topbar {
+      min-height: 66px;
+      border-bottom: 1px solid var(--lg-line);
+      background: var(--lg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 24px;
+    }
+
+    #la-ganga-erp-mockup .lg-topbar-copy strong,
+    #la-ganga-erp-mockup .lg-topbar-copy span { display: block; }
+    #la-ganga-erp-mockup .lg-topbar-copy strong { font-weight: 500; }
+    #la-ganga-erp-mockup .lg-topbar-copy span { color: var(--lg-muted); margin-top: 2px; }
+
+    #la-ganga-erp-mockup .lg-user {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--lg-muted);
+    }
+
+    #la-ganga-erp-mockup .lg-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--lg-cream);
+      color: var(--lg-navy);
+      font-weight: 500;
+    }
+
+    #la-ganga-erp-mockup .lg-content {
+      padding: 24px;
+      display: grid;
+      gap: 18px;
+    }
+
+    #la-ganga-erp-mockup .lg-demo-note {
+      background: var(--lg-warning-bg);
+      color: var(--lg-warning-text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    #la-ganga-erp-mockup .lg-page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    #la-ganga-erp-mockup h1,
+    #la-ganga-erp-mockup h2,
+    #la-ganga-erp-mockup h3,
+    #la-ganga-erp-mockup p { margin: 0; }
+    #la-ganga-erp-mockup h1 { font-size: 1.55rem; font-weight: 500; }
+    #la-ganga-erp-mockup h2 { font-size: 1.15rem; font-weight: 500; }
+    #la-ganga-erp-mockup h3 { font-size: 1rem; font-weight: 500; }
+    #la-ganga-erp-mockup .lg-subtitle { color: var(--lg-muted); margin-top: 5px; }
+
+    #la-ganga-erp-mockup .lg-actions,
+    #la-ganga-erp-mockup .lg-filter-row,
+    #la-ganga-erp-mockup .lg-inline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    #la-ganga-erp-mockup .lg-button {
+      border: 1px solid var(--lg-line);
+      border-radius: 10px;
+      min-height: 40px;
+      padding: 9px 13px;
+      background: var(--lg-surface);
+      color: var(--lg-text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    #la-ganga-erp-mockup .lg-button:hover { border-color: var(--lg-navy); }
+    #la-ganga-erp-mockup .lg-button-primary {
+      background: var(--lg-terra);
+      border-color: var(--lg-terra);
+      color: #fff;
+    }
+    #la-ganga-erp-mockup .lg-button-quiet { background: transparent; }
+    #la-ganga-erp-mockup .lg-button-danger { color: var(--lg-danger); }
+
+    #la-ganga-erp-mockup .lg-panel {
+      background: var(--lg-surface);
+      border: 1px solid var(--lg-line);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    #la-ganga-erp-mockup .lg-field {
+      display: grid;
+      gap: 6px;
+      min-width: 150px;
+      flex: 1 1 180px;
+    }
+
+    #la-ganga-erp-mockup .lg-field label,
+    #la-ganga-erp-mockup .lg-label { font-weight: 500; }
+
+    #la-ganga-erp-mockup .lg-input,
+    #la-ganga-erp-mockup .lg-select,
+    #la-ganga-erp-mockup .lg-textarea {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--lg-line);
+      border-radius: 9px;
+      padding: 9px 11px;
+      background: var(--lg-surface);
+      color: var(--lg-text);
+    }
+
+    #la-ganga-erp-mockup .lg-textarea { min-height: 86px; resize: vertical; }
+
+    #la-ganga-erp-mockup .lg-search {
+      position: relative;
+      flex: 1 1 300px;
+    }
+    #la-ganga-erp-mockup .lg-search .lg-input { padding-left: 38px; }
+    #la-ganga-erp-mockup .lg-search svg {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      color: var(--lg-muted);
+    }
+
+    #la-ganga-erp-mockup .lg-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 8px;
+      background: var(--lg-surface-soft);
+      color: var(--lg-muted);
+      border: 1px solid var(--lg-line);
+      white-space: nowrap;
+    }
+    #la-ganga-erp-mockup .lg-badge-draft { color: var(--lg-warning-text); background: var(--lg-warning-bg); border-color: transparent; }
+    #la-ganga-erp-mockup .lg-badge-active { color: var(--lg-success); }
+
+    #la-ganga-erp-mockup .lg-table-wrap { overflow-x: auto; }
+    #la-ganga-erp-mockup table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+    #la-ganga-erp-mockup th,
+    #la-ganga-erp-mockup td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--lg-line);
+      text-align: left;
+      vertical-align: middle;
+    }
+    #la-ganga-erp-mockup th { color: var(--lg-muted); font-weight: 500; }
+    #la-ganga-erp-mockup tbody tr:last-child td { border-bottom: 0; }
+
+    #la-ganga-erp-mockup .lg-product-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 220px;
+    }
+    #la-ganga-erp-mockup .lg-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 9px;
+      background: var(--lg-cream);
+      color: var(--lg-navy);
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+    #la-ganga-erp-mockup .lg-product-cell strong,
+    #la-ganga-erp-mockup .lg-product-cell span { display: block; }
+    #la-ganga-erp-mockup .lg-product-cell strong { font-weight: 500; }
+    #la-ganga-erp-mockup .lg-product-cell span { color: var(--lg-muted); margin-top: 3px; }
+
+    #la-ganga-erp-mockup .lg-mobile-list { display: none; gap: 10px; }
+    #la-ganga-erp-mockup .lg-mobile-item {
+      background: var(--lg-surface);
+      border: 1px solid var(--lg-line);
+      border-radius: 12px;
+      padding: 13px;
+      display: grid;
+      gap: 11px;
+    }
+    #la-ganga-erp-mockup .lg-mobile-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+    }
+    #la-ganga-erp-mockup .lg-mobile-meta span { color: var(--lg-muted); display: block; }
+
+    #la-ganga-erp-mockup .lg-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    #la-ganga-erp-mockup .lg-step {
+      border: 0;
+      border-bottom: 3px solid var(--lg-line);
+      background: transparent;
+      color: var(--lg-muted);
+      padding: 8px 5px 10px;
+      text-align: left;
+    }
+    #la-ganga-erp-mockup .lg-step[aria-current="step"] {
+      border-color: var(--lg-terra);
+      color: var(--lg-text);
+    }
+    #la-ganga-erp-mockup .lg-step-number {
+      width: 24px;
+      height: 24px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--lg-surface-soft);
+      margin-right: 5px;
+    }
+
+    #la-ganga-erp-mockup .lg-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    #la-ganga-erp-mockup .lg-span-2 { grid-column: span 2; }
+    #la-ganga-erp-mockup .lg-help { color: var(--lg-muted); }
+    #la-ganga-erp-mockup .lg-error { color: var(--lg-danger); }
+
+    #la-ganga-erp-mockup .lg-step-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--lg-line);
+    }
+
+    #la-ganga-erp-mockup .lg-upload-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    #la-ganga-erp-mockup .lg-upload {
+      min-height: 120px;
+      border: 1px dashed var(--lg-line);
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 12px;
+      color: var(--lg-muted);
+      background: var(--lg-surface-soft);
+    }
+
+    #la-ganga-erp-mockup .lg-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    #la-ganga-erp-mockup .lg-summary {
+      background: var(--lg-surface-soft);
+      border-radius: 11px;
+      padding: 13px;
+    }
+    #la-ganga-erp-mockup .lg-summary span,
+    #la-ganga-erp-mockup .lg-summary strong { display: block; }
+    #la-ganga-erp-mockup .lg-summary span { color: var(--lg-muted); }
+    #la-ganga-erp-mockup .lg-summary strong { margin-top: 5px; font-weight: 500; }
+
+    #la-ganga-erp-mockup .lg-detail-grid {
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1fr);
+      gap: 18px;
+    }
+    #la-ganga-erp-mockup .lg-product-photo {
+      min-height: 250px;
+      border-radius: 14px;
+      background: var(--lg-cream);
+      color: var(--lg-navy);
+      display: grid;
+      place-items: center;
+    }
+    #la-ganga-erp-mockup .lg-product-photo svg { width: 54px; height: 54px; }
+    #la-ganga-erp-mockup .lg-definition {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+    #la-ganga-erp-mockup .lg-definition div { padding-bottom: 10px; border-bottom: 1px solid var(--lg-line); }
+    #la-ganga-erp-mockup .lg-definition span,
+    #la-ganga-erp-mockup .lg-definition strong { display: block; }
+    #la-ganga-erp-mockup .lg-definition span { color: var(--lg-muted); }
+    #la-ganga-erp-mockup .lg-definition strong { margin-top: 4px; font-weight: 500; }
+
+    #la-ganga-erp-mockup .lg-empty {
+      padding: 34px 16px;
+      text-align: center;
+      color: var(--lg-muted);
+    }
+    #la-ganga-erp-mockup .lg-empty svg { margin-bottom: 8px; }
+
+    #la-ganga-erp-mockup .lg-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      background: rgba(6, 19, 25, .58);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+    #la-ganga-erp-mockup .lg-window { position: relative; }
+    #la-ganga-erp-mockup .lg-modal {
+      width: min(520px, 100%);
+      background: var(--lg-surface);
+      color: var(--lg-text);
+      border-radius: 16px;
+      border: 1px solid var(--lg-line);
+      box-shadow: var(--lg-shadow);
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+    #la-ganga-erp-mockup .lg-modal-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    #la-ganga-erp-mockup .lg-toast {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      z-index: 30;
+      max-width: 340px;
+      background: var(--lg-navy);
+      color: #fff8eb;
+      border-radius: 11px;
+      padding: 11px 13px;
+      box-shadow: var(--lg-shadow);
+    }
+
+    @media (max-width: 820px) {
+      #la-ganga-erp-mockup .lg-window { grid-template-columns: 1fr; }
+      #la-ganga-erp-mockup .lg-sidebar { padding: 14px; gap: 12px; }
+      #la-ganga-erp-mockup .lg-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      #la-ganga-erp-mockup .lg-nav-button { justify-content: center; padding: 8px; }
+      #la-ganga-erp-mockup .lg-nav-button span { display: none; }
+      #la-ganga-erp-mockup .lg-nav-button[aria-current="page"]::after { display: none; }
+      #la-ganga-erp-mockup .lg-sidebar-note { display: none; }
+      #la-ganga-erp-mockup .lg-brand { justify-content: center; }
+      #la-ganga-erp-mockup .lg-brand-copy { display: none; }
+      #la-ganga-erp-mockup .lg-content { padding: 18px; }
+      #la-ganga-erp-mockup .lg-detail-grid { grid-template-columns: 1fr; }
+      #la-ganga-erp-mockup .lg-product-photo { min-height: 190px; }
+    }
+
+    @media (max-width: 620px) {
+      #la-ganga-erp-mockup .lg-topbar { padding: 11px 14px; }
+      #la-ganga-erp-mockup .lg-user span { display: none; }
+      #la-ganga-erp-mockup .lg-page-head { display: grid; }
+      #la-ganga-erp-mockup .lg-page-head .lg-button-primary { width: 100%; }
+      #la-ganga-erp-mockup .lg-desktop-table { display: none; }
+      #la-ganga-erp-mockup .lg-mobile-list { display: grid; }
+      #la-ganga-erp-mockup .lg-steps { grid-template-columns: 1fr; }
+      #la-ganga-erp-mockup .lg-step { border-bottom-width: 1px; }
+      #la-ganga-erp-mockup .lg-step[aria-current="step"] { border-left: 3px solid var(--lg-terra); padding-left: 10px; }
+      #la-ganga-erp-mockup .lg-form-grid { grid-template-columns: 1fr; }
+      #la-ganga-erp-mockup .lg-span-2 { grid-column: auto; }
+      #la-ganga-erp-mockup .lg-upload-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #la-ganga-erp-mockup .lg-summary-grid,
+      #la-ganga-erp-mockup .lg-definition { grid-template-columns: 1fr; }
+      #la-ganga-erp-mockup .lg-step-actions { flex-direction: column-reverse; }
+      #la-ganga-erp-mockup .lg-step-actions .lg-button { width: 100%; }
+      #la-ganga-erp-mockup .lg-modal-backdrop { align-items: end; padding: 0; }
+      #la-ganga-erp-mockup .lg-modal { width: 100%; border-radius: 16px 16px 0 0; }
+    }
+  </style>
+
+  <div class="lg-window">
+    <aside class="lg-sidebar" aria-label="Navegación del ERP">
+      <div class="lg-brand">
+        <div class="lg-brand-mark"><i data-lucide="bike" aria-hidden="true"></i></div>
+        <div class="lg-brand-copy">
+          <strong>Tienda La Ganga</strong>
+          <span>ERP</span>
+        </div>
+      </div>
+
+      <nav class="lg-nav">
+        <button class="lg-nav-button" type="button" data-screen="products" aria-current="page" aria-label="Productos">
+          <i data-lucide="shirt" aria-hidden="true"></i><span>Productos</span>
+        </button>
+        <button class="lg-nav-button" type="button" data-screen="new-product" aria-label="Nuevo producto">
+          <i data-lucide="square-plus" aria-hidden="true"></i><span>Nuevo producto</span>
+        </button>
+        <button class="lg-nav-button" type="button" data-screen="detail" aria-label="Detalle del producto">
+          <i data-lucide="file-search" aria-hidden="true"></i><span>Detalle</span>
+        </button>
+        <button class="lg-nav-button" type="button" data-screen="inventory" aria-label="Inventario">
+          <i data-lucide="boxes" aria-hidden="true"></i><span>Inventario</span>
+        </button>
+        <button class="lg-nav-button" type="button" data-screen="kardex" aria-label="Kardex">
+          <i data-lucide="history" aria-hidden="true"></i><span>Kardex</span>
+        </button>
+      </nav>
+
+      <div class="lg-sidebar-note">
+        <strong>Diseño del Módulo 1</strong>
+        <p>Productos, variantes, existencias y movimientos.</p>
+      </div>
+    </aside>
+
+    <div class="lg-main">
+      <header class="lg-topbar">
+        <div class="lg-topbar-copy">
+          <strong>Tienda Managua</strong>
+          <span>Productos e inventario</span>
+        </div>
+        <div class="lg-user">
+          <span>Administrador</span>
+          <div class="lg-avatar" aria-hidden="true">A</div>
+        </div>
+      </header>
+
+      <main class="lg-content">
+        <div class="lg-demo-note">
+          <i data-lucide="info" aria-hidden="true"></i>
+          <span>Prototipo con información ilustrativa. No representa inventario real.</span>
+        </div>
+        <div id="lg-view-announcement" aria-live="polite" class="lg-sr-only">Vista Productos</div>
+
+        <section data-screen-panel="products">
+          <div class="lg-page-head">
+            <div>
+              <h1>Productos</h1>
+              <p class="lg-subtitle">Consultá prendas, variantes y disponibilidad.</p>
+            </div>
+            <button class="lg-button lg-button-primary" type="button" data-screen="new-product">
+              <i data-lucide="plus" aria-hidden="true"></i>Nuevo producto
+            </button>
+          </div>
+
+          <div class="lg-panel lg-filter-row">
+            <div class="lg-search">
+              <i data-lucide="search" aria-hidden="true"></i>
+              <label class="lg-sr-only" for="lg-product-search">Buscar producto</label>
+              <input class="lg-input" id="lg-product-search" type="search" placeholder="Nombre, marca o código">
+            </div>
+            <label class="lg-field">
+              <span class="lg-sr-only">Categoría</span>
+              <select class="lg-select"><option>Todas las categorías</option><option>Dama · Pantalones</option></select>
+            </label>
+            <button class="lg-button" type="button"><i data-lucide="sliders-horizontal" aria-hidden="true"></i>Filtros</button>
+          </div>
+
+          <div class="lg-panel lg-desktop-table">
+            <div class="lg-table-wrap">
+              <table>
+                <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Existencias</th><th>Estado</th><th></th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><div class="lg-product-cell"><div class="lg-thumb"><i data-lucide="shirt" aria-hidden="true"></i></div><div><strong>Monday Palazzo especial</strong><span>Monday · Palazzo</span></div></div></td>
+                    <td>Dama · Pantalones</td>
+                    <td>C$730 <span class="lg-help">por confirmar</span></td>
+                    <td>Sin cargar</td>
+                    <td><span class="lg-badge lg-badge-draft">Borrador</span></td>
+                    <td><button class="lg-button lg-button-quiet" type="button" data-screen="detail">Ver detalle</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="lg-product-cell"><div class="lg-thumb"><i data-lucide="image" aria-hidden="true"></i></div><div><strong>Producto demostrativo</strong><span>Sin marca · Sin corte</span></div></div></td>
+                    <td>Dama · Blusas</td>
+                    <td>C$—</td>
+                    <td>Sin cargar</td>
+                    <td><span class="lg-badge">Inactivo</span></td>
+                    <td><button class="lg-button lg-button-quiet" type="button" data-screen="detail">Ver detalle</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="lg-mobile-list">
+            <article class="lg-mobile-item">
+              <div class="lg-product-cell"><div class="lg-thumb"><i data-lucide="shirt" aria-hidden="true"></i></div><div><strong>Monday Palazzo especial</strong><span>Monday · Palazzo</span></div></div>
+              <div class="lg-mobile-meta"><div><span>Precio</span>C$730 por confirmar</div><div><span>Existencias</span>Sin cargar</div></div>
+              <div class="lg-inline"><span class="lg-badge lg-badge-draft">Borrador</span><button class="lg-button" type="button" data-screen="detail">Ver detalle</button></div>
+            </article>
+          </div>
+        </section>
+
+        <section data-screen-panel="new-product" hidden>
+          <div class="lg-page-head">
+            <div>
+              <h1>Nuevo producto</h1>
+              <p class="lg-subtitle">Guardá un borrador en cualquier momento.</p>
+            </div>
+            <span class="lg-badge lg-badge-draft"><i data-lucide="circle-dashed" aria-hidden="true"></i>Sin guardar</span>
+          </div>
+
+          <div class="lg-steps" aria-label="Pasos del producto">
+            <button class="lg-step" type="button" data-step="0" aria-current="step"><span class="lg-step-number">1</span>Información</button>
+            <button class="lg-step" type="button" data-step="1"><span class="lg-step-number">2</span>Variantes</button>
+            <button class="lg-step" type="button" data-step="2"><span class="lg-step-number">3</span>Fotos</button>
+            <button class="lg-step" type="button" data-step="3"><span class="lg-step-number">4</span>Existencias</button>
+            <button class="lg-step" type="button" data-step="4"><span class="lg-step-number">5</span>Revisar</button>
+          </div>
+
+          <div class="lg-panel">
+            <div data-step-panel="0">
+              <div class="lg-form-grid">
+                <label class="lg-field lg-span-2">Nombre del producto *<input class="lg-input" value="Pantalón Monday Palazzo talla especial"></label>
+                <label class="lg-field">Categoría *<select class="lg-select"><option>Dama · Pantalones</option></select></label>
+                <label class="lg-field">Marca *<select class="lg-select"><option>Monday</option></select></label>
+                <label class="lg-field">Corte<select class="lg-select"><option>Palazzo</option></select></label>
+                <label class="lg-field">Precio de venta predeterminado<input class="lg-input" inputmode="decimal" value="730"><span class="lg-help">Valor de referencia; confirmar antes de activar.</span></label>
+                <label class="lg-field lg-span-2">Descripción<textarea class="lg-textarea" placeholder="Descripción opcional para la tienda y el catálogo"></textarea></label>
+              </div>
+            </div>
+
+            <div data-step-panel="1" hidden>
+              <div class="lg-page-head"><div><h2>Variantes exactas</h2><p class="lg-subtitle">Agregá solo combinaciones disponibles para esta prenda.</p></div><button class="lg-button" type="button"><i data-lucide="plus" aria-hidden="true"></i>Agregar fila</button></div>
+              <div class="lg-table-wrap">
+                <table>
+                  <thead><tr><th>Talla</th><th>Color</th><th>Precio diferente</th><th>Estado</th><th></th></tr></thead>
+                  <tbody>
+                    <tr><td><select class="lg-select"><option>15</option></select></td><td><select class="lg-select"><option>Azul oscuro</option></select></td><td><input class="lg-input" placeholder="Usa C$730"></td><td><span class="lg-badge lg-badge-active">Activa</span></td><td><button class="lg-button lg-button-danger" type="button" aria-label="Quitar variante"><i data-lucide="trash-2" aria-hidden="true"></i></button></td></tr>
+                    <tr><td><select class="lg-select"><option>17</option></select></td><td><select class="lg-select"><option>Negro</option></select></td><td><input class="lg-input" placeholder="Usa C$730"></td><td><span class="lg-badge lg-badge-active">Activa</span></td><td><button class="lg-button lg-button-danger" type="button" aria-label="Quitar variante"><i data-lucide="trash-2" aria-hidden="true"></i></button></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div data-step-panel="2" hidden>
+              <div><h2>Fotografías</h2><p class="lg-subtitle">La primera fotografía será la principal. Máximo cuatro.</p></div>
+              <div class="lg-upload-grid" style="margin-top:14px">
+                <button class="lg-upload" type="button"><span><i data-lucide="image-plus" aria-hidden="true"></i><br>Agregar foto principal</span></button>
+                <button class="lg-upload" type="button"><span><i data-lucide="image-plus" aria-hidden="true"></i><br>Agregar foto</span></button>
+                <button class="lg-upload" type="button"><span><i data-lucide="image-plus" aria-hidden="true"></i><br>Agregar foto</span></button>
+                <button class="lg-upload" type="button"><span><i data-lucide="image-plus" aria-hidden="true"></i><br>Agregar foto</span></button>
+              </div>
+            </div>
+
+            <div data-step-panel="3" hidden>
+              <div class="lg-page-head"><div><h2>Existencias iniciales</h2><p class="lg-subtitle">Ubicación: Tienda Managua. No se han cargado cantidades reales.</p></div><button class="lg-button" type="button">Aplicar costo a todas</button></div>
+              <div class="lg-table-wrap">
+                <table>
+                  <thead><tr><th>Variante</th><th>Cantidad</th><th>Costo unitario</th></tr></thead>
+                  <tbody>
+                    <tr><td>Talla 15 · Azul oscuro</td><td><input class="lg-input" inputmode="numeric" placeholder="0"></td><td><input class="lg-input" inputmode="decimal" placeholder="C$ pendiente"></td></tr>
+                    <tr><td>Talla 17 · Negro</td><td><input class="lg-input" inputmode="numeric" placeholder="0"></td><td><input class="lg-input" inputmode="decimal" placeholder="C$ pendiente"></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="lg-help">Una cantidad positiva requerirá costo antes de activar.</p>
+            </div>
+
+            <div data-step-panel="4" hidden>
+              <div><h2>Revisar antes de activar</h2><p class="lg-subtitle">Los datos pendientes mantienen el producto como borrador.</p></div>
+              <div class="lg-summary-grid" style="margin-top:14px">
+                <div class="lg-summary"><span>Producto</span><strong>Monday Palazzo especial</strong></div>
+                <div class="lg-summary"><span>Variantes</span><strong>2 ilustrativas</strong></div>
+                <div class="lg-summary"><span>Existencias</span><strong>Sin cargar</strong></div>
+              </div>
+              <div class="lg-demo-note" style="margin-top:14px"><i data-lucide="triangle-alert" aria-hidden="true"></i><span>Confirmá precio, costo, colores y cantidades reales antes de activar.</span></div>
+            </div>
+
+            <div class="lg-step-actions">
+              <button class="lg-button" type="button" data-save-draft><i data-lucide="save" aria-hidden="true"></i>Guardar borrador</button>
+              <div class="lg-actions">
+                <button class="lg-button" type="button" data-prev-step>Anterior</button>
+                <button class="lg-button lg-button-primary" type="button" data-next-step>Continuar</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section data-screen-panel="detail" hidden>
+          <div class="lg-page-head">
+            <div><h1>Monday Palazzo especial</h1><p class="lg-subtitle">Producto de referencia · datos pendientes de confirmar</p></div>
+            <div class="lg-actions"><button class="lg-button" type="button"><i data-lucide="pencil" aria-hidden="true"></i>Editar</button><button class="lg-button lg-button-primary" type="button" data-screen="inventory">Ver inventario</button></div>
+          </div>
+          <div class="lg-detail-grid">
+            <div class="lg-product-photo"><i data-lucide="shirt" aria-hidden="true"></i></div>
+            <div class="lg-panel">
+              <div class="lg-inline"><span class="lg-badge lg-badge-draft">Borrador</span><span class="lg-badge">Dama · Pantalones</span></div>
+              <div class="lg-definition">
+                <div><span>Marca</span><strong>Monday</strong></div>
+                <div><span>Corte</span><strong>Palazzo</strong></div>
+                <div><span>Precio</span><strong>C$730 por confirmar</strong></div>
+                <div><span>Existencias</span><strong>Sin cargar</strong></div>
+              </div>
+              <h2>Variantes ilustrativas</h2>
+              <div class="lg-table-wrap">
+                <table><thead><tr><th>Talla</th><th>Color</th><th>Unidades</th><th>Estado</th></tr></thead><tbody><tr><td>15</td><td>Azul oscuro</td><td>Sin cargar</td><td><span class="lg-badge lg-badge-active">Activa</span></td></tr><tr><td>17</td><td>Negro</td><td>Sin cargar</td><td><span class="lg-badge lg-badge-active">Activa</span></td></tr></tbody></table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section data-screen-panel="inventory" hidden>
+          <div class="lg-page-head">
+            <div><h1>Inventario</h1><p class="lg-subtitle">Existencias por variante y ubicación.</p></div>
+            <button class="lg-button lg-button-primary" type="button" data-open-adjust><i data-lucide="clipboard-plus" aria-hidden="true"></i>Registrar ajuste</button>
+          </div>
+          <div class="lg-panel lg-filter-row">
+            <div class="lg-search"><i data-lucide="search" aria-hidden="true"></i><label class="lg-sr-only" for="lg-inventory-search">Buscar inventario</label><input class="lg-input" id="lg-inventory-search" placeholder="Producto, talla, color o código"></div>
+            <label class="lg-field"><span class="lg-sr-only">Ubicación</span><select class="lg-select"><option>Tienda Managua</option></select></label>
+            <button class="lg-button" type="button"><i data-lucide="sliders-horizontal" aria-hidden="true"></i>Filtros</button>
+          </div>
+          <div class="lg-panel">
+            <div class="lg-table-wrap">
+              <table>
+                <thead><tr><th>Producto</th><th>Talla</th><th>Color</th><th>Ubicación</th><th>Cantidad</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td>Monday Palazzo especial</td><td>15</td><td>Azul oscuro</td><td>Tienda Managua</td><td>Sin cargar</td><td><div class="lg-actions"><button class="lg-button" type="button" data-screen="kardex">Kardex</button><button class="lg-button" type="button" data-open-adjust>Ajustar</button></div></td></tr>
+                  <tr><td>Monday Palazzo especial</td><td>17</td><td>Negro</td><td>Tienda Managua</td><td>Sin cargar</td><td><div class="lg-actions"><button class="lg-button" type="button" data-screen="kardex">Kardex</button><button class="lg-button" type="button" data-open-adjust>Ajustar</button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section data-screen-panel="kardex" hidden>
+          <div class="lg-page-head">
+            <div><h1>Kardex</h1><p class="lg-subtitle">Monday Palazzo especial · talla 15 · azul oscuro</p></div>
+            <span class="lg-badge">Tienda Managua · Sin existencia cargada</span>
+          </div>
+          <div class="lg-panel lg-filter-row">
+            <label class="lg-field">Desde<input class="lg-input" type="date"></label>
+            <label class="lg-field">Hasta<input class="lg-input" type="date"></label>
+            <label class="lg-field">Movimiento<select class="lg-select"><option>Todos</option><option>Existencia inicial</option><option>Ajuste</option></select></label>
+            <button class="lg-button" type="button">Aplicar filtros</button>
+          </div>
+          <div class="lg-panel">
+            <div class="lg-table-wrap lg-desktop-table">
+              <table><thead><tr><th>Fecha</th><th>Movimiento</th><th>Entrada</th><th>Salida</th><th>Saldo</th><th>Referencia</th><th>Usuario</th></tr></thead><tbody></tbody></table>
+            </div>
+            <div class="lg-empty"><i data-lucide="history" aria-hidden="true"></i><h2>Sin movimientos reales</h2><p>El historial aparecerá cuando se confirme la existencia inicial o un ajuste.</p></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="lg-modal-backdrop" data-adjust-modal hidden>
+      <div class="lg-modal" role="dialog" aria-modal="true" aria-labelledby="lg-adjust-title">
+        <div class="lg-modal-head">
+          <div><h2 id="lg-adjust-title">Registrar ajuste</h2><p class="lg-subtitle">Monday Palazzo · talla 15 · azul oscuro</p></div>
+          <button class="lg-button lg-button-quiet" type="button" data-close-adjust aria-label="Cerrar ajuste"><i data-lucide="x" aria-hidden="true"></i></button>
+        </div>
+        <div class="lg-summary"><span>Existencia actual</span><strong>Sin cantidad real cargada</strong></div>
+        <div class="lg-form-grid">
+          <label class="lg-field">Tipo de ajuste<select class="lg-select"><option>Entrada</option><option>Salida</option></select></label>
+          <label class="lg-field">Cantidad *<input class="lg-input" inputmode="numeric" placeholder="Unidades"></label>
+          <label class="lg-field lg-span-2">Motivo *<select class="lg-select"><option value="">Seleccionar motivo</option><option>Corrección de conteo</option><option>Daño</option><option>Pérdida</option></select></label>
+          <label class="lg-field lg-span-2">Observación<textarea class="lg-textarea" placeholder="Explicá el ajuste cuando sea necesario"></textarea></label>
+        </div>
+        <div class="lg-actions" style="justify-content:flex-end"><button class="lg-button" type="button" data-close-adjust>Cancelar</button><button class="lg-button lg-button-primary" type="button" data-confirm-adjust>Registrar ajuste</button></div>
+      </div>
+    </div>
+
+    <div class="lg-toast" data-toast aria-live="polite" hidden></div>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('la-ganga-erp-mockup');
+      if (!root) return;
+
+      const state = {
+        screen: 'products',
+        step: 0
+      };
+
+      const saved = window.openai && window.openai.widgetState && window.openai.widgetState.privateContent;
+      if (saved && typeof saved === 'object') {
+        if (typeof saved.screen === 'string') state.screen = saved.screen;
+        if (Number.isInteger(saved.step)) state.step = Math.max(0, Math.min(4, saved.step));
+      }
+
+      const persist = () => {
+        if (!window.openai || !window.openai.setWidgetState) return;
+        window.openai.setWidgetState({
+          modelContent: { activeView: state.screen },
+          privateContent: { screen: state.screen, step: state.step }
+        }).catch(() => {});
+      };
+
+      const showToast = (message) => {
+        const toast = root.querySelector('[data-toast]');
+        toast.textContent = message;
+        toast.hidden = false;
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 2600);
+      };
+
+      const renderScreen = () => {
+        root.querySelectorAll('[data-screen-panel]').forEach((panel) => {
+          panel.hidden = panel.getAttribute('data-screen-panel') !== state.screen;
+        });
+        root.querySelectorAll('.lg-nav-button[data-screen]').forEach((button) => {
+          const active = button.getAttribute('data-screen') === state.screen;
+          if (active) button.setAttribute('aria-current', 'page');
+          else button.removeAttribute('aria-current');
+        });
+        const labels = { products: 'Productos', 'new-product': 'Nuevo producto', detail: 'Detalle', inventory: 'Inventario', kardex: 'Kardex' };
+        root.querySelector('#lg-view-announcement').textContent = `Vista ${labels[state.screen] || state.screen}`;
+        persist();
+      };
+
+      const renderStep = () => {
+        root.querySelectorAll('[data-step-panel]').forEach((panel) => {
+          panel.hidden = Number(panel.getAttribute('data-step-panel')) !== state.step;
+        });
+        root.querySelectorAll('[data-step]').forEach((button) => {
+          if (Number(button.getAttribute('data-step')) === state.step) button.setAttribute('aria-current', 'step');
+          else button.removeAttribute('aria-current');
+        });
+        const previous = root.querySelector('[data-prev-step]');
+        const next = root.querySelector('[data-next-step]');
+        previous.hidden = state.step === 0;
+        next.textContent = state.step === 4 ? 'Activar producto' : 'Continuar';
+        persist();
+      };
+
+      root.addEventListener('click', (event) => {
+        const screenButton = event.target.closest('[data-screen]');
+        if (screenButton) {
+          state.screen = screenButton.getAttribute('data-screen');
+          renderScreen();
+          return;
+        }
+
+        const stepButton = event.target.closest('[data-step]');
+        if (stepButton) {
+          state.step = Number(stepButton.getAttribute('data-step'));
+          renderStep();
+          return;
+        }
+
+        if (event.target.closest('[data-next-step]')) {
+          if (state.step < 4) state.step += 1;
+          else showToast('Faltan datos reales; el producto permanece como borrador.');
+          renderStep();
+          return;
+        }
+
+        if (event.target.closest('[data-prev-step]')) {
+          state.step = Math.max(0, state.step - 1);
+          renderStep();
+          return;
+        }
+
+        if (event.target.closest('[data-save-draft]')) {
+          showToast('Borrador guardado para continuar después.');
+          return;
+        }
+
+        if (event.target.closest('[data-open-adjust]')) {
+          root.querySelector('[data-adjust-modal]').hidden = false;
+          root.querySelector('[data-adjust-modal] input').focus();
+          return;
+        }
+
+        if (event.target.closest('[data-close-adjust]')) {
+          root.querySelector('[data-adjust-modal]').hidden = true;
+          return;
+        }
+
+        if (event.target.closest('[data-confirm-adjust]')) {
+          showToast('Completá cantidad y motivo antes de registrar el ajuste.');
+        }
+      });
+
+      window.addEventListener('openai:set_globals', (event) => {
+        const incoming = event.detail && event.detail.globals && event.detail.globals.widgetState;
+        const privateState = incoming && incoming.privateContent;
+        if (!privateState || typeof privateState !== 'object') return;
+        if (typeof privateState.screen === 'string') state.screen = privateState.screen;
+        if (Number.isInteger(privateState.step)) state.step = Math.max(0, Math.min(4, privateState.step));
+        renderScreen();
+        renderStep();
+      });
+
+      renderScreen();
+      renderStep();
+    })();
+  </script>
+</div>
