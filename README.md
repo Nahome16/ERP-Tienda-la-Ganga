@@ -15,6 +15,7 @@ reglas marcadas como **Propuesta** o **Pendiente** hasta que sean confirmadas.
 - [Modulo 0 - Estados y transiciones](docs/01-estados-y-transiciones.md)
 - [Modulo 0 - Documentos, auditoria y modelo de datos](docs/02-documentos-auditoria-modelo-datos.md)
 - [Modulo 0 - Arquitectura, entornos y pruebas](docs/03-arquitectura-entornos-y-pruebas.md)
+- [Modulo 1 - Productos e inventario](docs/10-productos-inventario-especificacion.md)
 
 ## Primer lanzamiento
 
