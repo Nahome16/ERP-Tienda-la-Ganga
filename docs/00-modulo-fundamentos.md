@@ -194,9 +194,12 @@ cantidades de la demostracion no son datos reales.
 ## 9. Bloques complementarios del Modulo 0
 
 El borrador de estados de producto, venta, pago, pedido y entrega se encuentra en
-[Estados y transiciones](01-estados-y-transiciones.md). Todavia falta definir:
+[Estados y transiciones](01-estados-y-transiciones.md). La numeracion, auditoria y
+estructura conceptual se encuentran en
+[Documentos, auditoria y modelo de datos](02-documentos-auditoria-modelo-datos.md).
+Todavia falta definir:
 
-1. Numeracion y trazabilidad de documentos.
-2. Reglas de sesiones, caja y autorizaciones administrativas.
-3. Modelo conceptual de datos del primer lanzamiento.
+1. Reglas de sesiones, caja y autorizaciones administrativas.
+2. Arquitectura y organizacion tecnica del repositorio.
+3. Ambientes y estrategia de pruebas.
 

@@ -276,5 +276,6 @@ se almacenarán de forma consistente y se mostrarán con el horario de Managua.
 
 ## 12. Próximo bloque
 
-Después de validar estos estados se definirán la numeración de documentos, las
-reglas de auditoría y el modelo conceptual de datos del primer lanzamiento.
+La numeración, auditoría y estructura conceptual se encuentran en
+[Documentos, auditoría y modelo de datos](02-documentos-auditoria-modelo-datos.md).
+El siguiente bloque definirá arquitectura, ambientes y estrategia de pruebas.
