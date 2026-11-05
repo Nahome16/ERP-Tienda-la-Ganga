@@ -12,6 +12,7 @@ reglas marcadas como **Propuesta** o **Pendiente** hasta que sean confirmadas.
 ## Documentacion actual
 
 - [Modulo 0 - Fundamentos](docs/00-modulo-fundamentos.md)
+- [Modulo 0 - Estados y transiciones](docs/01-estados-y-transiciones.md)
 
 ## Primer lanzamiento
 

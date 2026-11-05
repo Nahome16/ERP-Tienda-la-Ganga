@@ -191,12 +191,12 @@ cantidades de la demostracion no son datos reales.
 | DEC-009 | Acceso del vendedor a registrar abonos | Pendiente | Concederlo mediante permiso especifico |
 | DEC-010 | Acceso del vendedor a apertura y cierre | Pendiente | Concederlo al cajero responsable de la sesion |
 
-## 9. Siguiente bloque del Modulo 0
+## 9. Bloques complementarios del Modulo 0
 
-Despues de validar roles y permisos se definiran:
+El borrador de estados de producto, venta, pago, pedido y entrega se encuentra en
+[Estados y transiciones](01-estados-y-transiciones.md). Todavia falta definir:
 
-1. Estados de producto, venta, pago, pedido y entrega.
-2. Diferencia entre borrador, confirmacion, anulacion y reversion.
-3. Numeracion y trazabilidad de documentos.
-4. Reglas de sesiones, caja y autorizaciones administrativas.
+1. Numeracion y trazabilidad de documentos.
+2. Reglas de sesiones, caja y autorizaciones administrativas.
+3. Modelo conceptual de datos del primer lanzamiento.
 
