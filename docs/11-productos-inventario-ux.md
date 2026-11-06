@@ -249,5 +249,6 @@ Cada fila puede abrir su operación de origen. Las reversiones permanecen visibl
 
 ## 14. Próximo bloque
 
-Después de validar los recorridos se detallará el modelo físico de datos del
-Módulo 1: tablas, campos, restricciones, índices y transacciones.
+El modelo físico se encuentra en
+[Modelo físico de Productos e Inventario](12-productos-inventario-modelo-fisico.md).
+El siguiente bloque definirá contratos de API, permisos, errores e idempotencia.
