@@ -588,7 +588,7 @@ El modelo físico estará listo para migraciones cuando:
 
 ## 19. Próximo bloque
 
-El siguiente bloque definirá los contratos de la API del Módulo 1: casos de uso,
-rutas, solicitudes, respuestas, errores, permisos e idempotencia. Después de ese
-bloque se podrá preparar el esqueleto técnico y las primeras migraciones cuando se
-autorice comenzar la implementación.
+Los contratos se encuentran en
+[Contratos de API de Productos e Inventario](13-productos-inventario-api.md).
+El siguiente bloque consolidará las decisiones que bloquean la implementación y
+preparará el backlog técnico del Módulo 1.

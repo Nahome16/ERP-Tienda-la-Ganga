@@ -18,6 +18,7 @@ reglas marcadas como **Propuesta** o **Pendiente** hasta que sean confirmadas.
 - [Modulo 1 - Productos e inventario](docs/10-productos-inventario-especificacion.md)
 - [Modulo 1 - Pantallas y recorridos](docs/11-productos-inventario-ux.md)
 - [Modulo 1 - Modelo fisico de datos](docs/12-productos-inventario-modelo-fisico.md)
+- [Modulo 1 - Contratos de API](docs/13-productos-inventario-api.md)
 - [Prototipo navegable del Modulo 1](docs/visualizations/modulo-1-productos-inventario.html)
 
 ## Primer lanzamiento
