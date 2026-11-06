@@ -745,6 +745,7 @@ El contrato estará listo para implementación cuando:
 
 ## 16. Próximo bloque
 
-El siguiente bloque consolidará las decisiones pendientes que bloquean el inicio
-de implementación y preparará el backlog técnico del Módulo 1. No se crearán la
-API, la interfaz ni las migraciones hasta recibir autorización para programar.
+Las decisiones y tareas se consolidan en
+[Decisiones y backlog técnico](14-productos-inventario-decisiones-backlog.md).
+No se crearán la API, la interfaz ni las migraciones hasta recibir autorización
+para programar y aprobar las decisiones aplicables.
