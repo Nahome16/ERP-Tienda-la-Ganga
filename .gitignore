@@ -1,0 +1,22 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+
+# Frontend
+**/node_modules/
+**/dist/
+*.local
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+infrastructure/docker/.env
+
+# Editors and operating systems
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

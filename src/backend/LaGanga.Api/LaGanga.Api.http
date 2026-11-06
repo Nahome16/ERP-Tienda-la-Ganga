@@ -1,0 +1,6 @@
+@LaGanga.Api_HostAddress = http://localhost:5185
+
+GET {{LaGanga.Api_HostAddress}}/api/health
+Accept: application/json
+
+###
