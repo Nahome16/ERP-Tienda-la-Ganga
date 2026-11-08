@@ -7,6 +7,7 @@ import { listSales, listSessions } from '../admin/adminApi'
 import { channelLabels, formatDateTime, formatTime, managuaToday } from '../admin/format'
 import { useDebounced, useFetch } from '../admin/hooks'
 import { SaleDialog } from '../admin/SaleDialog'
+import { ExcelShortcut } from '../admin/reportsUi'
 import { LoadError, Pagination, Spinner, Tag } from '../admin/ui'
 
 const pageSize = 25
@@ -52,6 +53,7 @@ export function SalesView({ user }: { user: CurrentUser }) {
           <h1>Ventas</h1>
           <p className="page-summary">Historial de toda la tienda. Abrí una venta para reimprimir el recibo, anularla o resolver una revisión.</p>
         </div>
+        <div className="page-actions"><ExcelShortcut kind="sales" range={{ from, to }} /></div>
       </header>
 
       <section className="panel-card adm-card">

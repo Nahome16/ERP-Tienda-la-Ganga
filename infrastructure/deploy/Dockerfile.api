@@ -40,8 +40,8 @@ COPY infrastructure/deploy/healthcheck.sh /usr/local/bin/healthcheck.sh
 # compose.prod.yml monta aquí un volumen para que las sesiones sobrevivan a las
 # actualizaciones. Usuario "app" (no root): lo trae la imagen oficial de .NET 8.
 RUN chmod 755 /usr/local/bin/healthcheck.sh \
-    && mkdir -p /home/app/.aspnet \
-    && chown -R "$APP_UID:$APP_UID" /home/app/.aspnet
+    && mkdir -p /home/app/.aspnet /data/images \
+    && chown -R "$APP_UID:$APP_UID" /home/app/.aspnet /data/images
 USER $APP_UID
 
 EXPOSE 8080

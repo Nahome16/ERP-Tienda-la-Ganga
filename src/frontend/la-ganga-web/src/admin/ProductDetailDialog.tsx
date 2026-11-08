@@ -6,6 +6,7 @@ import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
 import { getProduct, updateProduct, updateVariant } from './adminApi'
 import { messageFrom } from './format'
+import { ImageManager } from './ImageManager'
 import { useFetch } from './hooks'
 import { LabelsDialog, type LabelVariant } from './LabelsDialog'
 import { AddVariantsDialog, EditProductDialog, EditVariantDialog } from './ProductDialogs'
@@ -31,6 +32,7 @@ type Nested =
 export function ProductDetailDialog({ productId, user, catalogs, openLabels, onClose, onChanged }: Props) {
   const canEdit = hasPermission(user, 'product.edit')
   const canCost = hasPermission(user, 'inventory.cost.read')
+  const canImages = hasPermission(user, 'product.images.manage')
   const { data: product, error, loading, reload } = useFetch<ProductDetail>(`product|${productId}`, (signal) => getProduct(productId, signal))
   const [nested, setNested] = useState<Nested>(openLabels ? { kind: 'labels' } : null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
@@ -109,6 +111,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
               <span>Existencia total <strong className={product.totalStock < 0 ? 'adm-neg' : undefined}>{product.totalStock}</strong></span>
               <span>{product.variantCount} variante{product.variantCount === 1 ? '' : 's'}</span>
             </div>
+            <ImageManager key={product.id} productId={product.id} images={product.images ?? []} canManage={canImages} onChanged={onChanged} />
             <div className="table-scroll">
               <table className="adm-table">
                 <thead>

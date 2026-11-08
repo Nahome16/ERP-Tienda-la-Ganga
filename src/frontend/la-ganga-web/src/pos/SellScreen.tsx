@@ -13,6 +13,7 @@ import { Modal } from './Modal'
 import { PaymentModal } from './PaymentModal'
 import { parseAmount } from './payments'
 import { buildSaleRequest, buildLocalSale, newClientSaleId } from './sale'
+import { PosThumb } from './Thumb'
 import { buildIndex, findByBarcode, groupByProduct, searchVariants } from './search'
 import { availableStock, pendingUnits } from './stock'
 import { clearCartDraft, loadCartDraft, saveCartDraft } from './storage'
@@ -327,6 +328,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
         {activeProduct && (
           <article className="pv-variants" aria-label={`Variantes de ${activeProduct.productName}`}>
             <header>
+              <PosThumb src={activeProduct.imageUrl} name={activeProduct.productName} size="row" />
               <div>
                 <h2>{activeProduct.productName}</h2>
                 <small>{[activeProduct.brandName, activeProduct.categoryName].filter(Boolean).join(' · ')}</small>
@@ -374,6 +376,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 className={`pv-product${activeProduct?.productId === group.productId ? ' is-active' : ''}`}
                 onClick={() => { setSelectedProductId(group.productId); focusScanner() }}
               >
+                <PosThumb src={group.imageUrl} name={group.productName} size="card" />
                 <strong>{group.productName}</strong>
                 <span>{[group.brandName, group.categoryName].filter(Boolean).join(' · ')}</span>
                 <b>{group.minPrice === group.maxPrice ? formatNio(group.minPrice) : `desde ${formatNio(group.minPrice)}`}</b>
@@ -408,6 +411,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
             const over = available !== null && line.quantity > available
             return (
               <article className={`pv-line${over ? ' is-over' : ''}`} key={line.variantId}>
+                <PosThumb src={known?.imageUrl} name={line.productName} size="line" />
                 <div className="pv-line-info">
                   <strong>{line.productName}</strong>
                   <small>{line.colorName} · {line.sizeName} · {formatNio(line.unitPrice)}</small>

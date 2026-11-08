@@ -12,6 +12,7 @@ import { TeamView } from './views/TeamView'
 import { AuditView } from './views/AuditView'
 import { CashView } from './views/CashView'
 import { ProductsView } from './views/ProductsView'
+import { ReportsView } from './views/ReportsView'
 import { SalesView } from './views/SalesView'
 import { SettingsView } from './views/SettingsView'
 
@@ -283,6 +284,7 @@ function App() {
       {view === 'panel' && <DashboardView user={user} onNavigate={navigate} />}
       {view === 'caja' && <CashView user={user} />}
       {view === 'ventas' && <SalesView user={user} />}
+      {view === 'reportes' && <ReportsView user={user} />}
       {view === 'productos' && <ProductsView user={user} />}
       {view === 'inventario' && <InventoryView user={user} />}
       {view === 'catalogos' && <CatalogsView user={user} isPreview={false} />}

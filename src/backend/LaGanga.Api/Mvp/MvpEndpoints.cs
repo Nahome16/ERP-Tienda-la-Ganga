@@ -4,6 +4,8 @@ using LaGanga.Application.Inventory;
 using LaGanga.Application.Sales;
 using LaGanga.Application.Settings;
 using LaGanga.Domain.Identity;
+using LaGanga.Domain.Inventory;
+using LaGanga.Infrastructure.Inventory;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LaGanga.Api.Mvp;
@@ -24,6 +26,8 @@ public static class MvpEndpoints
         MapCash(endpoints);
         MapSales(endpoints);
         MapProducts(endpoints);
+        MapImages(endpoints);
+        MapReports(endpoints);
         MapInventory(endpoints);
         MapAudit(endpoints);
         return endpoints;
@@ -283,6 +287,138 @@ public static class MvpEndpoints
                 return actor is null ? ApiHelpers.Unauthorized401() : (await service.FindByBarcodeAsync(barcode, actor, ct)).ToHttp();
             })
             .RequireAuthorization(PermissionNames.ProductRead);
+    }
+
+    private static void MapImages(IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/products/{id:guid}/images").WithTags("Product images");
+
+        // La protección CSRF de la API va en el encabezado X-CSRF-Token; la de formularios de ASP.NET no aplica.
+        group.MapPost("/", async (Guid id, HttpContext http, IProductImageService service, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                if (actor is null)
+                {
+                    return ApiHelpers.Unauthorized401();
+                }
+
+                if (!http.Request.HasFormContentType)
+                {
+                    return ApiHelpers.BadRequest("file", "Enviá la imagen como formulario (multipart/form-data).");
+                }
+
+                var form = await http.Request.ReadFormAsync(ct);
+                var file = form.Files.GetFile("file");
+                var thumb = form.Files.GetFile("thumb");
+                if (file is null || thumb is null)
+                {
+                    return ApiHelpers.BadRequest("file", "Faltan los campos «file» y «thumb».");
+                }
+
+                if (file.Length > ProductImageService.MaxImageBytes || thumb.Length > ProductImageService.MaxThumbBytes)
+                {
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status422UnprocessableEntity,
+                        title: "La imagen es demasiado pesada.",
+                        extensions: new Dictionary<string, object?> { ["code"] = "invalid_image" });
+                }
+
+                var image = await ReadAllAsync(file, ct);
+                var thumbnail = await ReadAllAsync(thumb, ct);
+                return (await service.AddAsync(id, image, thumbnail, actor, ct))
+                    .ToHttp(value => Results.Created(value.Url, value));
+            })
+            .RequireAuthorization(PermissionNames.ProductImagesManage)
+            .RequireCsrf()
+            .DisableAntiforgery();
+
+        group.MapPut("/order", async (Guid id, ReorderImagesRequest request, IProductImageService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.ReorderAsync(id, request, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.ProductImagesManage)
+            .RequireCsrf();
+
+        group.MapDelete("/{imageId:guid}", async (Guid id, Guid imageId, IProductImageService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null
+                    ? ApiHelpers.Unauthorized401()
+                    : (await service.DeleteAsync(id, imageId, actor, ct)).ToHttp(_ => Results.NoContent());
+            })
+            .RequireAuthorization(PermissionNames.ProductImagesManage)
+            .RequireCsrf();
+
+        // Las imágenes no cambian nunca para un mismo nombre: el navegador y el POS las guardan sin vencimiento.
+        endpoints.MapGet("/api/v1/media/{fileName}", (string fileName, IImageStorage storage, HttpContext http) =>
+            {
+                var stream = LocalImageStorage.IsValidName(fileName) ? storage.OpenRead(fileName) : null;
+                if (stream is null)
+                {
+                    return Results.NotFound();
+                }
+
+                http.Response.Headers.CacheControl = "private, max-age=31536000, immutable";
+                http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                return Results.Stream(stream, ImageSniffer.ContentType(Path.GetExtension(fileName).TrimStart('.')));
+            })
+            .WithTags("Product images")
+            .RequireAuthorization();
+    }
+
+    private static async Task<byte[]> ReadAllAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        using var buffer = new MemoryStream((int)file.Length);
+        await stream.CopyToAsync(buffer, cancellationToken);
+        return buffer.ToArray();
+    }
+
+    private static void MapReports(IEndpointRouteBuilder endpoints)
+    {
+        const string xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        var group = endpoints.MapGroup("/api/v1/reports").WithTags("Reports");
+
+        static IResult File(ServiceResult<ReportFile> result) =>
+            result.ToHttp(report => Results.File(report.Content, xlsx, report.FileName));
+
+        static (DateOnly From, DateOnly To) Range(DateOnly? from, DateOnly? to)
+        {
+            var today = BusinessTime.ToBusinessDate(DateTimeOffset.UtcNow);
+            return (from ?? to ?? today, to ?? from ?? today);
+        }
+
+        group.MapGet("/sales", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IReportService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                var (start, end) = Range(from, to);
+                return actor is null ? ApiHelpers.Unauthorized401() : File(await service.SalesAsync(start, end, actor, ct));
+            })
+            .RequireAuthorization(PermissionNames.SaleRead);
+
+        group.MapGet("/inventory", async (IReportService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : File(await service.InventoryAsync(actor, ct));
+            })
+            .RequireAuthorization(PermissionNames.InventoryRead);
+
+        group.MapGet("/movements", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IReportService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                var (start, end) = Range(from, to);
+                return actor is null ? ApiHelpers.Unauthorized401() : File(await service.MovementsAsync(start, end, actor, ct));
+            })
+            .RequireAuthorization(PermissionNames.InventoryKardexRead);
+
+        group.MapGet("/cash", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IReportService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                var (start, end) = Range(from, to);
+                return actor is null ? ApiHelpers.Unauthorized401() : File(await service.CashAsync(start, end, actor, ct));
+            })
+            .RequireAuthorization(PermissionNames.CashReportRead);
     }
 
     private static void MapInventory(IEndpointRouteBuilder endpoints)

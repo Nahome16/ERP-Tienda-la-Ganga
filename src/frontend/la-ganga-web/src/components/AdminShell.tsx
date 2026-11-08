@@ -15,6 +15,7 @@ const navigation: { label: string; view: AppView; icon: string }[] = [
   { label: 'Punto de venta', view: 'pos', icon: '▤' },
   { label: 'Caja y cierres', view: 'caja', icon: '▣' },
   { label: 'Ventas', view: 'ventas', icon: '▥' },
+  { label: 'Reportes', view: 'reportes', icon: '⌁' },
   { label: 'Productos', view: 'productos', icon: '♧' },
   { label: 'Inventario', view: 'inventario', icon: '⬡' },
   { label: 'Catálogos', view: 'catalogos', icon: '☰' },

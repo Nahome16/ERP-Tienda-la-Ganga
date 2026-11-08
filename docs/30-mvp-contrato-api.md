@@ -379,3 +379,45 @@ Acciones registradas: `sale.confirmed`, `sale.voided`, `sale.review_resolved`,
   usa la referencia corta `#` + primeros 6 caracteres del `clientSaleId`.
 - No se puede cerrar la caja con ventas pendientes de envío.
 - Descuentos por encima del límite requieren conexión (aprobación).
+
+## 9. Imágenes de productos
+
+Hasta **4 imágenes por producto**; la primera es la principal. El navegador
+reduce la foto antes de subirla (máx. 1200 px, JPEG) y genera una miniatura
+(320 px); el servidor guarda ambos archivos en disco (volumen del despliegue) y
+valida tipo real (JPEG, PNG o WebP por firma del archivo) y tamaño.
+
+```ts
+type ProductImage = { id: string; url: string; thumbUrl: string; isPrimary: boolean; sortOrder: number }
+// ProductListItem.primaryImageUrl: string | null     (miniatura de la principal)
+// ProductDetail.images: ProductImage[]
+// PosVariant.imageUrl: string | null                  (miniatura de la principal)
+```
+
+- `POST /products/{id}/images` — `product.images.manage`, `multipart/form-data`
+  con `file` (imagen, ≤ 2 MB) y `thumb` (miniatura, ≤ 300 KB) → 201 `ProductImage`.
+  Errores: 409 `image_limit` (ya hay 4), 422 `invalid_image`, 404.
+- `PUT /products/{id}/images/order` — `product.images.manage`:
+  `{ imageIds: string[] }` (todas las imágenes, la primera queda como principal)
+  → `ProductImage[]`.
+- `DELETE /products/{id}/images/{imageId}` — `product.images.manage` → 204.
+- `GET /media/{fileName}` es `/api/v1/media/{fileName}` (requiere sesión). Las URL
+  de las imágenes son relativas, p. ej. `/api/v1/media/3f2c….jpg` y
+  `/api/v1/media/3f2c…_t.jpg`; el archivo nunca cambia para un mismo nombre, así
+  que se envía con `Cache-Control: private, max-age=31536000, immutable`.
+
+## 10. Reportes en Excel (.xlsx)
+
+Todos son `GET`, devuelven un archivo (`Content-Disposition: attachment`,
+`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) y usan hora
+de Managua. `from` y `to` son `YYYY-MM-DD` (por defecto, hoy; máximo 366 días;
+errores como JSON `problem+json` con 400).
+
+| Endpoint | Permiso | Hojas |
+|---|---|---|
+| `/api/v1/reports/sales?from&to` | `sale.read` | Resumen, Ventas, Detalle (una fila por línea), Pagos |
+| `/api/v1/reports/inventory` | `inventory.read` | Existencias (costo y valor solo con `inventory.cost.read`), Resumen |
+| `/api/v1/reports/movements?from&to` | `inventory.kardex.read` | Movimientos (Kardex general) |
+| `/api/v1/reports/cash?from&to` | `cash.report.read` | Cierres por caja, Consolidado por día, Transferencias por banco |
+
+Aún no hay reporte de compras (no existe el módulo).

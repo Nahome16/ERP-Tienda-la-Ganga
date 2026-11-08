@@ -145,6 +145,13 @@ Flujo recomendado para una prueba local:
    volvé a conectar y comprobá que la venta se sincroniza una sola vez.
 6. Cerrar la caja (arqueo) y revisar el consolidado en **Caja y cierres**.
 
+Fotos y reportes:
+
+- Las fotos se guardan en la carpeta indicada por `Storage__ImagesPath` (por
+  defecto `data/images` junto a la API; en el despliegue, el volumen `api_images`).
+- Los reportes `.xlsx` se generan en el servidor desde **Reportes** (ventas,
+  existencias, movimientos y cierres), con fechas de Managua.
+
 Reglas que conviene recordar:
 
 - La venta ya ocurrió físicamente: el servidor **siempre acepta** una venta válida

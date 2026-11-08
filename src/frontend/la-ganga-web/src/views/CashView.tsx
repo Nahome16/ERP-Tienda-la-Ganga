@@ -9,6 +9,7 @@ import { PrintableCashSlip, type SlipData } from '../admin/CashSlip'
 import { printCashSlip } from '../admin/cashSlipData'
 import { addDays, formatIsoDate, formatTime, managuaToday } from '../admin/format'
 import { useFetch } from '../admin/hooks'
+import { ExcelShortcut } from '../admin/reportsUi'
 import { Kpi, LoadError, Notice, Row, Spinner, Tag } from '../admin/ui'
 
 function consolidatedSlip(storeName: string, data: CashConsolidated): SlipData {
@@ -53,6 +54,7 @@ export function CashView({ user }: { user: CurrentUser }) {
         <div className="page-actions">
           <button type="button" className="secondary-button" onClick={reload}>Actualizar</button>
           <button type="button" className="primary-button" disabled={!data} onClick={printCashSlip}>Imprimir cierre del día</button>
+          <ExcelShortcut kind="cash" range={{ from: date, to: date }} />
         </div>
       </header>
 

@@ -1,5 +1,6 @@
 using LaGanga.Application.Common;
 using LaGanga.Application.Identity;
+using LaGanga.Application.Inventory;
 using LaGanga.Application.Sales;
 using LaGanga.Application.Settings;
 using LaGanga.Domain.Identity;
@@ -44,7 +45,9 @@ public sealed class PosService(
                 color.SwatchHex,
                 variant.Barcode,
                 variant.PriceOverride ?? product.BasePrice,
-                balance == null ? 0 : balance.Quantity))
+                balance == null ? 0 : balance.Quantity,
+                dbContext.ProductImages.Where(image => image.ProductId == product.Id)
+                    .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault()))
             .ToListAsync(cancellationToken);
         return new PosSnapshotDto(timeProvider.GetUtcNow(), SettingsService.Map(settings), variants);
     }

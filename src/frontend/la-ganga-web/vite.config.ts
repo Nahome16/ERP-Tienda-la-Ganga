@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       // El service worker solo guarda el armazón de la app (HTML, JS, CSS, imágenes)
-      // para que abra sin internet. Las respuestas de /api NUNCA se cachean aquí:
+      // para que abra sin internet. Las respuestas de /api NUNCA se cachean aquí (salvo /api/v1/media):
       // los datos del POS viven en IndexedDB y los gestiona la propia app.
       registerType: 'autoUpdate',
       injectRegister: 'script',
@@ -38,7 +38,20 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
-        // Sin runtimeCaching: ninguna respuesta de la API pasa por el service worker.
+        // Única excepción en /api: las fotos de productos (/api/v1/media/…). Un mismo nombre
+        // de archivo nunca cambia, así que CacheFirst es seguro y deja verlas sin internet.
+        // El resto de la API (datos, sesión, ventas) NO pasa por el service worker.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url, request }) => request.method === 'GET' && url.pathname.startsWith('/api/v1/media/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'product-images',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
       devOptions: { enabled: false },
     }),

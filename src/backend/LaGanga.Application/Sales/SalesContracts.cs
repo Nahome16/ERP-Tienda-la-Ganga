@@ -17,7 +17,8 @@ public sealed record PosVariantDto(
     string? ColorHex,
     string Barcode,
     decimal Price,
-    int Stock);
+    int Stock,
+    string? ImageUrl);
 
 public sealed record PosSnapshotDto(
     DateTimeOffset GeneratedAtUtc,

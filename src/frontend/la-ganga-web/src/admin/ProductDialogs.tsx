@@ -7,6 +7,8 @@ import { formatNio } from '../lib/money'
 import { addVariant, createProduct, updateProduct, updateVariant, type ProductInput } from './adminApi'
 import { parseDecimal } from './csv'
 import { messageFrom } from './format'
+import { PendingImages } from './ImageManager'
+import { uploadPendingImages, type UploadReport } from './imageApi'
 import { Dialog, Notice } from './ui'
 import type { Catalogs } from './useCatalogs'
 import { categoryOptions } from './useCatalogs'
@@ -86,8 +88,13 @@ function validateFields(fields: ProductFields): { input: ProductInput | null; er
 
 /** Alta de producto con su matriz de variantes. */
 export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
-  user: CurrentUser; catalogs: Catalogs; onClose: () => void; onCreated: (product: ProductDetail) => void
+  user: CurrentUser; catalogs: Catalogs; onClose: () => void
+  /** `images` solo viene si se eligieron fotos; `failed` lista las que no se pudieron subir. */
+  onCreated: (product: ProductDetail, images?: UploadReport) => void
 }) {
+  const canImages = hasPermission(user, 'product.images.manage')
+  const [pending, setPending] = useState<File[]>([])
+  const [progress, setProgress] = useState<string | null>(null)
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
   const [fields, setFields] = useState<ProductFields>({ name: '', categoryId: '', brandId: '', cutId: '', basePrice: '' })
@@ -107,11 +114,20 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
     if (built.errors.length > 0) { setError(built.errors[0]); return }
     if (needsInitialPermission) { setError('Tu cuenta no puede registrar existencia inicial. Dejá las cantidades en cero.'); return }
     setSaving(true)
+    let created: ProductDetail
     try {
-      onCreated(await createProduct({ ...input, variants: built.inputs }))
+      created = await createProduct({ ...input, variants: built.inputs })
     } catch (caught) {
       setError(describeError(caught))
       setSaving(false)
+      return
+    }
+    // El producto ya existe: si alguna foto falla, se avisa y se reintenta desde el detalle.
+    if (canImages && pending.length > 0) {
+      const report = await uploadPendingImages(created.id, pending, (done, total) => setProgress(`Subiendo imágenes (${Math.min(done + 1, total)} de ${total})…`))
+      onCreated(created, report)
+    } else {
+      onCreated(created)
     }
   }
 
@@ -123,9 +139,9 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
       onClose={onClose}
       footer={(
         <>
-          <button type="button" className="secondary-button" onClick={onClose}>Cancelar</button>
+          <button type="button" className="secondary-button" disabled={saving} onClick={onClose}>Cancelar</button>
           <button type="submit" form="create-product-form" className="primary-button" disabled={saving}>
-            {saving ? 'Guardando…' : `Crear producto (${built.inputs.length} variante${built.inputs.length === 1 ? '' : 's'}, ${built.totalUnits} u.)`}
+            {saving ? (progress ?? 'Guardando…') : `Crear producto (${built.inputs.length} variante${built.inputs.length === 1 ? '' : 's'}, ${built.totalUnits} u.)`}
           </button>
         </>
       )}
@@ -133,6 +149,7 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
       <form id="create-product-form" className="adm-form" onSubmit={(event) => { void submit(event) }}>
         <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} />
         <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} />
+        {canImages && <PendingImages onChange={setPending} />}
         {needsInitialPermission && <Notice tone="warn">Tu cuenta no tiene permiso para registrar existencia inicial: dejá las cantidades vacías.</Notice>}
         {error && <Notice tone="error">{error}</Notice>}
       </form>

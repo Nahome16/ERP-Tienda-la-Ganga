@@ -6,6 +6,7 @@ import type { CurrentUser } from '../types'
 import { getInventorySummary, getSettings, getVariantByBarcode, listInventory } from '../admin/adminApi'
 import { formatInt, messageFrom } from '../admin/format'
 import { useDebounced, useFetch } from '../admin/hooks'
+import { ExcelShortcut } from '../admin/reportsUi'
 import { LoadError, Kpi, Notice, Pagination, Spinner, Tag } from '../admin/ui'
 import { VariantPanel, type PanelVariant } from '../admin/VariantPanel'
 
@@ -77,6 +78,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
           <h1>Inventario</h1>
           <p className="page-summary">Existencias por variante. Escaneá un código para abrir su ficha, ver el Kardex o registrar un movimiento.</p>
         </div>
+        {hasPermission(user, 'inventory.read') && <div className="page-actions"><ExcelShortcut kind="inventory" /></div>}
       </header>
 
       {summary.error && <LoadError message={summary.error} onRetry={summary.reload} />}

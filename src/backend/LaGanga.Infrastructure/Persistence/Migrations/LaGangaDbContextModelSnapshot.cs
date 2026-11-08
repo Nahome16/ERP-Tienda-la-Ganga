@@ -631,6 +631,48 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LaGanga.Domain.Inventory.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ThumbFileName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.ToTable("product_images", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_product_images_sort_order", "\"SortOrder\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("LaGanga.Domain.Inventory.ProductVariant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1336,6 +1378,20 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Inventory.ProductImage", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Identity.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LaGanga.Domain.Inventory.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("LaGanga.Domain.Inventory.ProductVariant", b =>
