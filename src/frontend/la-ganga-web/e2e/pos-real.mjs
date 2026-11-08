@@ -85,7 +85,7 @@ try {
   await page.getByLabel('Usuario del administrador').fill(ADMIN)
   await page.getByLabel('Contraseña').fill('contraseña-incorrecta')
   await page.getByRole('button', { name: 'Aprobar descuento' }).click()
-  await page.getByRole('alert').filter({ hasText: /.+/ }).last().waitFor()
+  await page.locator('.pv-modal .pv-error').waitFor()
   check('Credenciales malas muestran error y no aprueban', await page.getByRole('dialog', { name: 'Aprobación de descuento' }).isVisible())
   await page.getByLabel('Contraseña').fill(PASSWORD)
   await page.getByRole('button', { name: 'Aprobar descuento' }).click()
