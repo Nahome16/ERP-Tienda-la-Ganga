@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1
+# La Ganga ERP - imagen de la API (.NET 8).
+# Se construye desde la RAÍZ del repositorio (compose.prod.yml ya lo configura):
+#   docker build -f infrastructure/deploy/Dockerfile.api -t la-ganga-api .
+
+# ---------- Etapa 1: compilar ----------
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ENV DOTNET_NOLOGO=1 \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1
+WORKDIR /src
+
+# Configuración común de la solución (reglas de compilación).
+COPY Directory.*.props ./
+COPY .editorconfig ./
+COPY src/backend ./src/backend
+
+# El caché de NuGet se conserva entre construcciones: actualizar es más rápido.
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet restore src/backend/LaGanga.Api/LaGanga.Api.csproj
+
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet publish src/backend/LaGanga.Api/LaGanga.Api.csproj \
+      --configuration Release --no-restore \
+      --output /app/publish \
+      /p:UseAppHost=false
+
+# ---------- Etapa 2: imagen final (solo el runtime) ----------
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+ENV ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_NOLOGO=1 \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1
+WORKDIR /app
+
+COPY --from=build /app/publish ./
+COPY infrastructure/deploy/healthcheck.sh /usr/local/bin/healthcheck.sh
+
+# Carpeta donde ASP.NET guarda las llaves que protegen las cookies de sesión.
+# compose.prod.yml monta aquí un volumen para que las sesiones sobrevivan a las
+# actualizaciones. Usuario "app" (no root): lo trae la imagen oficial de .NET 8.
+RUN chmod 755 /usr/local/bin/healthcheck.sh \
+    && mkdir -p /home/app/.aspnet \
+    && chown -R "$APP_UID:$APP_UID" /home/app/.aspnet
+USER $APP_UID
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=6s --start-period=60s --retries=3 \
+  CMD ["/usr/local/bin/healthcheck.sh"]
+
+ENTRYPOINT ["dotnet", "LaGanga.Api.dll"]

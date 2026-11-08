@@ -11,7 +11,8 @@ namespace LaGanga.Infrastructure.Identity;
 /// <item>Agrega los permisos nuevos que todavía no estén en la base.</item>
 /// <item>Crea los roles del sistema que falten, con sus permisos iniciales.</item>
 /// <item>El rol Administrador recibe siempre todos los permisos.</item>
-/// <item>Nunca quita permisos ni modifica otros roles existentes.</item>
+/// <item>Los roles del sistema reciben los permisos nuevos que el código les define.</item>
+/// <item>Nunca quita permisos ni modifica roles creados por el negocio.</item>
 /// </list>
 /// </summary>
 public sealed class RoleSynchronizer(LaGangaDbContext dbContext)
@@ -38,20 +39,16 @@ public sealed class RoleSynchronizer(LaGangaDbContext dbContext)
         {
             var normalized = roleName.Trim().ToUpperInvariant();
             var role = roles.SingleOrDefault(candidate => candidate.NormalizedName == normalized);
-            var isNew = role is null;
-            if (role is null)
+                        if (role is null)
             {
                 role = new Role(Guid.NewGuid(), roleName);
                 dbContext.Roles.Add(role);
                 roles.Add(role);
             }
 
-            var isAdministrator = string.Equals(roleName, SystemRoles.Administrator, StringComparison.Ordinal);
-            if (!isNew && !isAdministrator)
-            {
-                continue;
-            }
-
+            // Los roles del sistema reciben siempre los permisos que el código les define
+            // (así una actualización que agrega permisos nuevos los habilita sin pasos manuales).
+            // Nunca se quita un permiso ya asignado.
             foreach (var permissionName in defaultPermissions)
             {
                 var permission = byName[permissionName];

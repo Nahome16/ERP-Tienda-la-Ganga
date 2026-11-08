@@ -1,9 +1,15 @@
 using LaGanga.Application.Catalog;
 using LaGanga.Application.Identity;
+using LaGanga.Application.Inventory;
+using LaGanga.Application.Sales;
+using LaGanga.Application.Settings;
 using LaGanga.Application.Users;
 using LaGanga.Domain.Identity;
 using LaGanga.Infrastructure.Catalog;
 using LaGanga.Infrastructure.Identity;
+using LaGanga.Infrastructure.Inventory;
+using LaGanga.Infrastructure.Sales;
+using LaGanga.Infrastructure.Settings;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +37,14 @@ public static class DependencyInjection
         services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<CatalogSeeder>();
+        services.AddScoped<IAuditWriter, AuditWriter>();
+        services.AddScoped<IAuditQueryService, AuditQueryService>();
+        services.AddScoped<ISettingsService, SettingsService>();
+        services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IInventoryService, InventoryService>();
+        services.AddScoped<IPosService, PosService>();
+        services.AddScoped<ICashService, CashService>();
+        services.AddScoped<ISalesService, SalesService>();
         return services;
     }
 }

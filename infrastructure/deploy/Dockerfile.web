@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+# La Ganga ERP - imagen de la web (React/Vite compilado) servida por Caddy.
+# Caddy también reenvía /api/* y /health a la API y obtiene el certificado
+# HTTPS (Let's Encrypt) automáticamente.
+# Se construye desde la RAÍZ del repositorio (compose.prod.yml ya lo configura).
+
+# ---------- Etapa 1: compilar el frontend ----------
+FROM node:22-alpine AS build
+WORKDIR /repo/src/frontend/la-ganga-web
+
+COPY src/frontend/la-ganga-web/package.json src/frontend/la-ganga-web/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
+
+COPY src/frontend/la-ganga-web ./
+# vite.config.ts usa publicDir ../../../docs/assets (logo, íconos): debe existir.
+COPY docs/assets /repo/docs/assets
+RUN npm run build
+
+# ---------- Etapa 2: Caddy ----------
+FROM caddy:2-alpine
+COPY infrastructure/deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /repo/src/frontend/la-ganga-web/dist /srv
+
+EXPOSE 80 443 443/udp

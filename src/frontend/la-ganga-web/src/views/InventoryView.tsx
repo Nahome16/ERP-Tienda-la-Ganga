@@ -1,10 +1,172 @@
+import { useState, type FormEvent } from 'react'
+import { ApiError } from '../lib/api'
+import { hasPermission } from '../lib/access'
+import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
+import { getInventorySummary, getSettings, getVariantByBarcode, listInventory } from '../admin/adminApi'
+import { formatInt, messageFrom } from '../admin/format'
+import { useDebounced, useFetch } from '../admin/hooks'
+import { LoadError, Kpi, Notice, Pagination, Spinner, Tag } from '../admin/ui'
+import { VariantPanel, type PanelVariant } from '../admin/VariantPanel'
 
-// Esqueleto: lo reemplaza la implementación real de la pantalla.
+const pageSize = 25
+const filters = [
+  { value: 'all', label: 'Todos' },
+  { value: 'low', label: 'Bajo stock' },
+  { value: 'out', label: 'Agotados' },
+  { value: 'negative', label: 'Negativos' },
+] as const
+type FilterValue = typeof filters[number]['value']
+
 export function InventoryView({ user }: { user: CurrentUser }) {
+  const canCost = hasPermission(user, 'inventory.cost.read')
+  const [searchInput, setSearchInput] = useState('')
+  const search = useDebounced(searchInput)
+  const [filter, setFilter] = useState<FilterValue>('all')
+  const [page, setPage] = useState(1)
+  const [scan, setScan] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [scanNotice, setScanNotice] = useState<{ tone: 'error' | 'warn'; text: string } | null>(null)
+  const [selected, setSelected] = useState<PanelVariant | null>(null)
+
+  const summary = useFetch('inv-summary', (signal) => getInventorySummary(signal))
+  const settings = useFetch('inv-settings', (signal) => getSettings(signal))
+  const list = useFetch(`inv|${search}|${filter}|${page}`, (signal) => listInventory({ search, filter, page, pageSize }, signal))
+  const lowThreshold = settings.data?.lowStockThreshold ?? 2
+
+  function refreshAll() {
+    summary.reload()
+    list.reload()
+  }
+
+  function chooseFilter(value: FilterValue) {
+    setFilter(value)
+    setPage(1)
+  }
+
+  async function submitScan(event: FormEvent) {
+    event.preventDefault()
+    const code = scan.trim()
+    if (!code) return
+    setScanning(true)
+    setScanNotice(null)
+    try {
+      const variant = await getVariantByBarcode(code)
+      setSelected({
+        variantId: variant.id, productName: variant.productName, sizeName: variant.sizeName, colorName: variant.colorName,
+        barcode: variant.barcode, price: variant.price, stock: variant.stock, cost: variant.cost,
+      })
+      setScan('')
+    } catch (caught) {
+      setScanNotice(caught instanceof ApiError && caught.status === 404
+        ? { tone: 'warn', text: `No existe ninguna variante con el código ${code}.` }
+        : { tone: 'error', text: messageFrom(caught) })
+    } finally {
+      setScanning(false)
+    }
+  }
+
+  const rows = list.data?.items ?? []
+  const stats = summary.data
+
   return (
-    <main className="admin-page">
-      <header className="page-header"><div><h1>Inventario</h1><p className="page-summary">En construcción · {user.displayName}</p></div></header>
+    <main className="admin-page adm-page">
+      <header className="page-header">
+        <div>
+          <p className="page-kicker">Inventario · <b className="live-data">Datos reales</b></p>
+          <h1>Inventario</h1>
+          <p className="page-summary">Existencias por variante. Escaneá un código para abrir su ficha, ver el Kardex o registrar un movimiento.</p>
+        </div>
+      </header>
+
+      {summary.error && <LoadError message={summary.error} onRetry={summary.reload} />}
+      <div className="adm-kpis">
+        <Kpi label="Unidades" value={stats ? formatInt(stats.totalUnits) : '—'} hint={stats ? `${formatInt(stats.totalVariants)} variantes` : undefined} />
+        <Kpi label="Bajo stock" value={stats ? formatInt(stats.lowStockCount) : '—'} hint={`Con ${lowThreshold} o menos`} tone={stats && stats.lowStockCount > 0 ? 'warn' : undefined} onClick={() => chooseFilter('low')} />
+        <Kpi label="Agotados" value={stats ? formatInt(stats.outOfStockCount) : '—'} hint="Existencia en cero" tone={stats && stats.outOfStockCount > 0 ? 'warn' : undefined} onClick={() => chooseFilter('out')} />
+        <Kpi label="Negativos" value={stats ? formatInt(stats.negativeCount) : '—'} hint="Requieren revisión" tone={stats && stats.negativeCount > 0 ? 'danger' : 'ok'} onClick={() => chooseFilter('negative')} />
+      </div>
+
+      <section className="panel-card adm-card">
+        <div className="adm-toolbar">
+          <form className="adm-scanner" onSubmit={(event) => { void submitScan(event) }} role="search">
+            <span aria-hidden="true">▥</span>
+            <input
+              value={scan} onChange={(event) => setScan(event.target.value)} autoFocus inputMode="numeric"
+              placeholder="Escaneá o escribí el código de barras y presioná Enter" aria-label="Escáner de código de barras"
+            />
+            <button type="submit" className="secondary-button" disabled={scanning || !scan.trim()}>{scanning ? 'Buscando…' : 'Buscar'}</button>
+          </form>
+          <label className="catalog-search grow">
+            <span aria-hidden="true">⌕</span>
+            <input
+              type="search" placeholder="Buscar por nombre, marca, talla, color o código" aria-label="Buscar en inventario"
+              value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1) }}
+            />
+          </label>
+        </div>
+        {scanNotice && <Notice tone={scanNotice.tone}>{scanNotice.text}</Notice>}
+
+        <nav className="catalog-tabs" aria-label="Filtro de existencias">
+          {filters.map((item) => (
+            <button key={item.value} type="button" className={filter === item.value ? 'active' : undefined} aria-pressed={filter === item.value} onClick={() => chooseFilter(item.value)}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {list.error && <LoadError message={list.error} onRetry={list.reload} />}
+
+        <div className="table-scroll">
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th>Producto</th><th>Talla</th><th>Color</th><th>Código</th><th className="numeric">Precio</th>
+                {canCost && <th className="numeric">Costo</th>}
+                <th className="numeric">Existencia</th>
+                {canCost && <th className="numeric">Valor al costo</th>}
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.loading && rows.length === 0 && <tr><td colSpan={9}><Spinner label="Cargando inventario…" /></td></tr>}
+              {!list.loading && !list.error && rows.length === 0 && <tr><td colSpan={9} className="adm-empty">No hay variantes con estos filtros.</td></tr>}
+              {rows.map((row) => (
+                <tr
+                  key={row.variantId}
+                  className={row.stock < 0 ? 'clickable neg-row' : 'clickable'}
+                  tabIndex={0}
+                  onClick={() => setSelected({ ...row })}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected({ ...row }) } }}
+                  aria-label={`${row.productName} talla ${row.sizeName} ${row.colorName}, existencia ${row.stock}`}
+                >
+                  <td><span className="row-title">{row.productName}</span><small className="row-sub">{row.categoryName}</small></td>
+                  <td>{row.sizeName}</td>
+                  <td>{row.colorName}</td>
+                  <td className="adm-mono">{row.barcode}</td>
+                  <td className="numeric">{formatNio(row.price)}</td>
+                  {canCost && <td className="numeric">{row.cost == null ? '—' : formatNio(row.cost)}</td>}
+                  <td className={row.stock < 0 ? 'numeric adm-neg' : 'numeric'}><strong>{row.stock}</strong></td>
+                  {canCost && <td className="numeric">{row.stockValue == null ? '—' : formatNio(row.stockValue)}</td>}
+                  <td>
+                    {row.stock < 0 ? <Tag tone="danger">Requiere revisión</Tag>
+                      : row.stock === 0 ? <Tag tone="danger">Agotado</Tag>
+                        : row.stock <= lowThreshold ? <Tag tone="warn">Bajo stock</Tag> : <Tag tone="ok">Disponible</Tag>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {list.data && <Pagination page={list.data.page} totalPages={list.data.totalPages} totalCount={list.data.totalCount} onPage={setPage} noun="variantes" />}
+      </section>
+
+      {selected && (
+        <VariantPanel
+          key={selected.variantId} user={user} variant={selected} lowThreshold={lowThreshold}
+          onClose={() => setSelected(null)} onChanged={refreshAll}
+        />
+      )}
     </main>
   )
 }

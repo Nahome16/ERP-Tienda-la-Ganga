@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using LaGanga.Api.Catalog;
+using System.Text.Json.Serialization;
 using LaGanga.Api.Identity;
+using LaGanga.Api.Mvp;
 using LaGanga.Api.Users;
 using LaGanga.Application;
 using LaGanga.Application.Identity;
@@ -11,6 +13,7 @@ using LaGanga.Infrastructure.Catalog;
 using LaGanga.Infrastructure.Identity;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +26,15 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHealthChecks();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    // La API solo recibe tráfico a través del proxy inverso (Caddy), no directamente.
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddRateLimiter(options =>
 {
@@ -101,6 +113,13 @@ var authorization = builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AuthConstants.InventoryCostPolicy, policy =>
         policy.RequireClaim(AuthConstants.PermissionClaim, PermissionNames.InventoryCostRead));
 
+authorization.AddPolicy(MvpPolicies.SettingsRead, policy => policy.RequireAssertion(context =>
+    HasAnyPermission(context.User, PermissionNames.SaleCreate, PermissionNames.SettingsManage)));
+authorization.AddPolicy(MvpPolicies.CashView, policy => policy.RequireAssertion(context =>
+    HasAnyPermission(context.User, PermissionNames.CashOperate, PermissionNames.CashReportRead)));
+authorization.AddPolicy(MvpPolicies.SaleView, policy => policy.RequireAssertion(context =>
+    HasAnyPermission(context.User, PermissionNames.SaleCreate, PermissionNames.SaleRead, PermissionNames.CashReportRead)));
+
 // Una política por permiso, con el mismo nombre: RequireAuthorization("catalog.read").
 foreach (var permission in PermissionNames.All)
 {
@@ -109,6 +128,12 @@ foreach (var permission in PermissionNames.All)
 }
 
 var app = builder.Build();
+
+if (app.Configuration.GetValue("Database:AutoMigrate", false))
+{
+    // Despliegue: aplica migraciones y sincroniza roles y permisos al arrancar.
+    await SynchronizeRolesAsync(app.Services);
+}
 
 if (args.Contains("--bootstrap-admin", StringComparer.OrdinalIgnoreCase))
 {
@@ -129,6 +154,7 @@ if (args.Contains("--seed-catalogs", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -142,8 +168,12 @@ app.MapHealthChecks("/health");
 app.MapAuthenticationEndpoints();
 app.MapCatalogEndpoints();
 app.MapUserEndpoints();
+app.MapMvpEndpoints();
 
 app.Run();
+
+static bool HasAnyPermission(ClaimsPrincipal user, params string[] permissions) =>
+    permissions.Any(permission => user.HasClaim(AuthConstants.PermissionClaim, permission));
 
 static async Task BootstrapAdministratorAsync(IServiceProvider services)
 {

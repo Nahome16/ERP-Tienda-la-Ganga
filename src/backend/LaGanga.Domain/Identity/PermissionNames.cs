@@ -17,6 +17,14 @@ public static class PermissionNames
     public const string InventoryAdjust = "inventory.adjust";
     public const string InventoryAdjustAuthorize = "inventory.adjust.authorize";
     public const string UserManage = "user.manage";
+    public const string SaleCreate = "sale.create";
+    public const string SaleRead = "sale.read";
+    public const string SaleVoid = "sale.void";
+    public const string SaleDiscountUnlimited = "sale.discount.unlimited";
+    public const string CashOperate = "cash.operate";
+    public const string CashReportRead = "cash.report.read";
+    public const string SettingsManage = "settings.manage";
+    public const string AuditRead = "audit.read";
 
     public static IReadOnlyCollection<string> All { get; } =
     [
@@ -35,5 +43,13 @@ public static class PermissionNames
         InventoryAdjust,
         InventoryAdjustAuthorize,
         UserManage,
+        SaleCreate,
+        SaleRead,
+        SaleVoid,
+        SaleDiscountUnlimited,
+        CashOperate,
+        CashReportRead,
+        SettingsManage,
+        AuditRead,
     ];
 }

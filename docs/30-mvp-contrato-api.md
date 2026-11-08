@@ -208,7 +208,8 @@ Reglas del servidor (no confía en totales del cliente):
 3. Pagos < total → 422 `payment_insufficient`. El cambio solo sale del efectivo
    y se entrega en córdobas; si no hay efectivo y sobra pago → 422
    `payment_exceeds_total`.
-4. Variante inexistente/inactiva → 422 `variant_not_found`.
+4. Variante inexistente → 422 `variant_not_found`. Una variante **inactiva**
+   se acepta y la venta queda para revisión.
 5. La venta **siempre se acepta** si es válida (la prenda ya se entregó):
    - stock insuficiente → se acepta, el saldo puede quedar negativo y la venta
      queda `requiresReview = true` con nota;
@@ -261,9 +262,10 @@ type Sale = {
 
 `POST /pos/discount-approvals` — `sale.create`, con límite de intentos:
 `{ username, password }` → `{ approvalId, approverName, expiresAtUtc }`
-(vigente 15 min, un solo uso). El aprobador debe tener
-`sale.discount.unlimited`; si no, 403 `approver_not_allowed`; credenciales
-malas, 401 `invalid_credentials`. **Solo con conexión.**
+(vigente 15 min, un solo uso; la vigencia se compara con la hora de la venta).
+El aprobador debe tener `sale.discount.unlimited`; si no, 403
+`approver_not_allowed`; credenciales malas, **422** `invalid_credentials`
+(no se usa 401 para no confundirlo con una sesión vencida). **Solo con conexión.**
 
 `GET /cash/sessions/{id}/sales` — dueño o `cash.report.read`: `Sale[]`.
 

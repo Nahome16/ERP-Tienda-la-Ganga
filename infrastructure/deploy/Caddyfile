@@ -1,0 +1,70 @@
+# La Ganga ERP - servidor web (Caddy).
+#  - Sirve la aplicación web (PWA) desde /srv.
+#  - Reenvía /api/* y /health a la API (contenedor "api", puerto 8080).
+#  - Obtiene y renueva solo el certificado HTTPS de Let's Encrypt para {$DOMINIO}.
+#  - Redirige http -> https automáticamente.
+# Las variables DOMINIO y ACME_EMAIL llegan desde compose.prod.yml (archivo .env).
+{
+	# Correo para avisos de Let's Encrypt (vencimientos, problemas).
+	email {$ACME_EMAIL}
+}
+
+{$DOMINIO} {
+	# Compresión de respuestas (la web carga más rápido en celular).
+	encode zstd gzip
+
+	# ---- Cabeceras de seguridad (aplican a todas las respuestas) ----
+	header {
+		# Obliga a usar HTTPS durante 1 año.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		# Nadie puede incrustar el sistema dentro de otra página.
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# La cámara queda disponible solo para este sitio (escáner por cámara a futuro).
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"
+		# Solo se ejecuta código y se cargan recursos de este mismo dominio.
+		# 'unsafe-inline' solo en estilos porque React usa estilos en línea.
+		# Si una función nueva (p. ej. una fuente externa) queda bloqueada, el
+		# navegador lo indica en la consola con "Content-Security-Policy".
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	# ---- API: nunca se guarda en caché ----
+	# Caddy envía solo a la API las cabeceras X-Forwarded-For (IP real del
+	# cliente), X-Forwarded-Proto (https) y X-Forwarded-Host. La API las lee con
+	# ForwardedHeaders; no hay que configurar nada más aquí.
+	handle /api/* {
+		header ?Cache-Control "no-store"
+		reverse_proxy api:8080
+	}
+
+	handle /health {
+		header ?Cache-Control "no-store"
+		reverse_proxy api:8080
+	}
+
+	# ---- Archivos con huella (hash) en el nombre: caché de 1 año ----
+	# Si el archivo no existe responde 404 (nunca index.html) y sin caché.
+	handle /assets/* {
+		root * /srv
+		@existe file
+		@falta not file
+		header @existe Cache-Control "public, max-age=31536000, immutable"
+		header @falta Cache-Control "no-store"
+		file_server
+	}
+
+	# ---- Todo lo demás: index.html, sw.js, manifest, íconos, rutas de la app ----
+	# "no-cache" = el navegador siempre pregunta si hay versión nueva (rápido,
+	# responde 304 si no cambió). Es lo que permite que la PWA se actualice y
+	# que el service worker (sw.js) nunca quede viejo.
+	handle {
+		root * /srv
+		header Cache-Control "no-cache"
+		# Rutas de la app (p. ej. /ventas) devuelven index.html.
+		try_files {path} /index.html
+		file_server
+	}
+}
