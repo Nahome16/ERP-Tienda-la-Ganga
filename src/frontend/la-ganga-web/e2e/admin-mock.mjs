@@ -34,7 +34,12 @@ export function createMock(options = {}) {
   }
   const sizeName = (id) => s.sizes.find((x) => x.id === id)?.name ?? '?'
   const colorOf = (id) => s.colors.find((x) => x.id === id)
-  const barcodeFor = () => { s.nextId += 1; return `20000000${String(s.nextId).padStart(4, '0')}`.slice(0, 12) + '0' }
+  const barcodeFor = () => {
+    s.nextId += 1
+    const body = `20000000${String(s.nextId).padStart(4, '0')}`
+    const sum = [...body].reduce((a, d, i) => a + Number(d) * (i % 2 === 0 ? 1 : 3), 0)
+    return body + String((10 - (sum % 10)) % 10)
+  }
 
   function addProduct(name, categoryId, brandId, cutId, basePrice, variants, id) {
     const product = { id: id ?? `p${++s.nextId}`, name, categoryId, brandId, cutId, basePrice, isActive: true, version: 1 }

@@ -156,8 +156,9 @@
 .pv-channel button, .pv-toggle button { min-height: 40px; border: 1px solid var(--line, #dfcfb6); border-radius: 9px; background: #fff; font-weight: 700; }
 .pv-channel button.is-active, .pv-toggle button.is-active { color: #fff; border-color: var(--teal, #0c555b); background: var(--teal, #0c555b); }
 .pv-discount { margin: 10px 0 4px; }
-.pv-discount-row { display: grid; grid-template-columns: auto 96px 1fr; align-items: center; gap: 10px; }
+.pv-discount-row { display: grid; grid-template-columns: auto 96px minmax(0, 1fr); align-items: center; gap: 10px; }
 .pv-discount-row > span { font-weight: 800; font-size: .92rem; }
+.pv-page .pv-discount-row input { width: 100%; min-width: 0; text-align: right; font-weight: 800; }
 .pv-totals { margin: 10px 0 12px; }
 .pv-totals div { display: flex; justify-content: space-between; margin: 4px 0; font-size: .98rem; }
 .pv-totals dt, .pv-totals dd { margin: 0; }

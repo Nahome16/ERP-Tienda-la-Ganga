@@ -182,6 +182,7 @@ try {
     await page.locator('#pv-scan-input').press('Enter') // Enter con el campo vacío = cobrar
     await page.getByRole('dialog', { name: 'Cobrar' }).waitFor()
     await page.getByRole('button', { name: 'Exacto' }).click()
+    await shot('pay')
     await page.getByRole('button', { name: /Confirmar cobro/ }).click()
     await page.getByTestId('sale-done').waitFor()
   }
@@ -226,7 +227,7 @@ try {
   // Descuento sobre el límite sin conexión: bloqueado
   await page.getByLabel('Porcentaje de descuento').fill('30')
   check('Descuento > límite sin conexión se bloquea', await page.getByText(/Sin conexión: un descuento mayor a 10%/).isVisible()
-    && await page.getByRole('button', { name: /^Cobrar/ }).first().isDisabled())
+    && await page.locator('.pv-charge').isDisabled())
   await page.getByLabel('Porcentaje de descuento').fill('5')
   await payExactAndFinish()
   check('Venta sin conexión guardada en el equipo', await page.getByTestId('sale-done').innerText().then((t) => /Guardada en este equipo/.test(t) && /#[0-9A-F]{6}/.test(t)))
@@ -237,8 +238,9 @@ try {
 
   // Stock mostrado descuenta lo pendiente: Jean 32 tenía 8, se vendió 2 -> 6
   await page.locator('#pv-scan-input').fill('jean')
-  await page.getByRole('button', { name: /^Jean Slim/ }).first().click()
-  check('Stock = instantánea − pendientes (6)', await page.getByLabel(/Jean Slim · Negro · 32, quedan 6/).count() === 1)
+  await page.locator('.pv-product').first().click()
+  const labels = await page.locator('.pv-size').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('aria-label')))
+  check('Stock = instantánea − pendientes (6)', labels.some((l) => /Jean Slim · Negro · 32, quedan 6/.test(l ?? '')), JSON.stringify(labels))
   await page.locator('#pv-scan-input').fill('')
 
   // 4) Recargar sin red: abre desde el service worker y entra con el usuario guardado
@@ -279,6 +281,7 @@ try {
   // 7) Ventas de esta caja
   await page.getByRole('button', { name: 'Ventas de esta caja' }).click()
   const salesText = await page.getByRole('dialog').innerText()
+  await shot('07-ventas-caja')
   check('Lista de ventas con números oficiales y estado Enviada', /V-000003/.test(salesText) && (salesText.match(/Enviada/g) ?? []).length >= 3)
   await page.getByRole('button', { name: 'Recibo' }).first().click()
   await page.waitForTimeout(300)
@@ -286,6 +289,7 @@ try {
   await page.keyboard.press('Escape')
 
   // 8) Cierre de caja con arqueo
+  await shot('06-sales')
   await page.getByRole('button', { name: 'Cerrar caja' }).click()
   await page.getByLabel('Cantidad de billetes o monedas de 1000 córdobas').fill('2')
   await page.getByRole('button', { name: 'Cerrar caja' }).last().click()

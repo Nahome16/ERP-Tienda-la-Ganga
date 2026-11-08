@@ -66,8 +66,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      # La API está detrás de Caddy: confiar en X-Forwarded-For / X-Forwarded-Proto.
-      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-la_ganga};Username=${POSTGRES_USER:-la_ganga};Password=${POSTGRES_PASSWORD}"
       # Aplica migraciones, sincroniza roles y crea las 2 cajas al arrancar.
       Database__AutoMigrate: "true"
