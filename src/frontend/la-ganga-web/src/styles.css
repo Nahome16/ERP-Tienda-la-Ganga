@@ -305,3 +305,34 @@ td:last-child, th:last-child { text-align: right; font-weight: 800; }
   .catalog-dialog-backdrop { align-items: end; padding: 0; }
   .catalog-dialog { width: 100%; border-radius: 16px 16px 0 0; }
 }
+
+/* Equipo (datos reales) */
+.team-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, .8fr); gap: 16px; align-items: start; }
+.team-section-title { margin: 0 0 10px; font-size: .95rem; }
+.team-list { margin: 0; padding: 0; list-style: none; }
+.team-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid #efe4d3; }
+.team-list li.inactive { opacity: .62; }
+.team-avatar { width: 40px; height: 40px; flex: 0 0 40px; color: #fff; background: var(--teal); font-size: .8rem; }
+.team-person { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.team-person strong { display: flex; align-items: center; gap: 6px; font-size: .88rem; }
+.team-person small { color: var(--muted); font-size: .72rem; overflow-wrap: anywhere; }
+.team-you { padding: 1px 7px; color: #76501f; border-radius: 999px; background: var(--orange-soft); font-size: .62rem; font-weight: 800; }
+.team-roles { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.team-role { padding: 2px 9px; color: var(--teal-dark); border-radius: 999px; background: var(--teal-soft); font-size: .68rem; font-weight: 800; }
+.team-actions { display: flex; flex-direction: column; align-items: flex-end; }
+.team-role-detail { padding: 10px 0; border-top: 1px solid #efe4d3; }
+.team-role-detail summary { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; cursor: pointer; font-size: .85rem; }
+.team-role-detail summary small { color: var(--muted); font-size: .7rem; }
+.team-role-detail ul { margin: 6px 0 0; padding-left: 18px; color: #4c5352; font-size: .76rem; line-height: 1.7; }
+.role-options { margin: 0; padding: 0; border: 0; }
+.role-options legend { margin-bottom: 6px; color: #5e4b39; font-size: .72rem; font-weight: 800; }
+.role-option { display: flex; align-items: flex-start; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
+.role-option + .role-option { margin-top: 6px; }
+.role-option input { margin-top: 3px; accent-color: var(--teal); }
+.role-option span { display: grid; gap: 2px; }
+.role-option strong { font-size: .82rem; }
+.role-option small { color: var(--muted); font-size: .72rem; }
+
+@media (max-width: 900px) {
+  .team-layout { grid-template-columns: 1fr; }
+}

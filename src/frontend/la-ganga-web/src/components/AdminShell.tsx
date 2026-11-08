@@ -3,6 +3,7 @@ import type { ApiState, AppView, CurrentUser } from '../types'
 
 type AdminShellProps = PropsWithChildren<{
   activeView: AppView
+  allowedViews: AppView[]
   api: ApiState
   user: CurrentUser
   onNavigate: (view: AppView) => void
@@ -37,11 +38,11 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toLocaleUpperCase('es') || 'LG'
 }
 
-export function AdminShell({ activeView, api, user, onNavigate, onLogout, children }: AdminShellProps) {
+export function AdminShell({ activeView, allowedViews, api, user, onNavigate, onLogout, children }: AdminShellProps) {
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <button className="sidebar-brand" type="button" onClick={() => onNavigate('panel')}>
+        <button className="sidebar-brand" type="button" onClick={() => onNavigate(allowedViews.includes('panel') ? 'panel' : allowedViews[0])}>
           <img src="/logo-tienda-la-ganga.png" alt="" />
           <span>
             <strong>Tienda La Ganga</strong>
@@ -50,7 +51,7 @@ export function AdminShell({ activeView, api, user, onNavigate, onLogout, childr
         </button>
 
         <nav className="admin-nav" aria-label="Módulos administrativos">
-          {navigation.map((item) => (
+          {navigation.filter((item) => allowedViews.includes(item.view)).map((item) => (
             <button
               className={activeView === item.view ? 'admin-nav-item active' : 'admin-nav-item'}
               key={item.view}
@@ -77,7 +78,7 @@ export function AdminShell({ activeView, api, user, onNavigate, onLogout, childr
         <div className={`preview-ribbon ${api.kind}`}>
           <span className="connection-dot" />
           <ConnectionLabel api={api} />
-          <strong>{activeView === 'catalogos' ? 'Datos reales · base de datos' : 'Vista previa · datos simulados'}</strong>
+          <strong>{activeView === 'catalogos' || activeView === 'equipo' ? 'Datos reales · base de datos' : 'Vista previa · datos simulados'}</strong>
         </div>
         {children}
       </div>

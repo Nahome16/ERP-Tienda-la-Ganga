@@ -25,4 +25,7 @@ public sealed class Role
 
     public void AddPermission(PermissionGrant permission) =>
         _permissions.Add(new RolePermissionGrant(Id, permission.Id));
+
+    public bool HasPermission(Guid permissionId) =>
+        _permissions.Exists(grant => grant.PermissionId == permissionId);
 }

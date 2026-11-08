@@ -1,6 +1,6 @@
 # Módulo 1 — Decisiones y backlog técnico
 
-Estado del documento: **En implementación** — Hitos 1, 2 (parcial) y 3 construidos  
+Estado del documento: **En implementación** — Hitos 1, 2 y 3 construidos  
 Objetivo: separar decisiones bloqueantes de decisiones aplazables y ordenar la
 implementación en entregas pequeñas, comprobables y reversibles.
 
@@ -10,9 +10,20 @@ implementación en entregas pequeñas, comprobables y reversibles.
 |---|---|---|
 | 0 — Decisiones | Resuelto para catálogos | Se parte de esta base (sin ZIP). Se aplican los valores recomendados de la sección 2 |
 | 1 — Base técnica | Terminado | Incluye integración continua en GitHub Actions |
-| 2 — Acceso y permisos | Parcial | Falta: roles Vendedor/Encargado de inventario, renovación de sesión y pruebas de revocación |
+| 2 — Acceso y permisos | Terminado | Roles Administrador, Vendedor y Encargado de inventario; pantalla **Equipo**; desactivar o cambiar contraseña revoca sesiones |
 | 3 — Catálogos | Terminado | API `/api/v1/catalog/*`, pantalla **Catálogos**, datos iniciales y pruebas contra PostgreSQL |
 | 4 — Borradores y variantes | Siguiente | Incluye código de barras único por variante |
+
+Decisiones aplicadas en el Hito 2:
+
+- Permisos por rol según la matriz del Módulo 0. Lo marcado «Limitado» para el
+  encargado de inventario (costos, autorizar ajustes) queda sin conceder hasta
+  definir sus límites. Descuentos, caja y abonos se agregarán con sus módulos.
+- Nuevo permiso `user.manage` para administrar cuentas, solo del Administrador.
+- Nadie puede desactivarse ni quitarse el rol Administrador a sí mismo, y debe
+  quedar al menos un administrador activo.
+- La sesión no se renueva: dura como máximo 8 horas y se cierra tras 30 minutos
+  sin actividad, como estaba definido.
 
 Decisiones aplicadas en el Hito 3:
 

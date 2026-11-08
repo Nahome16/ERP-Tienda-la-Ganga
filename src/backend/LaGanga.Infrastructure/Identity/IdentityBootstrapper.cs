@@ -8,6 +8,7 @@ namespace LaGanga.Infrastructure.Identity;
 public sealed class IdentityBootstrapper(
     LaGangaDbContext dbContext,
     IPasswordService passwordService,
+    RoleSynchronizer roleSynchronizer,
     TimeProvider timeProvider)
 {
     public async Task<bool> CreateInitialAdministratorAsync(
@@ -21,23 +22,13 @@ public sealed class IdentityBootstrapper(
             return false;
         }
 
-        var now = timeProvider.GetUtcNow();
-        var user = new UserAccount(Guid.NewGuid(), username.Trim(), displayName.Trim(), now);
+        await roleSynchronizer.SynchronizeAsync(cancellationToken);
+        var administratorRole = await dbContext.Roles
+            .SingleAsync(role => role.Name == SystemRoles.Administrator, cancellationToken);
+
+        var user = new UserAccount(Guid.NewGuid(), username.Trim(), displayName.Trim(), timeProvider.GetUtcNow());
         user.SetPasswordHash(passwordService.HashPassword(user, password));
-
-        var permissions = PermissionNames.All
-            .Select(name => new PermissionGrant(Guid.NewGuid(), name))
-            .ToArray();
-        var administratorRole = new Role(Guid.NewGuid(), "Administrador");
-
-        foreach (var permission in permissions)
-        {
-            administratorRole.AddPermission(permission);
-        }
-
         user.AddRole(administratorRole);
-        dbContext.Permissions.AddRange(permissions);
-        dbContext.Roles.Add(administratorRole);
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;

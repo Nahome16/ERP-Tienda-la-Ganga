@@ -16,6 +16,7 @@ public static class PermissionNames
     public const string InventoryInitialConfirm = "inventory.initial.confirm";
     public const string InventoryAdjust = "inventory.adjust";
     public const string InventoryAdjustAuthorize = "inventory.adjust.authorize";
+    public const string UserManage = "user.manage";
 
     public static IReadOnlyCollection<string> All { get; } =
     [
@@ -33,5 +34,6 @@ public static class PermissionNames
         InventoryInitialConfirm,
         InventoryAdjust,
         InventoryAdjustAuthorize,
+        UserManage,
     ];
 }

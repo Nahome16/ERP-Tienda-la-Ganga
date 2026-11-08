@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using LaGanga.Api.Catalog;
 using LaGanga.Api.Identity;
+using LaGanga.Api.Users;
 using LaGanga.Application;
 using LaGanga.Application.Identity;
 using LaGanga.Domain.Identity;
@@ -32,7 +33,7 @@ builder.Services.AddRateLimiter(options =>
             _ => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
-                PermitLimit = 5,
+                PermitLimit = builder.Configuration.GetValue("Authentication:LoginAttemptsPerMinute", 5),
                 QueueLimit = 0,
                 Window = TimeSpan.FromMinutes(1),
             }));
@@ -115,8 +116,15 @@ if (args.Contains("--bootstrap-admin", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+if (args.Contains("--sync-roles", StringComparer.OrdinalIgnoreCase))
+{
+    await SynchronizeRolesAsync(app.Services);
+    return;
+}
+
 if (args.Contains("--seed-catalogs", StringComparer.OrdinalIgnoreCase))
 {
+    await SynchronizeRolesAsync(app.Services);
     await SeedCatalogsAsync(app.Services, null);
     return;
 }
@@ -133,6 +141,7 @@ app.MapGet("/api/health", () =>
 app.MapHealthChecks("/health");
 app.MapAuthenticationEndpoints();
 app.MapCatalogEndpoints();
+app.MapUserEndpoints();
 
 app.Run();
 
@@ -174,6 +183,18 @@ static async Task BootstrapAdministratorAsync(IServiceProvider services)
             .SingleAsync();
         await SeedCatalogsAsync(services, administratorId);
     }
+}
+
+static async Task SynchronizeRolesAsync(IServiceProvider services)
+{
+    await using var scope = services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<LaGangaDbContext>();
+    await dbContext.Database.MigrateAsync();
+    var synchronizer = scope.ServiceProvider.GetRequiredService<RoleSynchronizer>();
+    var changes = await synchronizer.SynchronizeAsync(CancellationToken.None);
+    Console.WriteLine(changes > 0
+        ? $"Roles and permissions synchronized: {changes} changes."
+        : "Roles and permissions were already up to date.");
 }
 
 static async Task SeedCatalogsAsync(IServiceProvider services, Guid? createdBy)

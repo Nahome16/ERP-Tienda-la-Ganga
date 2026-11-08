@@ -35,7 +35,7 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
     public const string ConnectionVariable = "LA_GANGA_TEST_CONNECTION";
     public const string AdminUsername = "admin.pruebas";
     public const string ReaderUsername = "lector.pruebas";
-    private const string Password = "Contrasena-de-prueba-2026";
+    public const string DefaultPassword = "Contrasena-de-prueba-2026";
 
     private string? _serverConnection;
     private string? _databaseName;
@@ -52,6 +52,10 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
     public string ReaderCsrf { get; private set; } = string.Empty;
 
     public HttpClient Anonymous { get; private set; } = null!;
+
+    /// <summary>Cliente nuevo con su propia cookie de sesión.</summary>
+    public HttpClient CreateClient() =>
+        (_factory ?? throw new InvalidOperationException("La API de pruebas no está disponible.")).CreateClient();
 
     public async Task InitializeAsync()
     {
@@ -74,14 +78,15 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:DefaultConnection", testConnection);
+            builder.UseSetting("Authentication:LoginAttemptsPerMinute", "100");
         });
 
         await PrepareDatabaseAsync(_factory.Services);
 
         Admin = _factory.CreateClient();
-        AdminCsrf = await ApiTestHelpers.LoginAsync(Admin, AdminUsername, Password);
+        AdminCsrf = await ApiTestHelpers.LoginAsync(Admin, AdminUsername, DefaultPassword);
         Reader = _factory.CreateClient();
-        ReaderCsrf = await ApiTestHelpers.LoginAsync(Reader, ReaderUsername, Password);
+        ReaderCsrf = await ApiTestHelpers.LoginAsync(Reader, ReaderUsername, DefaultPassword);
         Anonymous = _factory.CreateClient();
     }
 
@@ -121,7 +126,7 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
         await bootstrapper.CreateInitialAdministratorAsync(
             AdminUsername,
             "Administración de pruebas",
-            Password,
+            DefaultPassword,
             CancellationToken.None);
 
         var catalogRead = await dbContext.Permissions
@@ -129,7 +134,7 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
         var readerRole = new Role(Guid.NewGuid(), "Lector de catálogos");
         readerRole.AddPermission(catalogRead);
         var reader = new UserAccount(Guid.NewGuid(), ReaderUsername, "Lector de pruebas", DateTimeOffset.UtcNow);
-        reader.SetPasswordHash(provider.GetRequiredService<IPasswordService>().HashPassword(reader, Password));
+        reader.SetPasswordHash(provider.GetRequiredService<IPasswordService>().HashPassword(reader, DefaultPassword));
         reader.AddRole(readerRole);
         dbContext.Roles.Add(readerRole);
         dbContext.Users.Add(reader);
