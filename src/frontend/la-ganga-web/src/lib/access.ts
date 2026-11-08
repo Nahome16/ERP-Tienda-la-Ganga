@@ -3,35 +3,41 @@ import type { AppView, CurrentUser } from '../types'
 export const administratorRole = 'Administrador'
 export const sellerRole = 'Vendedor'
 
+/** Orden en que se ofrecen las pantallas en el menú. */
 export const allViews: AppView[] = [
-  'panel', 'pos', 'caja', 'inventario', 'productos', 'compras', 'clientes',
-  'promociones', 'sucursales', 'tienda', 'reportes', 'contabilidad', 'equipo',
-  'configuracion', 'catalogos',
+  'panel', 'pos', 'caja', 'ventas', 'productos', 'inventario', 'catalogos',
+  'equipo', 'configuracion', 'auditoria',
 ]
 
 /**
- * Pantallas del panel que se habilitan por permiso a quien no es
- * administrador. El servidor vuelve a comprobar cada permiso; esto solo
- * decide qué se muestra en el menú.
+ * Permisos que habilitan cada pantalla (basta uno de la lista). El servidor
+ * vuelve a comprobar cada permiso en la API; esto solo decide qué se muestra.
+ * El vendedor solo recibe el punto de venta: sus permisos de lectura no abren
+ * pantallas administrativas.
  */
-const viewPermissions: [AppView, string][] = [
-  ['inventario', 'inventory.adjust'],
-  ['productos', 'product.create'],
-  ['catalogos', 'catalog.manage'],
-  ['equipo', 'user.manage'],
-]
+const viewPermissions: Record<AppView, string[]> = {
+  panel: ['cash.report.read'],
+  pos: ['sale.create'],
+  caja: ['cash.report.read'],
+  ventas: ['sale.read'],
+  productos: ['product.create', 'product.edit'],
+  inventario: ['inventory.adjust', 'inventory.kardex.read'],
+  catalogos: ['catalog.manage'],
+  equipo: ['user.manage'],
+  configuracion: ['settings.manage'],
+  auditoria: ['audit.read'],
+}
+
+export function hasPermission(user: CurrentUser, permission: string) {
+  return user.permissions.includes(permission)
+}
 
 export function isAppView(value: string): value is AppView {
   return allViews.some((view) => view === value)
 }
 
 export function allowedViews(user: CurrentUser): AppView[] {
-  if (user.roles.includes(administratorRole)) return allViews
-  const views = viewPermissions
-    .filter(([, permission]) => user.permissions.includes(permission))
-    .map(([view]) => view)
-  if (user.roles.includes(sellerRole)) views.push('pos')
-  return views
+  return allViews.filter((view) => viewPermissions[view].some((permission) => hasPermission(user, permission)))
 }
 
 /** Pantallas con menú lateral (todo excepto el punto de venta). */
@@ -41,8 +47,8 @@ export function shellViews(user: CurrentUser) {
 
 /** Primera pantalla después de iniciar sesión, o null si la cuenta no tiene ninguna. */
 export function landingView(user: CurrentUser): AppView | null {
-  if (user.roles.includes(administratorRole)) return 'panel'
   const allowed = allowedViews(user)
+  if (allowed.includes('panel')) return 'panel'
   return allowed.find((view) => view !== 'pos') ?? (allowed.includes('pos') ? 'pos' : null)
 }
 

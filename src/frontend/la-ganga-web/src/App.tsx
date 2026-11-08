@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AdminShell } from './components/AdminShell'
-import { administratorRole, allowedViews, isAppView, landingView, resolveView, shellViews } from './lib/access'
+import { allowedViews, isAppView, landingView, resolveView, shellViews } from './lib/access'
 import type { ApiState, AppView, AuthState, CurrentUser, HealthStatus } from './types'
 import { CatalogsView } from './views/CatalogsView'
 import { DashboardView } from './views/DashboardView'
@@ -8,18 +8,11 @@ import { InventoryView } from './views/InventoryView'
 import { LoginView } from './views/LoginView'
 import { PosView } from './views/PosView'
 import { TeamView } from './views/TeamView'
-import {
-  AccountingView,
-  BranchesView,
-  CashView,
-  ClientsView,
-  OnlineStoreView,
-  ProductsView,
-  PromotionsView,
-  PurchasesView,
-  ReportsView,
-  SettingsView,
-} from './views/ReferenceViews'
+import { AuditView } from './views/AuditView'
+import { CashView } from './views/CashView'
+import { ProductsView } from './views/ProductsView'
+import { SalesView } from './views/SalesView'
+import { SettingsView } from './views/SettingsView'
 
 function viewFromHash(): AppView {
   const value = window.location.hash.replace('#', '')
@@ -60,24 +53,6 @@ function readCookie(name: string) {
   const prefix = `${encodeURIComponent(name)}=`
   const cookie = document.cookie.split('; ').find((item) => item.startsWith(prefix))
   return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-}
-
-function createPreviewUser(role: 'Administrador' | 'Vendedor'): CurrentUser {
-  return {
-    id: `preview-${role.toLocaleLowerCase('es')}`,
-    username: 'vista_previa',
-    displayName: role === administratorRole ? 'Administrador de muestra' : 'Vendedor de muestra',
-    roles: [role],
-    permissions: [],
-  }
-}
-
-function previewUserFromUrl() {
-  if (!import.meta.env.DEV) return null
-  const role = new URLSearchParams(window.location.search).get('preview')
-  if (role === 'admin') return createPreviewUser('Administrador')
-  if (role === 'vendedor') return createPreviewUser('Vendedor')
-  return null
 }
 
 function SessionLoader() {
@@ -127,8 +102,7 @@ function App() {
           signal: controller.signal,
         })
         if (response.status === 401) {
-          const previewUser = previewUserFromUrl()
-          setAuth(previewUser ? { kind: 'preview', user: previewUser } : { kind: 'unauthenticated' })
+          setAuth({ kind: 'unauthenticated' })
           return
         }
         if (!response.ok) throw new Error(`Estado HTTP inesperado: ${response.status}`)
@@ -140,8 +114,8 @@ function App() {
         window.history.replaceState(null, '', `#${nextView}`)
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return
-        const previewUser = previewUserFromUrl()
-        setAuth(previewUser ? { kind: 'preview', user: previewUser } : { kind: 'unauthenticated' })
+        // TODO(offline): si no hay red y existe un usuario guardado en el equipo, entrar en modo sin conexión.
+        setAuth({ kind: 'unauthenticated' })
       }
     }
 
@@ -152,7 +126,7 @@ function App() {
   useEffect(() => {
     function handleHashChange() {
       const requested = viewFromHash()
-      if (auth.kind === 'authenticated' || auth.kind === 'preview') {
+      if (auth.kind === 'authenticated') {
         const allowed = resolveView(auth.user, requested) ?? requested
         if (allowed !== requested) window.history.replaceState(null, '', `#${allowed}`)
         setView(allowed)
@@ -166,7 +140,7 @@ function App() {
   }, [auth])
 
   function navigate(nextView: AppView, user?: CurrentUser) {
-    const current = user ?? (auth.kind === 'authenticated' || auth.kind === 'preview' ? auth.user : null)
+    const current = user ?? (auth.kind === 'authenticated' ? auth.user : null)
     if (current && !allowedViews(current).includes(nextView)) return
     setView(nextView)
     window.history.replaceState(null, '', `#${nextView}`)
@@ -201,18 +175,7 @@ function App() {
     }
   }
 
-  function enterPreview(role: 'Administrador' | 'Vendedor') {
-    const user = createPreviewUser(role)
-    setAuth({ kind: 'preview', user })
-    navigate(landingView(user) ?? 'panel', user)
-  }
-
   async function logout() {
-    if (auth.kind === 'preview') {
-      setAuth({ kind: 'unauthenticated' })
-      navigate('panel')
-      return
-    }
     if (auth.kind !== 'authenticated') return
     const csrfToken = readCookie('la_ganga_csrf')
     if (!csrfToken) return
@@ -237,15 +200,14 @@ function App() {
         api={api}
         error={loginError}
         isSubmitting={isSubmitting}
-        previewEnabled={import.meta.env.DEV}
+        previewEnabled={false}
         onLogin={login}
-        onPreview={enterPreview}
+        onPreview={() => undefined}
       />
     )
   }
 
   const user = auth.user
-  const isAdministrator = user.roles.includes(administratorRole)
   const allowed = allowedViews(user)
   const panelViews = shellViews(user)
 
@@ -274,20 +236,15 @@ function App() {
 
   return (
     <AdminShell activeView={view} allowedViews={allowed} api={api} user={user} onNavigate={navigate} onLogout={() => { void logout() }}>
-      {view === 'panel' && isAdministrator && <DashboardView onNavigate={navigate} />}
-      {view === 'caja' && <CashView />}
-      {view === 'inventario' && <InventoryView />}
-      {view === 'productos' && <ProductsView />}
-      {view === 'compras' && <PurchasesView />}
-      {view === 'clientes' && <ClientsView />}
-      {view === 'promociones' && <PromotionsView />}
-      {view === 'sucursales' && <BranchesView />}
-      {view === 'tienda' && <OnlineStoreView />}
-      {view === 'reportes' && <ReportsView />}
-      {view === 'contabilidad' && <AccountingView />}
-      {view === 'equipo' && <TeamView currentUser={user} isPreview={auth.kind === 'preview'} />}
-      {view === 'configuracion' && <SettingsView onOpenCatalogs={() => navigate('catalogos')} />}
-      {view === 'catalogos' && <CatalogsView user={user} isPreview={auth.kind === 'preview'} />}
+      {view === 'panel' && <DashboardView user={user} onNavigate={navigate} />}
+      {view === 'caja' && <CashView user={user} />}
+      {view === 'ventas' && <SalesView user={user} />}
+      {view === 'productos' && <ProductsView user={user} />}
+      {view === 'inventario' && <InventoryView user={user} />}
+      {view === 'catalogos' && <CatalogsView user={user} isPreview={false} />}
+      {view === 'equipo' && <TeamView currentUser={user} isPreview={false} />}
+      {view === 'configuracion' && <SettingsView user={user} onOpenCatalogs={() => navigate('catalogos')} />}
+      {view === 'auditoria' && <AuditView user={user} />}
     </AdminShell>
   )
 }

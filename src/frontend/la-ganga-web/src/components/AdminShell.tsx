@@ -14,23 +14,18 @@ const navigation: { label: string; view: AppView; icon: string }[] = [
   { label: 'Panel', view: 'panel', icon: '▦' },
   { label: 'Punto de venta', view: 'pos', icon: '▤' },
   { label: 'Caja y cierres', view: 'caja', icon: '▣' },
-  { label: 'Inventario', view: 'inventario', icon: '⬡' },
+  { label: 'Ventas', view: 'ventas', icon: '▥' },
   { label: 'Productos', view: 'productos', icon: '♧' },
-  { label: 'Compras', view: 'compras', icon: '▥' },
-  { label: 'Clientes', view: 'clientes', icon: '◎' },
-  { label: 'Promociones', view: 'promociones', icon: '◇' },
-  { label: 'Sucursales', view: 'sucursales', icon: '▱' },
-  { label: 'Tienda en línea', view: 'tienda', icon: '⊙' },
-  { label: 'Reportes', view: 'reportes', icon: '⌁' },
-  { label: 'Contabilidad', view: 'contabilidad', icon: '▭' },
-  { label: 'Equipo', view: 'equipo', icon: '♙' },
+  { label: 'Inventario', view: 'inventario', icon: '⬡' },
   { label: 'Catálogos', view: 'catalogos', icon: '☰' },
+  { label: 'Equipo', view: 'equipo', icon: '♙' },
   { label: 'Configuración', view: 'configuracion', icon: '☷' },
+  { label: 'Auditoría', view: 'auditoria', icon: '⌕' },
 ]
 
 function ConnectionLabel({ api }: { api: ApiState }) {
   if (api.kind === 'loading') return <>Comprobando API</>
-  if (api.kind === 'offline') return <>Modo de vista previa</>
+  if (api.kind === 'offline') return <>Sin conexión con el servidor</>
   return <>API conectada</>
 }
 
@@ -78,7 +73,7 @@ export function AdminShell({ activeView, allowedViews, api, user, onNavigate, on
         <div className={`preview-ribbon ${api.kind}`}>
           <span className="connection-dot" />
           <ConnectionLabel api={api} />
-          <strong>{activeView === 'catalogos' || activeView === 'equipo' ? 'Datos reales · base de datos' : 'Vista previa · datos simulados'}</strong>
+          <strong>Datos reales · base de datos</strong>
         </div>
         {children}
       </div>
