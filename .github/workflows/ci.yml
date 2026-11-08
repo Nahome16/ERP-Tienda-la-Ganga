@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      migration_name:
+        description: "Nombre de una migración EF a generar (opcional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (.NET 8 + PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: la_ganga_test
+          POSTGRES_USER: la_ganga
+          POSTGRES_PASSWORD: la_ganga_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U la_ganga -d la_ganga_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      LA_GANGA_TEST_CONNECTION: Host=localhost;Port=5432;Database=la_ganga_test;Username=la_ganga;Password=la_ganga_ci_password
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=la_ganga_test;Username=la_ganga;Password=la_ganga_ci_password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restaurar herramientas y paquetes
+        run: |
+          dotnet tool restore
+          dotnet restore LaGanga.sln
+      - name: Generar migración solicitada
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_name != '' }}
+        run: |
+          dotnet ef migrations add "${{ inputs.migration_name }}" \
+            --project src/backend/LaGanga.Infrastructure \
+            --startup-project src/backend/LaGanga.Api \
+            --output-dir Persistence/Migrations
+      - name: Publicar migración generada
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_name != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration
+          path: src/backend/LaGanga.Infrastructure/Persistence/Migrations/
+      - name: Compilar
+        run: dotnet build LaGanga.sln --no-restore --configuration Release
+      - name: Verificar que no falten migraciones
+        run: |
+          dotnet ef migrations has-pending-model-changes \
+            --project src/backend/LaGanga.Infrastructure \
+            --startup-project src/backend/LaGanga.Api \
+            --configuration Release --no-build
+      - name: Aplicar migraciones a una base vacía
+        run: |
+          dotnet ef database update \
+            --project src/backend/LaGanga.Infrastructure \
+            --startup-project src/backend/LaGanga.Api \
+            --configuration Release --no-build
+      - name: Pruebas
+        run: dotnet test LaGanga.sln --no-build --configuration Release --logger "console;verbosity=normal"
+
+  frontend:
+    name: Frontend (React + TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend/la-ganga-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/frontend/la-ganga-web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
