@@ -16,24 +16,27 @@ principal tendrá estos módulos:
 
 | Módulo visible | Responsabilidad dentro del sistema |
 |---|---|
-| Ventas | Resumen comercial, indicadores, devoluciones y operaciones que requieren seguimiento |
 | Punto de venta | Acceso al mismo flujo de cobro utilizado por el vendedor |
-| Caja | Aperturas, cierres, ingresos, egresos, dinero esperado y diferencias |
-| Historial de ventas | Búsqueda de comprobantes, detalle, reimpresión, anulaciones y devoluciones autorizadas |
-| Delivery | Entregas, asignaciones, motorizados, rutas, montos por cobrar y comprobantes |
-| Pedidos | Pedidos de tienda y canales digitales, estados de preparación, pago y entrega |
-| Clientes | CRM, contactos, direcciones, compras, preferencias, abonos y saldos |
+| Caja y cierres | Aperturas, cierres, ingresos, egresos, dinero esperado y diferencias |
+| Inventario | Existencias, movimientos, Kardex, conteos, ajustes y traslados autorizados |
+| Productos | Prendas, variantes, fotografías, precios, etiquetas y códigos de barras |
 | Compras | Proveedores, recepción de mercadería, costos y cuentas por pagar habilitadas |
-| Inventario | Productos, variantes, imágenes, existencias, movimientos, Kardex, ajustes y catálogos relacionados |
+| Clientes | CRM, contactos, direcciones, compras, preferencias, abonos y saldos |
+| Promociones | Borradores y reglas comerciales confirmadas para descuentos y campañas |
+| Sucursales | Ubicaciones y traslados; inicia únicamente con Tienda Managua |
+| Tienda en línea | Catálogo, pedidos digitales, preparación, delivery y entrega |
+| Reportes | Ventas, historial de comprobantes, tallas, colores, rotación y cierres |
+| Contabilidad | Resumen informativo; contabilidad formal y reglas fiscales son alcance adicional |
+| Equipo | Usuarios, roles, permisos y, si se aprueban, metas o comisiones |
+| Configuración | Identidad de la tienda, catálogos, parámetros, auditoría y respaldos |
 
-Para conservar esta navegación, productos, tallas, colores, marcas, categorías y
-cortes se administrarán dentro de **Inventario**. Usuarios, permisos,
-configuración y respaldos podrán ubicarse en un menú administrativo secundario,
-sin competir con los módulos operativos principales.
+Productos e Inventario comparten la misma estructura de variantes, pero se
+presentan como entradas separadas para distinguir la ficha comercial de la
+operación diaria de existencias. Historial de ventas se ubica dentro de
+**Reportes**; Pedidos y Delivery se organizan dentro de **Tienda en línea**.
 
-La apariencia definitiva del panel queda pendiente de la referencia visual que
-proporcionará la propietaria. La visualización actual no se considera diseño
-aprobado.
+La dirección visual quedó confirmada el 8 de noviembre de 2026: menú verde
+petróleo, fondo crema, tarjetas claras y naranja para acciones principales.
 
 ## 3. Experiencia del vendedor
 

@@ -23,15 +23,23 @@ cargarse como información real de la tienda.
 El menú principal contiene, en este orden:
 
 1. Panel.
-2. Ventas.
-3. Punto de venta.
-4. Caja.
-5. Historial de ventas.
-6. Delivery.
-7. Pedidos.
-8. Clientes.
-9. Compras.
-10. Inventario.
+2. Punto de venta.
+3. Caja y cierres.
+4. Inventario.
+5. Productos.
+6. Compras.
+7. Clientes.
+8. Promociones.
+9. Sucursales.
+10. Tienda en línea.
+11. Reportes.
+12. Contabilidad.
+13. Equipo.
+14. Configuración.
+
+Esta estructura no elimina requisitos anteriores: Historial de ventas queda
+dentro de Reportes; Pedidos y Delivery se gestionan dentro de Tienda en línea;
+Ventas se resume en Panel y se consulta en Reportes.
 
 El rol vendedor tendrá acceso directo al punto de venta y únicamente a las
 acciones autorizadas para cobrar, consultar disponibilidad y seleccionar un
@@ -91,3 +99,27 @@ bodegas, casas ni sucursales hasta confirmarlas.
 - El prototipo no confirma ventas, no persiste cambios y no altera inventario.
 - La conexión real de autenticación, permisos, productos, inventario y ventas se
   realizará por módulos sobre la API.
+
+## Vistas adicionales adaptadas
+
+Las referencias posteriores ampliaron el prototipo con Caja y cierres,
+Productos, Compras, Clientes, Promociones, Sucursales, Tienda en línea, Reportes,
+Contabilidad, Equipo y Configuración. Las pantallas comparten el mismo sistema
+visual y son navegables, pero todavía no confirman operaciones ni persisten
+información comercial.
+
+![Acceso por roles](visualizations/login-por-roles-v1.png)
+
+![Punto de venta para el rol vendedor](visualizations/pos-rol-vendedor-v1.png)
+
+![Caja y cierres](visualizations/caja-y-cierres-v1.png)
+
+![Clientes y CRM](visualizations/clientes-crm-v1.png)
+
+![Productos y variantes](visualizations/productos-variantes-v1.png)
+
+![Reportes](visualizations/reportes-v1.png)
+
+Las siguientes reglas visibles en las referencias continúan pendientes y no se
+consideran aprobadas: IVA, puntos y fidelización, comisiones, promociones,
+crédito, proveedores reales, varias sucursales y métodos de pago definitivos.

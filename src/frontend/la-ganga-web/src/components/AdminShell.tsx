@@ -1,23 +1,29 @@
 import type { PropsWithChildren } from 'react'
-import type { ApiState, AppView } from '../types'
+import type { ApiState, AppView, CurrentUser } from '../types'
 
 type AdminShellProps = PropsWithChildren<{
   activeView: AppView
   api: ApiState
+  user: CurrentUser
   onNavigate: (view: AppView) => void
+  onLogout: () => void
 }>
 
 const navigation: { label: string; view: AppView; icon: string }[] = [
   { label: 'Panel', view: 'panel', icon: '▦' },
-  { label: 'Ventas', view: 'ventas', icon: '◫' },
   { label: 'Punto de venta', view: 'pos', icon: '▤' },
-  { label: 'Caja', view: 'caja', icon: '▣' },
-  { label: 'Historial de ventas', view: 'historial', icon: '◷' },
-  { label: 'Delivery', view: 'delivery', icon: '◇' },
-  { label: 'Pedidos', view: 'pedidos', icon: '▱' },
-  { label: 'Clientes', view: 'clientes', icon: '◎' },
-  { label: 'Compras', view: 'compras', icon: '▥' },
+  { label: 'Caja y cierres', view: 'caja', icon: '▣' },
   { label: 'Inventario', view: 'inventario', icon: '⬡' },
+  { label: 'Productos', view: 'productos', icon: '♧' },
+  { label: 'Compras', view: 'compras', icon: '▥' },
+  { label: 'Clientes', view: 'clientes', icon: '◎' },
+  { label: 'Promociones', view: 'promociones', icon: '◇' },
+  { label: 'Sucursales', view: 'sucursales', icon: '▱' },
+  { label: 'Tienda en línea', view: 'tienda', icon: '⊙' },
+  { label: 'Reportes', view: 'reportes', icon: '⌁' },
+  { label: 'Contabilidad', view: 'contabilidad', icon: '▭' },
+  { label: 'Equipo', view: 'equipo', icon: '♙' },
+  { label: 'Configuración', view: 'configuracion', icon: '☷' },
 ]
 
 function ConnectionLabel({ api }: { api: ApiState }) {
@@ -26,7 +32,11 @@ function ConnectionLabel({ api }: { api: ApiState }) {
   return <>API conectada</>
 }
 
-export function AdminShell({ activeView, api, onNavigate, children }: AdminShellProps) {
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toLocaleUpperCase('es') || 'LG'
+}
+
+export function AdminShell({ activeView, api, user, onNavigate, onLogout, children }: AdminShellProps) {
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -53,11 +63,12 @@ export function AdminShell({ activeView, api, onNavigate, children }: AdminShell
         </nav>
 
         <div className="sidebar-account">
-          <span className="account-avatar">AD</span>
+          <span className="account-avatar">{initials(user.displayName)}</span>
           <span>
-            <strong>Administrador</strong>
-            <small>Acceso completo</small>
+            <strong>{user.displayName}</strong>
+            <small>{user.roles.join(' · ')}</small>
           </span>
+          <button type="button" onClick={onLogout} title="Cerrar sesión" aria-label="Cerrar sesión">↪</button>
         </div>
       </aside>
 

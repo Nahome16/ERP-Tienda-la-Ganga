@@ -1,10 +1,13 @@
 import { useMemo, useRef, useState } from 'react'
 import { demoCategories, demoProducts, formatCordobas, type DemoProduct, type StockCell } from '../demoData'
-import type { ApiState, AppView } from '../types'
+import type { ApiState, AppView, CurrentUser } from '../types'
 
 type PosViewProps = {
   api: ApiState
+  user: CurrentUser
+  canReturnToAdmin: boolean
   onNavigate: (view: AppView) => void
+  onLogout: () => void
 }
 
 type CartLine = {
@@ -31,7 +34,7 @@ function lineFrom(product: DemoProduct, stock: StockCell): CartLine {
   }
 }
 
-export function PosView({ api, onNavigate }: PosViewProps) {
+export function PosView({ api, user, canReturnToAdmin, onNavigate, onLogout }: PosViewProps) {
   const scannerRef = useRef<HTMLInputElement>(null)
   const [category, setCategory] = useState('Todo')
   const [selectedProductId, setSelectedProductId] = useState(demoProducts[0]?.id ?? '')
@@ -102,16 +105,17 @@ export function PosView({ api, onNavigate }: PosViewProps) {
     <main className="pos-page">
       <header className="pos-topbar">
         <div className="pos-title-group">
-          <button type="button" onClick={() => onNavigate('panel')} aria-label="Volver al panel">‹</button>
+          {canReturnToAdmin && <button type="button" onClick={() => onNavigate('panel')} aria-label="Volver al panel">‹</button>}
           <img src="/logo-tienda-la-ganga.png" alt="" />
           <div><span>Panel</span><h1>Punto de venta</h1></div>
-          <small>Caja 1 · Managua · Rol vendedor</small>
+          <small>Caja 1 · Managua · {user.displayName}</small>
         </div>
         <div className="pos-statuses">
           <span className={api.kind === 'ready' ? 'online' : 'offline'}>
             <i /> {api.kind === 'ready' ? 'En línea · sincronizado' : 'Vista previa · API sin conexión'}
           </span>
           <span>Turno de demostración</span>
+          <button className="pos-logout" type="button" onClick={onLogout}>Cerrar sesión</button>
         </div>
       </header>
 

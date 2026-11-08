@@ -152,7 +152,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <h2>Últimas ventas</h2>
             <p>Operaciones recientes de la tienda</p>
           </div>
-          <button className="text-button" type="button" onClick={() => onNavigate('historial')}>Abrir historial</button>
+          <button className="text-button" type="button" onClick={() => onNavigate('reportes')}>Abrir historial</button>
         </div>
         <div className="table-scroll">
           <table>
