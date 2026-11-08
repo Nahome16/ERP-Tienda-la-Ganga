@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AdminShell } from './components/AdminShell'
+import { administratorRole, allowedViews, isAppView, landingView, resolveView, shellViews } from './lib/access'
 import type { ApiState, AppView, AuthState, CurrentUser, HealthStatus } from './types'
 import { CatalogsView } from './views/CatalogsView'
 import { DashboardView } from './views/DashboardView'
 import { InventoryView } from './views/InventoryView'
 import { LoginView } from './views/LoginView'
 import { PosView } from './views/PosView'
+import { TeamView } from './views/TeamView'
 import {
   AccountingView,
   BranchesView,
@@ -17,20 +19,7 @@ import {
   PurchasesView,
   ReportsView,
   SettingsView,
-  TeamView,
 } from './views/ReferenceViews'
-
-const administratorRole = 'Administrador'
-const sellerRole = 'Vendedor'
-const knownViews: AppView[] = [
-  'panel', 'pos', 'caja', 'inventario', 'productos', 'compras', 'clientes',
-  'promociones', 'sucursales', 'tienda', 'reportes', 'contabilidad', 'equipo',
-  'configuracion', 'catalogos',
-]
-
-function isAppView(value: string): value is AppView {
-  return knownViews.some((view) => view === value)
-}
 
 function viewFromHash(): AppView {
   const value = window.location.hash.replace('#', '')
@@ -71,10 +60,6 @@ function readCookie(name: string) {
   const prefix = `${encodeURIComponent(name)}=`
   const cookie = document.cookie.split('; ').find((item) => item.startsWith(prefix))
   return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-}
-
-function preferredView(user: CurrentUser): AppView {
-  return user.roles.includes(administratorRole) ? 'panel' : 'pos'
 }
 
 function createPreviewUser(role: 'Administrador' | 'Vendedor'): CurrentUser {
@@ -150,8 +135,7 @@ function App() {
         const payload: unknown = await response.json()
         if (!isCurrentUser(payload)) throw new Error('Respuesta de sesión inválida')
         setAuth({ kind: 'authenticated', user: payload })
-        const requested = viewFromHash()
-        const nextView = payload.roles.includes(administratorRole) ? requested : preferredView(payload)
+        const nextView = resolveView(payload, viewFromHash()) ?? 'panel'
         setView(nextView)
         window.history.replaceState(null, '', `#${nextView}`)
       } catch (error) {
@@ -168,11 +152,10 @@ function App() {
   useEffect(() => {
     function handleHashChange() {
       const requested = viewFromHash()
-      if ((auth.kind === 'authenticated' || auth.kind === 'preview')
-        && !auth.user.roles.includes(administratorRole)
-        && requested !== 'pos') {
-        window.history.replaceState(null, '', '#pos')
-        setView('pos')
+      if (auth.kind === 'authenticated' || auth.kind === 'preview') {
+        const allowed = resolveView(auth.user, requested) ?? requested
+        if (allowed !== requested) window.history.replaceState(null, '', `#${allowed}`)
+        setView(allowed)
         return
       }
       setView(requested)
@@ -182,10 +165,9 @@ function App() {
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [auth])
 
-  function navigate(nextView: AppView) {
-    if ((auth.kind === 'authenticated' || auth.kind === 'preview')
-      && !auth.user.roles.includes(administratorRole)
-      && nextView !== 'pos') return
+  function navigate(nextView: AppView, user?: CurrentUser) {
+    const current = user ?? (auth.kind === 'authenticated' || auth.kind === 'preview' ? auth.user : null)
+    if (current && !allowedViews(current).includes(nextView)) return
     setView(nextView)
     window.history.replaceState(null, '', `#${nextView}`)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -211,8 +193,7 @@ function App() {
       const user = loginResponseUser(payload)
       if (!user) throw new Error('La respuesta del servidor no contiene una sesión válida.')
       setAuth({ kind: 'authenticated', user })
-      const nextView = preferredView(user)
-      navigate(nextView)
+      navigate(landingView(user) ?? 'panel', user)
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.')
     } finally {
@@ -223,7 +204,7 @@ function App() {
   function enterPreview(role: 'Administrador' | 'Vendedor') {
     const user = createPreviewUser(role)
     setAuth({ kind: 'preview', user })
-    navigate(preferredView(user))
+    navigate(landingView(user) ?? 'panel', user)
   }
 
   async function logout() {
@@ -265,9 +246,10 @@ function App() {
 
   const user = auth.user
   const isAdministrator = user.roles.includes(administratorRole)
-  const isSeller = user.roles.includes(sellerRole)
+  const allowed = allowedViews(user)
+  const panelViews = shellViews(user)
 
-  if (!isAdministrator && !isSeller) {
+  if (allowed.length === 0) {
     return (
       <main className="access-denied">
         <img src="/logo-tienda-la-ganga.png" alt="" />
@@ -278,12 +260,12 @@ function App() {
     )
   }
 
-  if (!isAdministrator || view === 'pos') {
+  if (panelViews.length === 0 || view === 'pos') {
     return (
       <PosView
         api={api}
         user={user}
-        canReturnToAdmin={isAdministrator}
+        canReturnToAdmin={panelViews.length > 0}
         onNavigate={navigate}
         onLogout={() => { void logout() }}
       />
@@ -291,8 +273,8 @@ function App() {
   }
 
   return (
-    <AdminShell activeView={view} api={api} user={user} onNavigate={navigate} onLogout={() => { void logout() }}>
-      {view === 'panel' && <DashboardView onNavigate={navigate} />}
+    <AdminShell activeView={view} allowedViews={allowed} api={api} user={user} onNavigate={navigate} onLogout={() => { void logout() }}>
+      {view === 'panel' && isAdministrator && <DashboardView onNavigate={navigate} />}
       {view === 'caja' && <CashView />}
       {view === 'inventario' && <InventoryView />}
       {view === 'productos' && <ProductsView />}
@@ -303,7 +285,7 @@ function App() {
       {view === 'tienda' && <OnlineStoreView />}
       {view === 'reportes' && <ReportsView />}
       {view === 'contabilidad' && <AccountingView />}
-      {view === 'equipo' && <TeamView />}
+      {view === 'equipo' && <TeamView currentUser={user} isPreview={auth.kind === 'preview'} />}
       {view === 'configuracion' && <SettingsView onOpenCatalogs={() => navigate('catalogos')} />}
       {view === 'catalogos' && <CatalogsView user={user} isPreview={auth.kind === 'preview'} />}
     </AdminShell>

@@ -57,6 +57,22 @@ El comando sólo crea la cuenta cuando todavía no existe ningún usuario. Las
 contraseñas se almacenan mediante el hash seguro provisto por ASP.NET Core.
 Al crear la cuenta también carga los catálogos iniciales.
 
+### Roles y cuentas del equipo
+
+El sistema tiene tres roles iniciales: **Administrador** (todo), **Vendedor**
+(solo punto de venta; consulta productos y existencias sin costos) y
+**Encargado de inventario** (productos, catálogos e inventario, sin costos ni
+cuentas). Las cuentas de cada persona se crean desde **Equipo** en el menú.
+
+Si la base se creó antes de que existieran estos roles, sincronizalos una vez:
+
+```powershell
+dotnet run --project src/backend/LaGanga.Api -- --sync-roles
+```
+
+El comando agrega permisos y roles faltantes, da todos los permisos al
+Administrador y nunca quita permisos ya asignados.
+
 ### Cargar los catálogos iniciales
 
 Si la base ya tenía un administrador antes de este hito, cargá los catálogos
@@ -112,6 +128,9 @@ job incluye la migración generada para revisarla.
 ## Alcance actual
 
 - Base ejecutable, acceso por sesión, roles y permisos.
+- **Cuentas y roles reales** (Hito 2): pantalla **Equipo** para crear cuentas,
+  asignar roles, desactivarlas y cambiar contraseñas. El menú se adapta a los
+  permisos de cada persona.
 - **Catálogos reales** (Hito 3): categorías jerárquicas, marcas, cortes, grupos
   de tallas, tallas y colores, guardados en PostgreSQL y editables desde
   **Catálogos** en el menú.
