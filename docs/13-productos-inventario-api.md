@@ -254,6 +254,24 @@ existen productos históricos relacionados.
 
 ## 7. Productos
 
+### 7.0 Resolver variante por código de barras
+
+```http
+GET /api/v1/variants/lookup?barcode=0123456789012
+```
+
+Permiso: `product.read` o el permiso de venta equivalente. Devuelve la variante
+exacta, descripción, estado y precio autorizado para el contexto. La
+disponibilidad y los costos se incluyen únicamente cuando el permiso lo permite.
+
+Errores específicos:
+
+- `404 barcode_not_found` si el código no existe o no es visible.
+- `409 duplicate_barcode` al intentar asignar un código utilizado.
+
+Resolver el código no modifica existencias. Las entradas, ajustes y ventas se
+confirman mediante sus operaciones transaccionales correspondientes.
+
 ### 7.1 Listar productos
 
 ```http
@@ -658,7 +676,9 @@ relacionada. Los costos se omiten si falta `inventory.cost.read`.
 | `validation_failed` | 400 | Campos o parámetros inválidos |
 | `duplicate_catalog_value` | 409 | Valor de catálogo repetido |
 | `duplicate_variant` | 409 | Misma talla y color en el producto |
-| `duplicate_code` | 409 | Código interno o de barras repetido |
+| `duplicate_barcode` | 409 | Código de barras repetido |
+| `duplicate_code` | 409 | Código interno repetido |
+| `barcode_not_found` | 404 | Código de barras no registrado o no visible |
 | `stale_version` | 409 | Otra sesión modificó el registro |
 | `idempotency_conflict` | 409 | Misma clave con otro contenido |
 | `product_not_ready` | 422 | Faltan datos para activar |

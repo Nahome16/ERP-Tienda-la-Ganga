@@ -44,7 +44,7 @@ Estas recomendaciones no fijan todavía cuántos vendedores existirán.
 | Talla y color | Obligatorios para cada variante de ropa | Conserva combinaciones exactas |
 | Precio | Predeterminado en producto con excepción opcional por variante | Evita repetir valores y permite casos especiales |
 | Código interno | Columna única opcional al inicio; generación automática antes de etiquetas | No bloquea el primer registro |
-| Código de barras | Opcional | Puede asociarse después sin cambiar la variante |
+| Código de barras | Requerido para el flujo ágil de POS e inventario; puede quedar pendiente mientras se prepara un borrador | Identifica una variante exacta y debe ser único |
 | Producto activo sin existencias | Permitido | Facilita preparar mercadería próxima o mostrar agotados |
 | Máximo de imágenes | Cuatro | Requisito confirmado del módulo inicial |
 

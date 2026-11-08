@@ -43,7 +43,8 @@ Después de iniciar sesión, una cuenta con rol vendedor accede directamente a
 El espacio del vendedor incluirá únicamente lo necesario para vender:
 
 1. Estado de su caja o turno, mostrado dentro del POS.
-2. Búsqueda rápida por nombre, código, marca, talla, color y corte.
+2. Escaneo prioritario por código de barras y búsqueda manual alternativa por
+   nombre, código, marca, talla, color y corte.
 3. Selección exacta de variante y consulta de disponibilidad.
 4. Carrito, cantidades y descuentos permitidos.
 5. Selección o registro mínimo del cliente cuando corresponda.
@@ -83,6 +84,8 @@ Primera entrega recomendada:
 
 - Instalar la interfaz como PWA.
 - Conservar de forma local el armazón del POS y un catálogo sincronizado.
+- Conservar el índice `código de barras → variante` necesario para escanear sin
+  conexión.
 - Recuperar un carrito o borrador después de un corte de red o cierre accidental.
 - Mostrar cuándo se realizó la última sincronización.
 - Permitir búsquedas y preparación del carrito sin conexión.

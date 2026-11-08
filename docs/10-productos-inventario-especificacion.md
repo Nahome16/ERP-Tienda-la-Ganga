@@ -220,7 +220,9 @@ Cada variante tendrá:
 - Color.
 - Estado activo o inactivo.
 - Código interno, cuando se apruebe su generación.
-- Código de barras opcional.
+- Código de barras principal por variante, único en todo el sistema. Puede ser
+  proporcionado por el fabricante o generado internamente antes de imprimir una
+  etiqueta.
 - Precio de venta diferente, solo cuando se utilice una excepción.
 
 Reglas:

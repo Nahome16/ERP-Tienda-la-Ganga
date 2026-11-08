@@ -189,7 +189,7 @@ cantidades de la demostracion no son datos reales.
 | DEC-004 | Metodos de pago | Pendiente | Efectivo, transferencia, tarjeta y combinados |
 | DEC-005 | Ventas a credito en tienda | Pendiente | Habilitarlas con cuenta por cobrar |
 | DEC-006 | Limite de descuento para vendedores | Pendiente | Porcentaje configurable |
-| DEC-007 | Codigos por variante | Pendiente | Codigo interno unico y codigo de barras opcional |
+| DEC-007 | Codigos por variante | Confirmado | Código de barras único por variante para POS e inventario; código interno generado cuando haga falta |
 | DEC-008 | Metodo de valoracion del inventario | Pendiente | Costo promedio ponderado por variante |
 | DEC-009 | Acceso del vendedor a registrar abonos | Pendiente | Concederlo mediante permiso especifico |
 | DEC-010 | Acceso del vendedor a apertura y cierre | Pendiente | Concederlo al cajero responsable de la sesion |

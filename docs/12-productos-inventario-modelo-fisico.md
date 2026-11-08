@@ -230,7 +230,7 @@ Restricciones:
 | `size_id` | uuid | FK a `sizes` |
 | `color_id` | uuid | FK a `colors` |
 | `internal_code` | varchar(60), nullable | Único cuando exista |
-| `barcode` | varchar(80), nullable | Único cuando exista |
+| `barcode` | varchar(80), nullable | Texto normalizado, único cuando exista; conserva ceros iniciales |
 | `sale_price_override` | numeric(18,2), nullable | Mayor que cero |
 | `status` | varchar(20) | ACTIVE o INACTIVE |
 | Auditoría y versión | varios | Según convención |
@@ -239,6 +239,8 @@ Restricciones:
 
 - Única por `(product_id, size_id, color_id)`.
 - `internal_code` y `barcode` son únicos con índices parciales que ignoran nulos.
+- La búsqueda exacta por `barcode` debe usar un índice y resolver una sola
+  variante sin depender del nombre del producto.
 - Una variante con movimientos no se elimina.
 - El precio efectivo es la excepción de variante cuando existe; en otro caso, el
   precio predeterminado del producto.
