@@ -69,6 +69,11 @@ services:
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-la_ganga};Username=${POSTGRES_USER:-la_ganga};Password=${POSTGRES_PASSWORD}"
       # Aplica migraciones, sincroniza roles y crea las 2 cajas al arrancar.
       Database__AutoMigrate: "true"
+      # Varias cajas comparten la IP de la tienda: el límite de 5 intentos/min era muy estricto.
+      Authentication__LoginAttemptsPerMinute: "20"
+      # Jornada larga: la sesión dura hasta 12 horas y se cierra tras 60 minutos sin actividad.
+      Authentication__MaximumSessionDuration: "12:00:00"
+      Authentication__IdleTimeout: "01:00:00"
       # "localhost" lo usa la comprobación de salud interna del contenedor.
       AllowedHosts: "${DOMINIO:?Falta DOMINIO en el archivo .env};localhost"
       TZ: ${TZ:-America/Managua}

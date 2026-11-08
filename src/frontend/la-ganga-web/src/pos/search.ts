@@ -20,10 +20,10 @@ export function buildIndex(variants: PosVariant[]): VariantIndex {
     byBarcode.set(normalize(variant.barcode), variant)
     byId.set(variant.variantId, variant)
     if (variant.categoryName) categories.add(variant.categoryName)
-    return normalize([
+    return ` ${normalize([
       variant.productName, variant.brandName, variant.categoryName,
       variant.sizeName, variant.colorName, variant.barcode,
-    ].join(' '))
+    ].join(' '))}`
   })
   return { variants, byBarcode, byId, haystacks, categories: [...categories].sort((a, b) => a.localeCompare(b, 'es')) }
 }
@@ -33,14 +33,18 @@ export function findByBarcode(index: VariantIndex, code: string): PosVariant | n
   return index.byBarcode.get(normalize(code)) ?? null
 }
 
-/** Todas las palabras de la búsqueda deben aparecer en nombre, marca, talla, color, categoría o código. */
+/**
+ * Todas las palabras de la búsqueda deben aparecer en nombre, marca, talla, color, categoría o código.
+ * Una palabra coincide si EMPIEZA una palabra del producto («cam» → camisa; «l» → talla L) o, desde
+ * 3 letras, si aparece en cualquier parte (útil para buscar por los últimos dígitos de un código).
+ */
 export function searchVariants(index: VariantIndex, query: string, category: string | null = null): PosVariant[] {
   const tokens = normalize(query).split(/\s+/).filter(Boolean)
   const result: PosVariant[] = []
   index.variants.forEach((variant, position) => {
     if (category && variant.categoryName !== category) return
     const haystack = index.haystacks[position] ?? ''
-    if (tokens.every((token) => haystack.includes(token))) result.push(variant)
+    if (tokens.every((token) => haystack.includes(` ${token}`) || (token.length >= 3 && haystack.includes(token)))) result.push(variant)
   })
   return result
 }

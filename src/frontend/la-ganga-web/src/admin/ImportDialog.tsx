@@ -210,16 +210,18 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
                     return (
                       <tr key={item.row} className={problems ? 'error-row' : undefined} title={problems?.join(' ')}>
                         <td className="numeric">{item.row}</td>
-                        <td>{data?.productName ?? item.cells[0]}</td>
-                        <td>{data?.category ?? ''}</td>
-                        <td>{data?.brand ?? ''}</td>
-                        <td>{data?.cut ?? ''}</td>
-                        <td>{data?.size ?? ''}</td>
-                        <td>{data?.color ?? ''}</td>
-                        <td className="adm-mono">{data?.barcode ?? (data ? 'auto' : '')}</td>
-                        <td className="numeric">{data ? formatNio(data.price) : ''}</td>
-                        {canCost && <td className="numeric">{data?.cost != null ? formatNio(data.cost) : ''}</td>}
-                        <td className="numeric">{data?.quantity ?? ''}</td>
+                        {data ? (
+                          <>
+                            <td>{data.productName}</td><td>{data.category}</td><td>{data.brand}</td><td>{data.cut ?? ''}</td>
+                            <td>{data.size}</td><td>{data.color}</td>
+                            <td className="adm-mono">{data.barcode ?? 'auto'}</td>
+                            <td className="numeric">{formatNio(data.price)}</td>
+                            {canCost && <td className="numeric">{data.cost != null ? formatNio(data.cost) : ''}</td>}
+                            <td className="numeric">{data.quantity}</td>
+                          </>
+                        ) : (
+                          <td colSpan={canCost ? 10 : 9} className="adm-mono">{item.cells.join(' ; ')}</td>
+                        )}
                       </tr>
                     )
                   })}

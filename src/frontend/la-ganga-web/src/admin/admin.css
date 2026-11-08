@@ -44,6 +44,7 @@
 .adm-toolbar label.adm-field-inline { display: grid; gap: 3px; font-size: .68rem; font-weight: 800; color: #5e4b39; }
 .adm-toolbar label.adm-field-inline > span { text-transform: uppercase; letter-spacing: .04em; }
 
+.adm-toolbar .catalog-search input[type="search"] { min-height: 0; height: 40px; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .adm-scanner { min-width: 0; max-width: 100%; display: flex; align-items: center; gap: 10px; flex: 1 1 280px; min-height: 46px; padding: 0 8px 0 14px; border: 1.5px solid var(--teal); border-radius: 12px; background: var(--paper); }
 .adm-scanner input { flex: 1; min-width: 0; height: 42px; border: 0; outline: 0; background: transparent; font-size: .9rem; }
 .adm-scanner > span { color: var(--teal); font-size: 1.15rem; }
