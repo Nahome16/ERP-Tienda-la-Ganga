@@ -1,0 +1,30 @@
+# La Ganga ERP - archivos que NO deben entrar al contexto de construcción de Docker.
+# (Hace las construcciones más rápidas y evita filtrar secretos a las imágenes.)
+
+# Control de versiones y herramientas
+.git
+.github
+.vs
+.vscode
+.idea
+.DS_Store
+
+# Secretos y respaldos (nunca deben entrar a una imagen)
+.env
+.env.*
+**/.env
+**/.env.*
+infrastructure/deploy/backups
+**/*.dump
+
+# Artefactos de compilación (se generan dentro de Docker)
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/*.user
+
+# Pruebas y documentación (la web solo necesita docs/assets)
+tests
+docs/*
+!docs/assets

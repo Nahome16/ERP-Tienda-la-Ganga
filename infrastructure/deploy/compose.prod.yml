@@ -1,0 +1,157 @@
+# La Ganga ERP - producción (VPS con Docker).
+#
+# Uso (desde esta carpeta, con el archivo .env ya creado):
+#   docker compose -f compose.prod.yml up -d --build
+#
+# Servicios:
+#   db   PostgreSQL 16 (sin puerto expuesto al servidor: solo la red interna)
+#   api  API .NET 8 (puerto 8080 solo en la red interna)
+#   web  Caddy: sirve la web, reenvía /api y /health a la API, HTTPS automático
+#   cli  (solo bajo demanda) comandos de la API: --bootstrap-admin, --sync-roles, ...
+
+name: la-ganga
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-la_ganga}
+      POSTGRES_USER: ${POSTGRES_USER:-la_ganga}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en el archivo .env}
+      TZ: ${TZ:-America/Managua}
+    # Ajustes modestos para un VPS de 2 GB de RAM.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=50
+    # SIN "ports": la base de datos NO es accesible desde internet.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    networks: [interna]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/deploy/Dockerfile.api
+    image: la-ganga-api:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-la_ganga};Username=${POSTGRES_USER:-la_ganga};Password=${POSTGRES_PASSWORD}"
+      # Aplica migraciones, sincroniza roles y crea las 2 cajas al arrancar.
+      Database__AutoMigrate: "true"
+      # Varias cajas comparten la IP de la tienda: el límite de 5 intentos/min era muy estricto.
+      Authentication__LoginAttemptsPerMinute: "20"
+      # Jornada larga: la sesión dura hasta 12 horas y se cierra tras 60 minutos sin actividad.
+      Authentication__MaximumSessionDuration: "12:00:00"
+      Authentication__IdleTimeout: "01:00:00"
+      # "localhost" lo usa la comprobación de salud interna del contenedor.
+      AllowedHosts: "${DOMINIO:?Falta DOMINIO en el archivo .env};localhost"
+      TZ: ${TZ:-America/Managua}
+    volumes:
+      # Llaves de ASP.NET que protegen las cookies de sesión: así nadie debe
+      # volver a iniciar sesión cada vez que se actualiza el sistema.
+      - api_keys:/home/app/.aspnet
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 60s
+    mem_limit: 768m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    networks: [interna]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/deploy/Dockerfile.web
+    image: la-ganga-web:latest
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      DOMINIO: ${DOMINIO:?Falta DOMINIO en el archivo .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Falta ACME_EMAIL en el archivo .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      # Certificados HTTPS: deben persistir (Let's Encrypt limita las emisiones).
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      # API de administración interna de Caddy (solo dentro del contenedor).
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    mem_limit: 192m
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    networks: [interna]
+
+  # Comandos de la API bajo demanda. No arranca con "up".
+  #   docker compose -f compose.prod.yml run --rm cli --bootstrap-admin
+  #   docker compose -f compose.prod.yml run --rm cli --sync-roles
+  #   docker compose -f compose.prod.yml run --rm cli --seed-catalogs
+  cli:
+    profiles: ["herramientas"]
+    image: la-ganga-api:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-la_ganga};Username=${POSTGRES_USER:-la_ganga};Password=${POSTGRES_PASSWORD}"
+      LA_GANGA_ADMIN_USERNAME: ${LA_GANGA_ADMIN_USERNAME:-}
+      LA_GANGA_ADMIN_DISPLAY_NAME: ${LA_GANGA_ADMIN_DISPLAY_NAME:-}
+      LA_GANGA_ADMIN_PASSWORD: ${LA_GANGA_ADMIN_PASSWORD:-}
+    mem_limit: 512m
+    logging: *default-logging
+    networks: [interna]
+
+networks:
+  interna:
+
+volumes:
+  pgdata:
+  api_keys:
+  caddy_data:
+  caddy_config:

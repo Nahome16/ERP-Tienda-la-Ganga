@@ -10,12 +10,14 @@ public static class SystemRoles
     public const string Seller = "Vendedor";
     public const string InventoryManager = "Encargado de inventario";
 
-    /// <summary>Consulta productos y disponibilidad, sin costos ni ajustes.</summary>
+    /// <summary>Vende y maneja su caja; consulta productos y disponibilidad, sin costos ni ajustes.</summary>
     public static IReadOnlyCollection<string> SellerPermissions { get; } =
     [
         PermissionNames.CatalogRead,
         PermissionNames.ProductRead,
         PermissionNames.InventoryRead,
+        PermissionNames.SaleCreate,
+        PermissionNames.CashOperate,
     ];
 
     /// <summary>

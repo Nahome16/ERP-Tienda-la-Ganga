@@ -22,7 +22,7 @@ public sealed class UserApiTests(CatalogApiFixture fixture) : IClassFixture<Cata
     private static readonly string[] SellerRole = ["Vendedor"];
     private static readonly string[] AdministratorRole = ["Administrador"];
     private static readonly string[] InventoryRole = ["Encargado de inventario"];
-    private static readonly string[] ExpectedSellerPermissions = ["catalog.read", "inventory.read", "product.read"];
+    private static readonly string[] ExpectedSellerPermissions = ["cash.operate", "catalog.read", "inventory.read", "product.read", "sale.create"];
 
     [PostgresFact]
     public async Task SystemRolesHaveTheirDocumentedPermissions()

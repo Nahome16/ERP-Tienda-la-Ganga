@@ -1,0 +1,4 @@
+# Secretos y datos: nunca se versionan.
+.env
+backups/
+.ultima-version

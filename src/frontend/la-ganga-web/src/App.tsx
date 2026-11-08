@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminShell } from './components/AdminShell'
-import { administratorRole, allowedViews, isAppView, landingView, resolveView, shellViews } from './lib/access'
+import { allowedViews, isAppView, landingView, resolveView, shellViews } from './lib/access'
+import { clearCachedUser, restoreOfflineUser, saveCachedUser } from './lib/session'
 import type { ApiState, AppView, AuthState, CurrentUser, HealthStatus } from './types'
 import { CatalogsView } from './views/CatalogsView'
 import { DashboardView } from './views/DashboardView'
@@ -8,18 +9,11 @@ import { InventoryView } from './views/InventoryView'
 import { LoginView } from './views/LoginView'
 import { PosView } from './views/PosView'
 import { TeamView } from './views/TeamView'
-import {
-  AccountingView,
-  BranchesView,
-  CashView,
-  ClientsView,
-  OnlineStoreView,
-  ProductsView,
-  PromotionsView,
-  PurchasesView,
-  ReportsView,
-  SettingsView,
-} from './views/ReferenceViews'
+import { AuditView } from './views/AuditView'
+import { CashView } from './views/CashView'
+import { ProductsView } from './views/ProductsView'
+import { SalesView } from './views/SalesView'
+import { SettingsView } from './views/SettingsView'
 
 function viewFromHash(): AppView {
   const value = window.location.hash.replace('#', '')
@@ -62,24 +56,6 @@ function readCookie(name: string) {
   return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
 }
 
-function createPreviewUser(role: 'Administrador' | 'Vendedor'): CurrentUser {
-  return {
-    id: `preview-${role.toLocaleLowerCase('es')}`,
-    username: 'vista_previa',
-    displayName: role === administratorRole ? 'Administrador de muestra' : 'Vendedor de muestra',
-    roles: [role],
-    permissions: [],
-  }
-}
-
-function previewUserFromUrl() {
-  if (!import.meta.env.DEV) return null
-  const role = new URLSearchParams(window.location.search).get('preview')
-  if (role === 'admin') return createPreviewUser('Administrador')
-  if (role === 'vendedor') return createPreviewUser('Vendedor')
-  return null
-}
-
 function SessionLoader() {
   return (
     <main className="session-loader">
@@ -96,6 +72,8 @@ function App() {
   const [view, setView] = useState<AppView>(() => viewFromHash())
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // true cuando el usuario se restauró desde este equipo porque no había red al abrir la app.
+  const [offlineStart, setOfflineStart] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -127,21 +105,32 @@ function App() {
           signal: controller.signal,
         })
         if (response.status === 401) {
-          const previewUser = previewUserFromUrl()
-          setAuth(previewUser ? { kind: 'preview', user: previewUser } : { kind: 'unauthenticated' })
+          setAuth({ kind: 'unauthenticated' })
           return
         }
         if (!response.ok) throw new Error(`Estado HTTP inesperado: ${response.status}`)
         const payload: unknown = await response.json()
         if (!isCurrentUser(payload)) throw new Error('Respuesta de sesión inválida')
         setAuth({ kind: 'authenticated', user: payload })
+        void saveCachedUser(payload).catch(() => undefined)
         const nextView = resolveView(payload, viewFromHash()) ?? 'panel'
         setView(nextView)
         window.history.replaceState(null, '', `#${nextView}`)
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return
-        const previewUser = previewUserFromUrl()
-        setAuth(previewUser ? { kind: 'preview', user: previewUser } : { kind: 'unauthenticated' })
+        // Sin red (o servidor caído): si hay un usuario y una caja abierta guardados en este equipo,
+        // se entra directo al POS en modo sin conexión. No se guardan contraseñas ni cookies.
+        const cachedUser = await restoreOfflineUser()
+        if (controller.signal.aborted) return
+        if (cachedUser) {
+          setOfflineStart(true)
+          setAuth({ kind: 'authenticated', user: cachedUser })
+          setView('pos')
+          window.history.replaceState(null, '', '#pos')
+          return
+        }
+        setLoginError('Sin conexión con el servidor. Para entrar necesitás conexión al menos una vez; después el punto de venta funciona aunque se caiga la red.')
+        setAuth({ kind: 'unauthenticated' })
       }
     }
 
@@ -152,7 +141,7 @@ function App() {
   useEffect(() => {
     function handleHashChange() {
       const requested = viewFromHash()
-      if (auth.kind === 'authenticated' || auth.kind === 'preview') {
+      if (auth.kind === 'authenticated') {
         const allowed = resolveView(auth.user, requested) ?? requested
         if (allowed !== requested) window.history.replaceState(null, '', `#${allowed}`)
         setView(allowed)
@@ -166,7 +155,7 @@ function App() {
   }, [auth])
 
   function navigate(nextView: AppView, user?: CurrentUser) {
-    const current = user ?? (auth.kind === 'authenticated' || auth.kind === 'preview' ? auth.user : null)
+    const current = user ?? (auth.kind === 'authenticated' ? auth.user : null)
     if (current && !allowedViews(current).includes(nextView)) return
     setView(nextView)
     window.history.replaceState(null, '', `#${nextView}`)
@@ -192,7 +181,9 @@ function App() {
       }
       const user = loginResponseUser(payload)
       if (!user) throw new Error('La respuesta del servidor no contiene una sesión válida.')
+      setOfflineStart(false)
       setAuth({ kind: 'authenticated', user })
+      void saveCachedUser(user).catch(() => undefined)
       navigate(landingView(user) ?? 'panel', user)
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.')
@@ -201,33 +192,47 @@ function App() {
     }
   }
 
-  function enterPreview(role: 'Administrador' | 'Vendedor') {
-    const user = createPreviewUser(role)
-    setAuth({ kind: 'preview', user })
-    navigate(landingView(user) ?? 'panel', user)
-  }
-
   async function logout() {
-    if (auth.kind === 'preview') {
+    if (auth.kind !== 'authenticated') return
+    const csrfToken = readCookie('la_ganga_csrf')
+    if (!csrfToken) {
+      // Sin cookie de sesión (venció o se entró sin conexión): solo se cierra en este equipo.
+      void clearCachedUser().catch(() => undefined)
+      setOfflineStart(false)
       setAuth({ kind: 'unauthenticated' })
       navigate('panel')
       return
     }
-    if (auth.kind !== 'authenticated') return
-    const csrfToken = readCookie('la_ganga_csrf')
-    if (!csrfToken) return
     try {
       const response = await fetch('/api/v1/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'X-CSRF-Token': csrfToken },
       })
-      if (!response.ok) throw new Error(`Estado HTTP inesperado: ${response.status}`)
+      if (!response.ok && response.status !== 401) throw new Error(`Estado HTTP inesperado: ${response.status}`)
+      void clearCachedUser().catch(() => undefined)
+      setOfflineStart(false)
       setAuth({ kind: 'unauthenticated' })
       navigate('panel')
-    } catch {
+    } catch (error) {
+      if (error instanceof TypeError) {
+        // Sin red: se cierra la sesión en este equipo (la cola de ventas pendientes se conserva).
+        void clearCachedUser().catch(() => undefined)
+        setOfflineStart(false)
+        setAuth({ kind: 'unauthenticated' })
+        navigate('panel')
+        return
+      }
       setLoginError('No se pudo cerrar la sesión. Comprobá la conexión e intentá nuevamente.')
     }
+  }
+
+  /** La sesión venció: se vuelve al inicio de sesión sin tocar la cola de ventas ni la caja guardada. */
+  function sessionExpired() {
+    void clearCachedUser().catch(() => undefined)
+    setOfflineStart(false)
+    setLoginError('Tu sesión venció: iniciá sesión de nuevo para sincronizar tus ventas pendientes.')
+    setAuth({ kind: 'unauthenticated' })
   }
 
   if (auth.kind === 'loading') return <SessionLoader />
@@ -237,15 +242,14 @@ function App() {
         api={api}
         error={loginError}
         isSubmitting={isSubmitting}
-        previewEnabled={import.meta.env.DEV}
+        previewEnabled={false}
         onLogin={login}
-        onPreview={enterPreview}
+        onPreview={() => undefined}
       />
     )
   }
 
   const user = auth.user
-  const isAdministrator = user.roles.includes(administratorRole)
   const allowed = allowedViews(user)
   const panelViews = shellViews(user)
 
@@ -268,26 +272,23 @@ function App() {
         canReturnToAdmin={panelViews.length > 0}
         onNavigate={navigate}
         onLogout={() => { void logout() }}
+        offlineStart={offlineStart}
+        onSessionExpired={sessionExpired}
       />
     )
   }
 
   return (
     <AdminShell activeView={view} allowedViews={allowed} api={api} user={user} onNavigate={navigate} onLogout={() => { void logout() }}>
-      {view === 'panel' && isAdministrator && <DashboardView onNavigate={navigate} />}
-      {view === 'caja' && <CashView />}
-      {view === 'inventario' && <InventoryView />}
-      {view === 'productos' && <ProductsView />}
-      {view === 'compras' && <PurchasesView />}
-      {view === 'clientes' && <ClientsView />}
-      {view === 'promociones' && <PromotionsView />}
-      {view === 'sucursales' && <BranchesView />}
-      {view === 'tienda' && <OnlineStoreView />}
-      {view === 'reportes' && <ReportsView />}
-      {view === 'contabilidad' && <AccountingView />}
-      {view === 'equipo' && <TeamView currentUser={user} isPreview={auth.kind === 'preview'} />}
-      {view === 'configuracion' && <SettingsView onOpenCatalogs={() => navigate('catalogos')} />}
-      {view === 'catalogos' && <CatalogsView user={user} isPreview={auth.kind === 'preview'} />}
+      {view === 'panel' && <DashboardView user={user} onNavigate={navigate} />}
+      {view === 'caja' && <CashView user={user} />}
+      {view === 'ventas' && <SalesView user={user} />}
+      {view === 'productos' && <ProductsView user={user} />}
+      {view === 'inventario' && <InventoryView user={user} />}
+      {view === 'catalogos' && <CatalogsView user={user} isPreview={false} />}
+      {view === 'equipo' && <TeamView currentUser={user} isPreview={false} />}
+      {view === 'configuracion' && <SettingsView user={user} onOpenCatalogs={() => navigate('catalogos')} />}
+      {view === 'auditoria' && <AuditView user={user} />}
     </AdminShell>
   )
 }

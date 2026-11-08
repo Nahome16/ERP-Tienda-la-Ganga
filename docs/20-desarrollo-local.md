@@ -125,6 +125,35 @@ no falten migraciones, aplica las migraciones a una base vacía y corre todas la
 pruebas contra PostgreSQL 16. Si el modelo cambió sin migración, el registro del
 job incluye la migración generada para revisarla.
 
+## MVP: venta, cajas y modo sin conexión
+
+Variables útiles al arrancar la API:
+
+- `Database__AutoMigrate=true`: aplica migraciones y sincroniza roles y permisos
+  al iniciar (lo usa el despliegue; en desarrollo basta con `dotnet ef database update`).
+- `AllowedHosts`: dominios aceptados (en producción, el dominio de la tienda).
+
+Flujo recomendado para una prueba local:
+
+1. Crear el administrador (`--bootstrap-admin`) y entrar a la interfaz.
+2. En **Equipo**, crear las cuentas de vendedor (rol *Vendedor*: solo POS).
+3. En **Configuración**, revisar la tasa del dólar (36.7 por defecto), los bancos
+   y los datos del recibo.
+4. En **Productos**, crear productos o usar **Importar** con la plantilla CSV.
+5. Entrar como vendedor, abrir **Caja 1** y vender. Para probar el modo sin
+   conexión, cortá la red del navegador (DevTools → Network → Offline), vendé,
+   volvé a conectar y comprobá que la venta se sincroniza una sola vez.
+6. Cerrar la caja (arqueo) y revisar el consolidado en **Caja y cierres**.
+
+Reglas que conviene recordar:
+
+- La venta ya ocurrió físicamente: el servidor **siempre acepta** una venta válida
+  y la marca *Requiere revisión* si el stock quedó negativo, el precio o la tasa
+  no coinciden con los vigentes o la caja ya estaba cerrada.
+- Descuentos hasta el límite del vendedor (10 % por defecto) se aplican solos;
+  por encima requieren usuario y contraseña de un administrador (solo con conexión).
+- Los dólares solo se reciben en efectivo; el cambio siempre se entrega en córdobas.
+
 ## Alcance actual
 
 - Base ejecutable, acceso por sesión, roles y permisos.
@@ -134,5 +163,8 @@ job incluye la migración generada para revisarla.
 - **Catálogos reales** (Hito 3): categorías jerárquicas, marcas, cortes, grupos
   de tallas, tallas y colores, guardados en PostgreSQL y editables desde
   **Catálogos** en el menú.
-- El resto de los módulos sigue siendo un prototipo navegable con datos
-  simulados: no confirma ventas ni modifica inventario real.
+- **MVP de ventas** (ver [contrato de API](30-mvp-contrato-api.md)): productos,
+  inventario y Kardex, cajas, ventas con pagos mixtos y descuentos, cierres,
+  auditoría y configuración, todo con datos reales en PostgreSQL.
+- Los módulos de la maqueta original (compras, clientes, promociones, sucursales,
+  tienda en línea, reportes, contabilidad) se retiraron del menú hasta que existan.

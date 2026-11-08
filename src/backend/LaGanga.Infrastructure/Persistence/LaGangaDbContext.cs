@@ -1,5 +1,8 @@
 using LaGanga.Domain.Catalog;
 using LaGanga.Domain.Identity;
+using LaGanga.Domain.Inventory;
+using LaGanga.Domain.Sales;
+using LaGanga.Domain.Settings;
 using Microsoft.EntityFrameworkCore;
 
 namespace LaGanga.Infrastructure.Persistence;
@@ -31,6 +34,30 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
 
     public DbSet<Color> Colors => Set<Color>();
 
+    public DbSet<Product> Products => Set<Product>();
+
+    public DbSet<ProductVariant> Variants => Set<ProductVariant>();
+
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+
+    public DbSet<InventoryMovement> Movements => Set<InventoryMovement>();
+
+    public DbSet<CashRegister> CashRegisters => Set<CashRegister>();
+
+    public DbSet<CashSession> CashSessions => Set<CashSession>();
+
+    public DbSet<Sale> Sales => Set<Sale>();
+
+    public DbSet<SaleLine> SaleLines => Set<SaleLine>();
+
+    public DbSet<SalePayment> SalePayments => Set<SalePayment>();
+
+    public DbSet<DiscountApproval> DiscountApprovals => Set<DiscountApproval>();
+
+    public DbSet<StoreSettings> Settings => Set<StoreSettings>();
+
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
     public override Task<int> SaveChangesAsync(
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
@@ -47,6 +74,8 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasSequence<long>(SalesSchema.SaleNumberSequence, SalesSchema.Name).StartsAt(1);
+        modelBuilder.HasSequence<long>("barcode_seq", "inventory").StartsAt(1);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LaGangaDbContext).Assembly);
     }
 
@@ -65,6 +94,18 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
             }
 
             var version = entry.Property(catalogEntry => catalogEntry.Version);
+            version.CurrentValue = version.OriginalValue + 1;
+        }
+
+        foreach (var entry in ChangeTracker.Entries<Product>().Where(entry => entry.State == EntityState.Modified))
+        {
+            var version = entry.Property(product => product.Version);
+            version.CurrentValue = version.OriginalValue + 1;
+        }
+
+        foreach (var entry in ChangeTracker.Entries<ProductVariant>().Where(entry => entry.State == EntityState.Modified))
+        {
+            var version = entry.Property(variant => variant.Version);
             version.CurrentValue = version.OriginalValue + 1;
         }
     }

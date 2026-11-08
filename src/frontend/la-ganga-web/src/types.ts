@@ -2,18 +2,13 @@ export type AppView =
   | 'panel'
   | 'pos'
   | 'caja'
+  | 'ventas'
   | 'inventario'
   | 'productos'
-  | 'compras'
-  | 'clientes'
-  | 'promociones'
-  | 'sucursales'
-  | 'tienda'
-  | 'reportes'
-  | 'contabilidad'
   | 'equipo'
   | 'configuracion'
   | 'catalogos'
+  | 'auditoria'
 
 export type HealthStatus = {
   service: string
@@ -39,4 +34,3 @@ export type AuthState =
   | { kind: 'loading' }
   | { kind: 'unauthenticated' }
   | { kind: 'authenticated'; user: CurrentUser }
-  | { kind: 'preview'; user: CurrentUser }

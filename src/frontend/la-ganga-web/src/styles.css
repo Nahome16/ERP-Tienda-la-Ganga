@@ -64,9 +64,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .text-button { padding: 0; color: var(--teal); border: 0; background: transparent; font-size: .72rem; font-weight: 800; text-decoration: underline; cursor: pointer; }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-bottom: 18px; }
-.kpi-card { min-height: 112px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.78); }
+.kpi-card { min-width: 0; overflow: hidden; min-height: 112px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.78); }
 .kpi-card > span { display: block; color: #5e4b39; font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
-.kpi-card > strong { display: block; margin: 7px 0 5px; color: #0d1717; font-size: clamp(1.35rem, 2.4vw, 1.85rem); line-height: 1; }
+.kpi-card > strong { display: block; margin: 7px 0 5px; color: #0d1717; font-size: clamp(1.1rem, 1.75vw, 1.6rem); line-height: 1.1; white-space: nowrap; }
 .kpi-card small { color: #6a6a61; font-size: .65rem; }
 .kpi-card small.positive { color: var(--teal); font-weight: 800; }
 
