@@ -1,5 +1,7 @@
+using LaGanga.Application.Catalog;
 using LaGanga.Application.Identity;
 using LaGanga.Domain.Identity;
+using LaGanga.Infrastructure.Catalog;
 using LaGanga.Infrastructure.Identity;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -24,6 +26,8 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
         services.AddScoped<IPasswordService, PasswordService>();
         services.AddScoped<IdentityBootstrapper>();
+        services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<CatalogSeeder>();
         return services;
     }
 }

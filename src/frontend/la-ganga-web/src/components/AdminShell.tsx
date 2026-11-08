@@ -23,6 +23,7 @@ const navigation: { label: string; view: AppView; icon: string }[] = [
   { label: 'Reportes', view: 'reportes', icon: '⌁' },
   { label: 'Contabilidad', view: 'contabilidad', icon: '▭' },
   { label: 'Equipo', view: 'equipo', icon: '♙' },
+  { label: 'Catálogos', view: 'catalogos', icon: '☰' },
   { label: 'Configuración', view: 'configuracion', icon: '☷' },
 ]
 
@@ -76,7 +77,7 @@ export function AdminShell({ activeView, api, user, onNavigate, onLogout, childr
         <div className={`preview-ribbon ${api.kind}`}>
           <span className="connection-dot" />
           <ConnectionLabel api={api} />
-          <strong>Vista previa · datos simulados</strong>
+          <strong>{activeView === 'catalogos' ? 'Datos reales · base de datos' : 'Vista previa · datos simulados'}</strong>
         </div>
         {children}
       </div>

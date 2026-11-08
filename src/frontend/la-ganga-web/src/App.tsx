@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminShell } from './components/AdminShell'
 import type { ApiState, AppView, AuthState, CurrentUser, HealthStatus } from './types'
+import { CatalogsView } from './views/CatalogsView'
 import { DashboardView } from './views/DashboardView'
 import { InventoryView } from './views/InventoryView'
 import { LoginView } from './views/LoginView'
@@ -24,7 +25,7 @@ const sellerRole = 'Vendedor'
 const knownViews: AppView[] = [
   'panel', 'pos', 'caja', 'inventario', 'productos', 'compras', 'clientes',
   'promociones', 'sucursales', 'tienda', 'reportes', 'contabilidad', 'equipo',
-  'configuracion',
+  'configuracion', 'catalogos',
 ]
 
 function isAppView(value: string): value is AppView {
@@ -303,7 +304,8 @@ function App() {
       {view === 'reportes' && <ReportsView />}
       {view === 'contabilidad' && <AccountingView />}
       {view === 'equipo' && <TeamView />}
-      {view === 'configuracion' && <SettingsView />}
+      {view === 'configuracion' && <SettingsView onOpenCatalogs={() => navigate('catalogos')} />}
+      {view === 'catalogos' && <CatalogsView user={user} isPreview={auth.kind === 'preview'} />}
     </AdminShell>
   )
 }

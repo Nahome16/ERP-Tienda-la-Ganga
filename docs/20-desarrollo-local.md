@@ -55,6 +55,20 @@ Remove-Item Env:LA_GANGA_ADMIN_PASSWORD
 
 El comando sólo crea la cuenta cuando todavía no existe ningún usuario. Las
 contraseñas se almacenan mediante el hash seguro provisto por ASP.NET Core.
+Al crear la cuenta también carga los catálogos iniciales.
+
+### Cargar los catálogos iniciales
+
+Si la base ya tenía un administrador antes de este hito, cargá los catálogos
+documentados en la especificación del Módulo 1 (marcas, cortes, tallas,
+colores y categorías):
+
+```powershell
+dotnet run --project src/backend/LaGanga.Api -- --seed-catalogs
+```
+
+Cada catálogo se carga solo si está vacío, así que repetir el comando no
+duplica datos ni pisa cambios hechos desde la pantalla **Catálogos**.
 
 La autenticación utiliza una cookie de sesión `HttpOnly`, una sesión revocable
 en PostgreSQL y un token CSRF separado para operaciones protegidas. La interfaz
@@ -77,6 +91,9 @@ API local.
 
 ```powershell
 dotnet build LaGanga.sln
+# Opcional: habilita las pruebas de integración contra PostgreSQL. Cada
+# ejecución crea y elimina su propia base temporal.
+$env:LA_GANGA_TEST_CONNECTION = "Host=localhost;Database=postgres;Username=la_ganga;Password=TU_CLAVE_LOCAL"
 dotnet test LaGanga.sln --no-build
 
 Set-Location src/frontend/la-ganga-web
@@ -84,9 +101,19 @@ npm run lint
 npm run build
 ```
 
-## Alcance del hito
+Sin `LA_GANGA_TEST_CONNECTION`, las pruebas de integración se omiten.
 
-El repositorio contiene la base ejecutable, el acceso por sesión, roles y
-permisos, la migración inicial de identidad y el prototipo navegable de los
-módulos. Los formularios de demostración todavía no confirman operaciones
-comerciales ni modifican inventario real.
+GitHub Actions (`.github/workflows/ci.yml`) ejecuta lo mismo en cada pull request
+y en cada cambio a `master`: compila con advertencias como errores, verifica que
+no falten migraciones, aplica las migraciones a una base vacía y corre todas las
+pruebas contra PostgreSQL 16. Si el modelo cambió sin migración, el registro del
+job incluye la migración generada para revisarla.
+
+## Alcance actual
+
+- Base ejecutable, acceso por sesión, roles y permisos.
+- **Catálogos reales** (Hito 3): categorías jerárquicas, marcas, cortes, grupos
+  de tallas, tallas y colores, guardados en PostgreSQL y editables desde
+  **Catálogos** en el menú.
+- El resto de los módulos sigue siendo un prototipo navegable con datos
+  simulados: no confirma ventas ni modifica inventario real.
