@@ -69,7 +69,7 @@ export function excelRange(range: InvRange, today: string): ExcelRange {
   const problem = validateInvRange(range, today)
   if (problem) return { ok: false, message: problem }
   let from = range.from
-  let to = range.to || today
+  const to = range.to || today
   let clamped = false
   if (!from) {
     from = addDays(to, -(maxRangeDays - 1))

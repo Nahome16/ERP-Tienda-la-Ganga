@@ -170,19 +170,21 @@ export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged }
               {showEntryFields && (
                 <fieldset className="adm-section inv-entry-fields">
                   <legend>Datos de la entrada</legend>
-                  <PartnersHint error={partnerList.error} empty={!partnerList.loading && !partnerList.error && partnerList.partners.length === 0} onRetry={partnerList.reload} />
-                  {partnerList.partners.length > 0 && <PartnerSelect partners={partnerList.partners} value={partnerId} onChange={setPartnerId} />}
-                  <div className="adm-grid-2">
-                    <label className="adm-field">
-                      <span>Costo unitario (C$)</span>
-                      <input type="number" min={0} step="0.01" inputMode="decimal" value={unitCost} onChange={(event) => setUnitCost(event.target.value)} />
-                      <small>{variant.cost == null ? 'Vacío = sin costo registrado.' : 'Vacío = costo actual de la variante.'}</small>
-                    </label>
-                    <label className="adm-field">
-                      <span>Precio de venta dado (C$)</span>
-                      <input type="number" min={0} step="0.01" inputMode="decimal" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} />
-                      <small>Vacío = precio actual ({formatNio(variant.price)}).</small>
-                    </label>
+                  <div className="inv-entry-body">
+                    <PartnersHint error={partnerList.error} empty={!partnerList.loading && !partnerList.error && partnerList.partners.length === 0} onRetry={partnerList.reload} />
+                    {partnerList.partners.length > 0 && <PartnerSelect partners={partnerList.partners} value={partnerId} onChange={setPartnerId} />}
+                    <div className="adm-grid-2">
+                      <label className="adm-field">
+                        <span>Costo unitario (C$)</span>
+                        <input type="number" min={0} step="0.01" inputMode="decimal" value={unitCost} onChange={(event) => setUnitCost(event.target.value)} />
+                        <small>{variant.cost == null ? 'Vacío = sin costo registrado.' : 'Vacío = costo actual de la variante.'}</small>
+                      </label>
+                      <label className="adm-field">
+                        <span>Precio de venta dado (C$)</span>
+                        <input type="number" min={0} step="0.01" inputMode="decimal" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} />
+                        <small>Vacío = precio actual ({formatNio(variant.price)}).</small>
+                      </label>
+                    </div>
                   </div>
                 </fieldset>
               )}
