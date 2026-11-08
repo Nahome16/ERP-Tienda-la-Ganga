@@ -20,7 +20,8 @@ const viewPermissions: Record<AppView, string[]> = {
   pos: ['sale.create'],
   caja: ['cash.report.read'],
   ventas: ['sale.read'],
-  reportes: ['sale.read', 'inventory.read', 'inventory.kardex.read', 'cash.report.read'],
+  // Sin inventory.read: el vendedor tiene ese permiso y solo debe ver el punto de venta.
+  reportes: ['sale.read', 'inventory.kardex.read', 'cash.report.read'],
   productos: ['product.create', 'product.edit'],
   inventario: ['inventory.adjust', 'inventory.kardex.read'],
   catalogos: ['catalog.manage'],

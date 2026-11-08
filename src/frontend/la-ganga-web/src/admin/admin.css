@@ -254,9 +254,9 @@
 .img-tile.is-upload .img-frame > img { opacity: .55; }
 .img-tile.has-error .img-frame { border-color: var(--danger); }
 .img-badge { position: absolute; top: 8px; left: 8px; padding: 2px 9px; color: #1b1b16; border-radius: 999px; background: var(--orange, #ff7900); font-size: .68rem; font-weight: 800; pointer-events: none; }
-.img-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.img-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .img-actions button, .img-confirm button { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: .74rem; font-weight: 700; cursor: pointer; }
-.img-actions button.wide { flex: 1 1 100%; }
+.img-actions button.wide, .img-actions button.danger { grid-column: 1 / -1; }
 .img-actions button.danger, .img-confirm button.danger { color: var(--danger); border-color: #e6b8b0; }
 .img-actions button:disabled, .img-confirm button:disabled { opacity: .45; cursor: not-allowed; }
 .img-confirm { display: grid; gap: 6px; padding: 8px; border-radius: 8px; background: #fbe6e1; color: #7c2a1f; font-size: .76rem; }

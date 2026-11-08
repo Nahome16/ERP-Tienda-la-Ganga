@@ -13,12 +13,12 @@
 .pv-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* --- Miniaturas de producto (tamaño fijo: sin saltos al cargar) --- */
-.pv-thumb { display: inline-flex; align-items: center; justify-content: center; flex: none; overflow: hidden; color: #8a7f6c; background: #efe5d2; }
-.pv-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.pv-thumb b { font-size: .95em; letter-spacing: .02em; }
-.pv-thumb-card { width: 100%; height: 92px; margin-bottom: 4px; border-radius: 8px; font-size: 1.5rem; }
-.pv-thumb-row { width: 48px; height: 48px; border-radius: 9px; font-size: 1.1rem; }
-.pv-thumb-line { width: 40px; height: 40px; border-radius: 8px; font-size: .9rem; }
+.pv-page .pv-thumb { display: inline-flex; align-items: center; justify-content: center; position: relative; flex: none; overflow: hidden; color: #8a7f6c; background: #efe5d2; }
+.pv-page .pv-thumb img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.pv-page .pv-thumb i { font-style: normal; font-weight: 800; font-size: .95em; letter-spacing: .02em; }
+.pv-page .pv-thumb-card { width: 100%; height: 92px; margin-bottom: 4px; border-radius: 8px; font-size: 1.5rem; }
+.pv-page .pv-thumb-row { width: 48px; height: 48px; border-radius: 9px; font-size: 1.1rem; }
+.pv-page .pv-thumb-line { width: 40px; height: 40px; border-radius: 8px; font-size: .9rem; }
 
 /* --- Barra superior --- */
 .pv-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 8px 16px; color: #fff; background: var(--pv-header); }
@@ -148,7 +148,12 @@
 .pv-cart-head strong { font-size: 1.2rem; }
 .pv-cart-lines { flex: 1; min-height: 120px; padding: 0 16px; overflow-y: auto; }
 .pv-empty-cart { padding: 40px 10px; color: var(--muted, #6d6860); text-align: center; }
-.pv-line { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 6px 8px; padding: 10px 0; border-bottom: 1px solid #eadfce; }
+.pv-line { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'thumb info rm' 'thumb qty total'; align-items: center; gap: 6px 10px; padding: 10px 0; border-bottom: 1px solid #eadfce; }
+.pv-line > .pv-thumb-line { grid-area: thumb; align-self: start; }
+.pv-line > .pv-line-info { grid-area: info; }
+.pv-line > .pv-qty { grid-area: qty; }
+.pv-line > .pv-line-total { grid-area: total; }
+.pv-line > .pv-icon-button { grid-area: rm; justify-self: end; align-self: start; }
 .pv-line.is-over { background: #fff8e8; }
 .pv-line-info { display: flex; flex-direction: column; min-width: 0; }
 .pv-line-info strong { font-size: .98rem; line-height: 1.2; }
@@ -287,9 +292,6 @@
   .pv-row-2 { grid-template-columns: 1fr; }
   .pv-overlay { padding: 0; align-items: end; }
   .pv-modal { max-height: 94dvh; border-radius: 16px 16px 0 0; }
-  .pv-line { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .pv-line > .pv-thumb-line { grid-row: span 2; }
-  .pv-line-total { text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) { .pv-spinner, .pv-conn-syncing i { animation: none; } }
 @media print { .pv-page, .pv-overlay, .pv-toasts { display: none !important; } }

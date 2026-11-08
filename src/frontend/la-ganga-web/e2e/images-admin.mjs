@@ -145,7 +145,7 @@ function installImageApi(context, mock, state) {
     if ((m = pathname.match(/^\/api\/v1\/products\/([^/]+)\/images$/)) && method === 'POST') {
       const list = imagesOf(m[1])
       const { type, parts } = parseMultipart(request)
-      state.uploads.push({ productId: m[1], contentType: type, hasCsrfHeader: 'x-csrf-token' in request.headers(), file: parts.file, thumb: parts.thumb })
+      state.uploads.push({ productId: m[1], contentType: type, csrf: request.headers()['x-csrf-token'], file: parts.file, thumb: parts.thumb })
       if (state.delayUploadMs) await new Promise((r) => setTimeout(r, state.delayUploadMs))
       if (state.failNext) { const f = state.failNext; state.failNext = null; return f(route) }
       if (list.length >= 4) return problem(route, 409, 'Ya hay 4 imágenes.', 'image_limit')
@@ -188,6 +188,7 @@ try {
   const mock = createMock({ user: { ...adminUser, permissions } })
   const state = { images: {}, uploads: [], orders: [], deletes: [], createCalls: [], seq: 0, failNext: null, failOrder: false, delayUploadMs: 0 }
   const context = await browser.newContext({ viewport: { width: 1366, height: 900 }, serviceWorkers: 'block' })
+  await context.addCookies([{ name: 'la_ganga_csrf', value: 'tok-csrf-123', url: BASE_URL }])
   await mock.install(context)
   await installImageApi(context, mock, state)
   const page = await context.newPage()
@@ -216,7 +217,7 @@ try {
   check(state.uploads.length === 2, 'se hicieron 2 peticiones POST')
   const [u1, u2] = state.uploads
   check(/^multipart\/form-data; boundary=/.test(u1.contentType), `Content-Type multipart con boundary automático (${u1.contentType.slice(0, 45)}…)`)
-  check(u1.hasCsrfHeader || true, 'petición enviada')
+  check(u1.csrf === 'tok-csrf-123', `envía X-CSRF-Token leído de la cookie (${u1.csrf})`)
   const s1 = jpegSize(u1.file.data); const t1 = jpegSize(u1.thumb.data)
   check(s1?.width === 1200 && s1?.height === 800, `foto grande: file reducido a 1200x800 (${s1?.width}x${s1?.height}, ${u1.file.data.length} B)`)
   check(t1?.width === 320 && t1?.height === 213, `foto grande: thumb 320x213 (${t1?.width}x${t1?.height}, ${u1.thumb.data.length} B)`)
@@ -249,7 +250,7 @@ try {
 
   // --- error de red
   await context.route('**/api/v1/products/*/images', (route) => route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.fallback())
-  await dialog.getByTestId('image-input').setInputFiles([{ name: 'sinred.jpg', mimeType: 'image/jpeg', buffer: small.length ? big : big }])
+  await dialog.getByTestId('image-input').setInputFiles([{ name: 'sinred.jpg', mimeType: 'image/jpeg', buffer: big }])
   check(await visible(dialog.getByRole('alert').filter({ hasText: /No hay conexión/ })), 'error de red: avisa que no hay conexión')
   await dialog.getByRole('button', { name: 'Descartar' }).click()
   await context.unroute('**/api/v1/products/*/images')
@@ -303,11 +304,12 @@ try {
   const toDelete = ids()[1]
   await dialog.getByTestId('image-tile').nth(1).getByRole('button', { name: 'Eliminar' }).click()
   check(await visible(dialog.getByText('¿Eliminar esta imagen?')), 'pide confirmación')
+  const deletesBefore = state.deletes.length
   await dialog.getByRole('button', { name: 'Cancelar' }).click()
-  check(state.deletes.length === 0, 'Cancelar no elimina')
+  check(state.deletes.length === deletesBefore, 'Cancelar no elimina')
   await dialog.getByTestId('image-tile').nth(1).getByRole('button', { name: 'Eliminar' }).click()
   await dialog.getByRole('button', { name: 'Sí, eliminar' }).click()
-  check(await waitFor(async () => state.deletes.length === 1 && state.deletes[0] === toDelete), 'confirmar llama a DELETE de esa imagen')
+  check(await waitFor(async () => state.deletes.length === deletesBefore + 1 && state.deletes.at(-1) === toDelete), 'confirmar llama a DELETE de esa imagen')
   check(await waitFor(async () => (await dialog.getByTestId('image-tile').count()) === 2), 'queda con 2 imágenes')
   await dialog.getByRole('button', { name: 'Cerrar' }).click()
 
@@ -318,13 +320,14 @@ try {
   await create.getByLabel('Categoría').selectOption({ label: 'Camisas' })
   await create.getByLabel('Marca').selectOption({ label: 'Bossini' })
   await create.getByLabel('Precio base (C$)').fill('450')
-  await create.getByRole('checkbox').first().check()
+  await create.getByRole('checkbox', { name: 'S', exact: true }).check()
+  await create.getByRole('checkbox', { name: 'Negro' }).check()
   await create.getByTestId('create-image-input').setInputFiles([
     { name: 'a.jpg', mimeType: 'image/jpeg', buffer: big }, { name: 'b.png', mimeType: 'image/png', buffer: small },
   ])
   check(await create.getByTestId('pending-image').count() === 2, 'el alta permite elegir imágenes antes de guardar')
   await create.getByRole('button', { name: /Crear producto/ }).click()
-  check(await waitFor(async () => state.uploads.length >= 0 && Object.values(state.images).some((l) => l.length === 2 && l !== state.images.p1)), 'tras crear, sube las 2 imágenes al producto nuevo')
+  check(await waitFor(async () => Object.values(state.images).some((l) => l.length === 2 && l !== state.images.p1)), 'tras crear, sube las 2 imágenes al producto nuevo')
   check(await visible(page.getByText(/Se subieron 2 imágenes/)), 'avisa que se subieron')
   // creación con una imagen que falla
   await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).click()
@@ -334,7 +337,8 @@ try {
   await create2.getByLabel('Categoría').selectOption({ label: 'Camisas' })
   await create2.getByLabel('Marca').selectOption({ label: 'Bossini' })
   await create2.getByLabel('Precio base (C$)').fill('300')
-  await create2.getByRole('checkbox').first().check()
+  await create2.getByRole('checkbox', { name: 'S', exact: true }).check()
+  await create2.getByRole('checkbox', { name: 'Negro' }).check()
   await create2.getByTestId('create-image-input').setInputFiles([{ name: 'falla.jpg', mimeType: 'image/jpeg', buffer: big }])
   state.failNext = (route) => route.fulfill({ status: 422, contentType: 'application/problem+json', body: JSON.stringify({ title: 'Imagen inválida.', code: 'invalid_image', errors: {} }) })
   await create2.getByRole('button', { name: /Crear producto/ }).click()
@@ -362,12 +366,10 @@ try {
   console.log('Miniaturas en el POS')
   const user = { id: 'u1', username: 'vendedor', displayName: 'Vendedor Uno', roles: ['Vendedor'], permissions: ['catalog.read', 'product.read', 'inventory.read', 'sale.create', 'cash.operate'] }
   const settings = { usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000', receiptFooter: 'x', banks: ['BAC'], sellerDiscountLimitPercent: 10, lowStockThreshold: 2 }
-  const jpeg = await makeImage(page, { width: 90, height: 90, mime: 'image/jpeg' }).catch(() => null)
   const pageForJpeg = await browser.newPage()
   await pageForJpeg.goto('about:blank')
   const tiny = await makeImage(pageForJpeg, { width: 96, height: 96, mime: 'image/jpeg' })
   await pageForJpeg.close()
-  void jpeg
   const variants = [
     { variantId: 'v1', productId: 'p1', productName: 'Camisa Oxford', categoryName: 'Camisas', brandName: 'Ganga', sizeName: 'M', colorName: 'Azul', colorHex: '#2a5db0', barcode: '7000000000011', price: 350, stock: 5, imageUrl: '/api/v1/media/aaa_t.jpg' },
     { variantId: 'v2', productId: 'p1', productName: 'Camisa Oxford', categoryName: 'Camisas', brandName: 'Ganga', sizeName: 'L', colorName: 'Azul', colorHex: '#2a5db0', barcode: '7000000000028', price: 350, stock: 3, imageUrl: '/api/v1/media/aaa_t.jpg' },
@@ -399,9 +401,9 @@ try {
   check(await waitFor(() => withImg.locator('img').evaluate((img) => img.complete && img.naturalWidth > 0)), 'tarjeta con imagen carga la miniatura')
   check(await withImg.locator('img').getAttribute('loading') === 'lazy', 'la miniatura usa loading="lazy"')
   const broken = pos.locator('.pv-product', { hasText: 'Jean Slim' })
-  check(await visible(broken.locator('.pv-thumb b')) && (await broken.locator('.pv-thumb b').innerText()) === 'JS', 'imagen que falla (404): muestra iniciales «JS»')
+  check(await broken.locator('.pv-thumb img').count() === 0 && await visible(broken.locator('.pv-thumb i')) && (await broken.locator('.pv-thumb i').innerText()) === 'JS', 'imagen que falla (404): muestra iniciales «JS»')
   const none = pos.locator('.pv-product', { hasText: 'Gorra Lisa' })
-  check(await none.locator('.pv-thumb b').innerText() === 'GL', 'sin imageUrl (snapshot antiguo): muestra iniciales «GL»')
+  check(await none.locator('.pv-thumb i').innerText() === 'GL', 'sin imageUrl (snapshot antiguo): muestra iniciales «GL»')
   const boxes = await cards.evaluateAll((els) => els.map((el) => el.querySelector('.pv-thumb').getBoundingClientRect()).map((r) => `${Math.round(r.width)}x${Math.round(r.height)}`))
   check(new Set(boxes).size === 1, `todas las miniaturas ocupan lo mismo (${boxes[0]}), sin saltos de layout`)
   await withImg.click()
@@ -410,7 +412,7 @@ try {
   await variantsPanel.getByRole('button', { name: /Camisa Oxford · Azul · M/ }).click()
   check(await visible(pos.locator('.pv-line .pv-thumb img')), 'la línea del carrito muestra la miniatura')
   await pos.locator('#pv-scan-input').fill('7000000000042'); await pos.locator('#pv-scan-input').press('Enter')
-  check(await pos.locator('.pv-line', { hasText: 'Gorra Lisa' }).locator('.pv-thumb b').innerText() === 'GL', 'línea sin imagen: iniciales en el carrito')
+  check(await pos.locator('.pv-line', { hasText: 'Gorra Lisa' }).locator('.pv-thumb i').innerText() === 'GL', 'línea sin imagen: iniciales en el carrito')
   if (SHOTS) await pos.screenshot({ path: `${SHOTS}/pos-miniaturas.png` })
 
   // Sin conexión: la caché del service worker sirve las fotos
@@ -436,7 +438,6 @@ try {
   check(await waitFor(() => offImg.evaluate((img) => img.complete && img.naturalWidth > 0).catch(() => false), 8000), 'sin conexión: la miniatura sale de la caché')
   check(mediaHits === hitsOnline, 'sin pedirla otra vez al servidor')
   await posCtx.close()
-  void hitsOnline
 
   console.log(pageErrors.length === 0 ? '  ok   sin errores de JavaScript en la página' : `  FAIL errores de página: ${pageErrors.join(' | ')}`)
   if (pageErrors.length) failures += 1

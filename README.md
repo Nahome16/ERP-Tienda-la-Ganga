@@ -18,15 +18,16 @@ confirmadas.
 - Punto de venta con escáner, descuentos, pagos mixtos (efectivo C$/US$, transferencia, tarjeta) y recibo interno opcional.
 - **Modo sin conexión**: el POS abre sin internet (PWA), vende contra una copia local y sincroniza solo, sin duplicar ventas.
 - Dos cajas independientes (Caja 1 y Caja 2) con apertura, cierre y arqueo por moneda, más cierre consolidado.
-- Productos con variantes talla/color, código de barras (EAN-13 interno si no trae), etiquetas e importación desde Excel/CSV.
+- Productos con variantes talla/color, código de barras (EAN-13 interno si no trae), **fotos (hasta 4 por producto, también visibles en el POS y sin conexión)**, etiquetas e importación desde Excel/CSV.
 - Inventario con Kardex, ajustes con motivo y alertas de stock.
+- **Reportes en Excel (.xlsx)** por rango de fechas: ventas, existencias, movimientos de inventario y cierres de caja.
 - Ventas: historial, anulación con reversión de inventario y revisión de ventas con diferencias.
 - Roles y permisos validados en el servidor, auditoría de acciones sensibles y configuración (tasa del dólar, bancos, datos del recibo).
 - Kit de despliegue para VPS (Docker, SSL automático, respaldos): ver [Despliegue](docs/21-despliegue-hostinger.md).
 
 Base técnica: ASP.NET Core 8 (API, aplicación, dominio, infraestructura), React + TypeScript, PostgreSQL 16, pruebas unitarias y de integración en CI.
 
-Fuera del MVP (siguientes fases): catálogo digital, compras, clientes y CRM, reportes avanzados, devoluciones parciales, 2FA.
+Fuera del MVP (siguientes fases): catálogo digital, compras, clientes y CRM, devoluciones parciales, 2FA.
 
 La puesta en marcha está explicada en [Desarrollo local](docs/20-desarrollo-local.md).
 
