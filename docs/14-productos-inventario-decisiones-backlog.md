@@ -399,7 +399,35 @@ Este backlog no autoriza:
 Estas acciones comienzan solamente cuando el usuario autorice expresamente la
 implementación y se cierre la puerta de decisiones aplicable.
 
-## 12. Próximo paso
+## 12. Revisión del punto de partida
 
-Revisar y aprobar las decisiones recomendadas de la sección 2. Después se podrá
-iniciar el Hito 0 y, según el estado del ZIP, crear o adaptar la base técnica.
+- GitHub está conectado y la implementación puede continuar desde la base
+  versionada. Se propone usar esa base como punto de partida y evaluar por
+  separado cualquier cambio que se quiera recuperar del ZIP.
+- La rama principal contiene la solución ASP.NET Core, el frontend React, la
+  configuración local de PostgreSQL y los proyectos de pruebas.
+- El acceso por sesión y los permisos de catálogo ya tienen una base en el
+  código. La migración versionada corresponde a identidad. Los catálogos y
+  las existencias de las pantallas de demostración todavía no se guardan como
+  datos comerciales.
+
+### Decisiones para revisar
+
+| Tema | Propuesta para revisión |
+|---|---|
+| Catálogos | Marca obligatoria con opción `Sin marca`. Corte obligatorio en pantalones y en otras categorías solo cuando se configuren. Cada talla pertenece a un grupo y cada variante de ropa requiere talla y color. |
+| Variantes | Una combinación única de producto, talla y color. Precio predeterminado por producto con excepción opcional por variante. |
+| Códigos de barras | Código único por variante. Generar Code 128 al ingresar mercadería y permitir asociar un código de fábrica. El catálogo inicial de categorías, marcas, cortes, tallas y colores puede construirse antes de las etiquetas. |
+| Ubicaciones | Usar `Sucursal San Judas` para el piso de venta. Confirmar si se habilita también `Bodega` desde el arranque. Esta decisión se aplica al hito de existencias iniciales. |
+
+Las reglas de esta tabla se presentan para revisión. Las decisiones de la
+sección 2 que correspondan a hitos posteriores se revisarán antes de aplicarlas.
+
+### Primera entrega de implementación
+
+Tras aprobar las reglas de catálogos y verificar el acceso y los permisos del
+Hito 2, iniciar el Hito 3. El resultado esperado es que un administrador pueda
+gestionar categorías, marcas, cortes, grupos de tallas, tallas y colores desde
+la aplicación. La API debe aplicar los permisos existentes, persistir los
+cambios en PostgreSQL y rechazar duplicados, jerarquías inválidas y ediciones
+concurrentes que sobrescriban cambios previos.
