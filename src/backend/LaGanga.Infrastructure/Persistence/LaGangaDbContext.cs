@@ -38,6 +38,8 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
 
     public DbSet<ProductVariant> Variants => Set<ProductVariant>();
 
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+
     public DbSet<StockBalance> StockBalances => Set<StockBalance>();
 
     public DbSet<InventoryMovement> Movements => Set<InventoryMovement>();

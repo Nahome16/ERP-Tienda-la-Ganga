@@ -409,6 +409,21 @@ se conserva y el script avisa con un error en `backups/backup.log`.
 
 ---
 
+### Fotos de los productos
+
+Las fotos que se suben en **Productos** se guardan en el servidor (volumen
+`api_images`). `backup.sh` las respalda cada noche junto con la base, en un
+archivo aparte `imagenes_FECHA.tar.gz` (también se copian al destino externo si lo
+configuró). Si todavía no hay fotos, el aviso «No se pudieron respaldar las
+imágenes» es normal.
+
+Para restaurar las fotos en un servidor nuevo (después de restaurar la base):
+
+```bash
+cd ~/la-ganga/infrastructure/deploy
+docker compose -f compose.prod.yml exec -T api tar -xzf - -C /data/images < backups/imagenes_FECHA.tar.gz
+```
+
 ## 10. Probar una restauración
 
 Un respaldo que nunca se probó no es un respaldo. Haga esta prueba **antes de

@@ -77,3 +77,19 @@ public sealed class InventoryMovementConfiguration : IEntityTypeConfiguration<In
         builder.HasIndex(movement => movement.SaleId);
     }
 }
+
+public sealed class ProductImageConfiguration : IEntityTypeConfiguration<ProductImage>
+{
+    public void Configure(EntityTypeBuilder<ProductImage> builder)
+    {
+        builder.ToTable("product_images", "inventory", table =>
+            table.HasCheckConstraint("CK_product_images_sort_order", "\"SortOrder\" >= 0"));
+        builder.HasKey(image => image.Id);
+        builder.Property(image => image.Id).ValueGeneratedNever();
+        builder.Property(image => image.FileName).HasMaxLength(ProductImage.FileNameMaxLength).IsRequired();
+        builder.Property(image => image.ThumbFileName).HasMaxLength(ProductImage.FileNameMaxLength).IsRequired();
+        builder.HasOne<Product>().WithMany().HasForeignKey(image => image.ProductId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(image => image.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(image => new { image.ProductId, image.SortOrder });
+    }
+}

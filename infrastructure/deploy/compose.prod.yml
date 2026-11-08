@@ -69,6 +69,7 @@ services:
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-la_ganga};Username=${POSTGRES_USER:-la_ganga};Password=${POSTGRES_PASSWORD}"
       # Aplica migraciones, sincroniza roles y crea las 2 cajas al arrancar.
       Database__AutoMigrate: "true"
+      Storage__ImagesPath: /data/images
       # Varias cajas comparten la IP de la tienda: el límite de 5 intentos/min era muy estricto.
       Authentication__LoginAttemptsPerMinute: "20"
       # Jornada larga: la sesión dura hasta 12 horas y se cierra tras 60 minutos sin actividad.
@@ -81,6 +82,8 @@ services:
       # Llaves de ASP.NET que protegen las cookies de sesión: así nadie debe
       # volver a iniciar sesión cada vez que se actualiza el sistema.
       - api_keys:/home/app/.aspnet
+      # Fotos de los productos. Se respaldan junto con la base (backup.sh).
+      - api_images:/data/images
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 30s
@@ -153,5 +156,6 @@ networks:
 volumes:
   pgdata:
   api_keys:
+  api_images:
   caddy_data:
   caddy_config:

@@ -74,7 +74,9 @@ public sealed class ProductService(
                 dbContext.StockBalances
                     .Where(balance => dbContext.Variants.Any(variant => variant.Id == balance.VariantId && variant.ProductId == product.Id))
                     .Sum(balance => (int?)balance.Quantity) ?? 0,
-                product.Version))
+                product.Version,
+                dbContext.ProductImages.Where(image => image.ProductId == product.Id)
+                    .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault()))
             .ToListAsync(cancellationToken);
         return Paging.Create(items, query.Page, query.PageSize, total);
     }
@@ -527,6 +529,10 @@ public sealed class ProductService(
                 includeCost))
             .ToArray();
 
+        var images = (await dbContext.ProductImages.AsNoTracking().Where(image => image.ProductId == id)
+            .OrderBy(image => image.SortOrder).ToListAsync(cancellationToken))
+            .Select(image => ProductImageService.ToDto(image, image.SortOrder == 0)).ToArray();
+
         return new ProductDetailDto(
             product.Id,
             product.Name,
@@ -541,7 +547,9 @@ public sealed class ProductService(
             variants.Length,
             variants.Sum(variant => variant.Stock),
             product.Version,
-            variants);
+            images.FirstOrDefault()?.ThumbUrl,
+            variants,
+            images);
     }
 
     private static string EscapeLike(string value) =>

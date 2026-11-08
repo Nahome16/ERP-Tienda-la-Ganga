@@ -141,6 +141,43 @@ apply_retention() {
 }
 apply_retention
 
+# 4b) Imágenes de productos ------------------------------------------------
+# Las fotos viven en el volumen del contenedor "api" (/data/images). Se guardan
+# aparte de la base: imagenes_FECHA.tar.gz. Si falla, el respaldo de la base ya
+# quedó guardado y solo se avisa.
+# IMAGES_TAR_EXEC: comando que escribe el tar.gz de las imágenes en su salida
+# estándar (por defecto, tar dentro del contenedor "api"; se cambia solo para pruebas).
+IMG_NAME="imagenes_${STAMP}${LABEL:+_$LABEL}.tar.gz"
+IMG_FINAL="$BACKUP_DIR/$IMG_NAME"
+IMG_STATUS=0
+backup_images() {
+  local partial="$BACKUP_DIR/.$IMG_NAME.partial"
+  trap 'rm -f "$partial"' RETURN
+  info "Respaldando imágenes de productos -> $IMG_NAME"
+  if [[ -n "${IMAGES_TAR_EXEC:-}" ]]; then
+    bash -c "$IMAGES_TAR_EXEC" >"$partial" || return 1
+  else
+    dc exec -T api tar -czf - -C /data/images . >"$partial" || return 1
+  fi
+  tar -tzf "$partial" >/dev/null 2>&1 || { warn "El archivo de imágenes no se puede leer."; return 1; }
+  mv "$partial" "$IMG_FINAL"
+  chmod 600 "$IMG_FINAL"
+  (cd "$BACKUP_DIR" && sha256sum "$IMG_NAME" >"$IMG_NAME.sha256")
+  chmod 600 "$BACKUP_DIR/$IMG_NAME.sha256"
+  ok "Imágenes respaldadas: $IMG_FINAL ($(du -h "$IMG_FINAL" | cut -f1))"
+  # Retención: se conservan las KEEP_DAILY más recientes.
+  local -a old=()
+  mapfile -t old < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'imagenes_*.tar.gz' | sort -r)
+  local idx
+  for idx in "${!old[@]}"; do
+    if (( idx >= KEEP_DAILY )); then rm -f -- "${old[$idx]}" "${old[$idx]}.sha256"; fi
+  done
+}
+if ! backup_images; then
+  IMG_STATUS=1
+  warn "No se pudieron respaldar las imágenes (si todavía no hay fotos cargadas, es normal). El respaldo de la base sí está guardado."
+fi
+
 # 5) Copia externa (opcional) --------------------------------------------
 REMOTE_STATUS=0
 copy_remote() {
@@ -153,6 +190,10 @@ copy_remote() {
       info "Copiando a $dest con rclone ..."
       rclone copyto "$FINAL" "${dest%/}/$NAME" || return 1
       rclone copyto "$FINAL.sha256" "${dest%/}/$NAME.sha256" || return 1
+      if (( IMG_STATUS == 0 )); then
+        rclone copyto "$IMG_FINAL" "${dest%/}/$IMG_NAME" || return 1
+        rclone copyto "$IMG_FINAL.sha256" "${dest%/}/$IMG_NAME.sha256" || return 1
+      fi
       if [[ "$REMOTE_KEEP_DAYS" =~ ^[0-9]+$ ]] && (( REMOTE_KEEP_DAYS > 0 )); then
         rclone delete "$dest" --min-age "${REMOTE_KEEP_DAYS}d" || warn "No se pudieron limpiar copias externas viejas."
       fi
@@ -162,6 +203,9 @@ copy_remote() {
       local target="${BACKUP_REMOTE#scp:}"
       info "Copiando a $target con scp ..."
       scp -q -o BatchMode=yes -o ConnectTimeout=20 "$FINAL" "$FINAL.sha256" "$target" || return 1
+      if (( IMG_STATUS == 0 )); then
+        scp -q -o BatchMode=yes -o ConnectTimeout=20 "$IMG_FINAL" "$IMG_FINAL.sha256" "$target" || return 1
+      fi
       ;;
     *)
       warn "BACKUP_REMOTE no se entiende ('$BACKUP_REMOTE'). Use rclone:remoto:carpeta o scp:usuario@host:/ruta/"

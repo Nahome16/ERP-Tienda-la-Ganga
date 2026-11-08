@@ -28,6 +28,8 @@ export type PosVariant = {
   barcode: string
   price: number
   stock: number
+  /** Miniatura de la imagen principal del producto (URL relativa) o null. */
+  imageUrl?: string | null
 }
 
 export type PosSnapshot = {
@@ -194,6 +196,8 @@ export type ProductListItem = {
   variantCount: number
   totalStock: number
   version: number
+  /** Miniatura de la imagen principal (URL relativa) o null. */
+  primaryImageUrl: string | null
 }
 
 export type Variant = {
@@ -213,7 +217,15 @@ export type Variant = {
   cost?: number | null
 }
 
-export type ProductDetail = ProductListItem & { variants: Variant[] }
+export type ProductImage = {
+  id: string
+  url: string
+  thumbUrl: string
+  isPrimary: boolean
+  sortOrder: number
+}
+
+export type ProductDetail = ProductListItem & { variants: Variant[]; images: ProductImage[] }
 
 export type ImportRow = {
   productName: string

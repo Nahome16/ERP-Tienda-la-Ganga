@@ -16,7 +16,8 @@ public sealed record ProductListItemDto(
     bool IsActive,
     int VariantCount,
     int TotalStock,
-    long Version);
+    long Version,
+    string? PrimaryImageUrl);
 
 public sealed record VariantDto(
     Guid Id,
@@ -48,7 +49,9 @@ public sealed record ProductDetailDto(
     int VariantCount,
     int TotalStock,
     long Version,
-    IReadOnlyList<VariantDto> Variants);
+    string? PrimaryImageUrl,
+    IReadOnlyList<VariantDto> Variants,
+    IReadOnlyList<ProductImageDto> Images);
 
 public sealed record VariantLookupDto(string ProductName, VariantDto Variant);
 

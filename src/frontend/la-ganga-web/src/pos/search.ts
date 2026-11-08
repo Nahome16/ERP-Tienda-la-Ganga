@@ -56,6 +56,8 @@ export type ProductGroup = {
   categoryName: string
   minPrice: number
   maxPrice: number
+  /** Miniatura del producto (puede faltar en instantáneas antiguas). */
+  imageUrl: string | null
   variants: PosVariant[]
 }
 
@@ -68,6 +70,7 @@ export function groupByProduct(variants: PosVariant[]): ProductGroup[] {
       group.variants.push(variant)
       group.minPrice = Math.min(group.minPrice, variant.price)
       group.maxPrice = Math.max(group.maxPrice, variant.price)
+      if (!group.imageUrl && variant.imageUrl) group.imageUrl = variant.imageUrl
     } else {
       groups.set(variant.productId, {
         productId: variant.productId,
@@ -76,6 +79,7 @@ export function groupByProduct(variants: PosVariant[]): ProductGroup[] {
         categoryName: variant.categoryName,
         minPrice: variant.price,
         maxPrice: variant.price,
+        imageUrl: variant.imageUrl ?? null,
         variants: [variant],
       })
     }

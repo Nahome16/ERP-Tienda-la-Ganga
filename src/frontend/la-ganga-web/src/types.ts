@@ -3,6 +3,7 @@ export type AppView =
   | 'pos'
   | 'caja'
   | 'ventas'
+  | 'reportes'
   | 'inventario'
   | 'productos'
   | 'equipo'

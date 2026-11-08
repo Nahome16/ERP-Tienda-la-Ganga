@@ -4,6 +4,7 @@ import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
 import { listProducts } from '../admin/adminApi'
 import { useDebounced, useFetch } from '../admin/hooks'
+import { Thumb } from '../admin/ImageManager'
 import { ImportDialog } from '../admin/ImportDialog'
 import { ProductDetailDialog } from '../admin/ProductDetailDialog'
 import { CreateProductDialog } from '../admin/ProductDialogs'
@@ -23,7 +24,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
   const [detail, setDetail] = useState<{ id: string; labels: boolean } | null>(null)
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
 
   const catalogs = useCatalogs()
   const filter = { search, categoryId, brandId, status, page, pageSize }
@@ -51,7 +52,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
         )}
       </header>
 
-      {notice && <Notice tone="ok">{notice}</Notice>}
+      {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
       {catalogs.error && <LoadError message={`No se pudieron cargar los catálogos: ${catalogs.error}`} onRetry={catalogs.reload} />}
 
       <section className="panel-card adm-card">
@@ -84,16 +85,17 @@ export function ProductsView({ user }: { user: CurrentUser }) {
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Producto</th><th>Categoría</th><th>Marca</th><th className="numeric">Precio base</th>
+                <th className="thumb-col"><span className="visually-hidden">Imagen</span></th><th>Producto</th><th>Categoría</th><th>Marca</th><th className="numeric">Precio base</th>
                 <th className="numeric">Variantes</th><th className="numeric">Existencia</th><th>Estado</th>
                 <th className="actions-col"><span className="visually-hidden">Acciones</span></th>
               </tr>
             </thead>
             <tbody>
-              {loading && items.length === 0 && <tr><td colSpan={8}><Spinner label="Cargando productos…" /></td></tr>}
-              {!loading && !error && items.length === 0 && <tr><td colSpan={8} className="adm-empty">No hay productos con estos filtros.</td></tr>}
+              {loading && items.length === 0 && <tr><td colSpan={9}><Spinner label="Cargando productos…" /></td></tr>}
+              {!loading && !error && items.length === 0 && <tr><td colSpan={9} className="adm-empty">No hay productos con estos filtros.</td></tr>}
               {items.map((product) => (
                 <tr key={product.id} className={product.isActive ? undefined : 'inactive-row'}>
+                  <td className="thumb-col"><Thumb src={product.primaryImageUrl} name={product.name} size={44} /></td>
                   <td>
                     <button type="button" className="link-button" style={{ padding: 0, textAlign: 'left' }} onClick={() => setDetail({ id: product.id, labels: false })}>{product.name}</button>
                     {product.cutName && <small className="row-sub">Corte {product.cutName}</small>}
@@ -126,16 +128,22 @@ export function ProductsView({ user }: { user: CurrentUser }) {
       {creating && catalogs.data && (
         <CreateProductDialog
           user={user} catalogs={catalogs.data} onClose={() => setCreating(false)}
-          onCreated={(product) => {
+          onCreated={(product, images) => {
             setCreating(false)
-            setNotice(`Producto «${product.name}» creado con ${product.variants.length} variante${product.variants.length === 1 ? '' : 's'}. Podés imprimir sus etiquetas desde la lista.`)
+            const base = `Producto «${product.name}» creado con ${product.variants.length} variante${product.variants.length === 1 ? '' : 's'}. Podés imprimir sus etiquetas desde la lista.`
+            if (images && images.failed.length > 0) {
+              const names = images.failed.map((item) => `«${item.name}»`).join(', ')
+              setNotice({ tone: 'warn', text: `${base} El producto quedó creado, pero no se pudo subir: ${names}. Reintentá desde el detalle del producto. ${images.failed[0].reason}` })
+            } else {
+              setNotice({ tone: 'ok', text: images ? `${base} Se subieron ${images.total} ${images.total === 1 ? 'imagen' : 'imágenes'}.` : base })
+            }
             reload()
             setDetail({ id: product.id, labels: false })
           }}
         />
       )}
       {importing && (
-        <ImportDialog user={user} onClose={() => setImporting(false)} onImported={() => { setNotice('Importación completada.'); reload(); catalogs.reload() }} />
+        <ImportDialog user={user} onClose={() => setImporting(false)} onImported={() => { setNotice({ tone: 'ok', text: 'Importación completada.' }); reload(); catalogs.reload() }} />
       )}
     </main>
   )
