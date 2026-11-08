@@ -28,6 +28,10 @@ El primer lanzamiento debe permitir:
 - `XL` y `1XL` son valores diferentes.
 - Cada producto recibe solo las tallas y colores que realmente ofrece.
 - Interfaz adaptable a computadora, tableta y celular.
+- Dos experiencias después del acceso: panel administrativo y POS para vendedor.
+- El vendedor accede directamente al POS y no al panel administrativo.
+- El POS tendrá continuidad offline por etapas, con reglas de sincronización
+  aprobadas antes de confirmar ventas sin red.
 - Los permisos se validan en el servidor.
 - Los datos demostrativos no se cargan como inventario real.
 - Identidad visual basada en el logo proporcionado: azul marino, naranja
@@ -83,16 +87,15 @@ Un **rol** es una plantilla de trabajo. Un **permiso** es la autorizacion concre
 que el servidor comprueba. La interfaz puede ocultar acciones no autorizadas,
 pero esto no sustituye la validacion de la API.
 
-Roles iniciales propuestos:
+Roles iniciales confirmados para el acceso inicial:
 
 1. Propietario o administrador.
 2. Vendedor o cajero.
-3. Encargado de inventario.
-4. Repartidor.
 
-Todos estos roles, excepto el propietario o administrador requerido para iniciar
-el sistema, permanecen como propuesta hasta confirmar la operacion real de la
-tienda.
+El administrador abre el panel administrativo y también puede utilizar el punto
+de venta. El vendedor abre directamente el POS y no recibe navegación ni datos
+administrativos. Encargado de inventario y repartidor permanecen como roles
+posteriores o combinaciones de permisos por confirmar.
 
 ## 5. Matriz inicial de permisos
 
@@ -190,6 +193,9 @@ cantidades de la demostracion no son datos reales.
 | DEC-008 | Metodo de valoracion del inventario | Pendiente | Costo promedio ponderado por variante |
 | DEC-009 | Acceso del vendedor a registrar abonos | Pendiente | Concederlo mediante permiso especifico |
 | DEC-010 | Acceso del vendedor a apertura y cierre | Pendiente | Concederlo al cajero responsable de la sesion |
+| DEC-011 | Experiencias después del login | Confirmado | Administrador abre panel; vendedor abre únicamente POS |
+| DEC-012 | Módulos principales del panel | Confirmado | Ventas, POS, Caja, Historial, Delivery, Pedidos, Clientes, Compras e Inventario |
+| DEC-013 | Continuidad offline del POS | Confirmado | Implementación por etapas; reglas de venta offline pendientes |
 
 ## 9. Bloques complementarios del Modulo 0
 
@@ -199,6 +205,8 @@ estructura conceptual se encuentran en
 [Documentos, auditoria y modelo de datos](02-documentos-auditoria-modelo-datos.md).
 La base tecnica se encuentra en
 [Arquitectura, entornos y estrategia de pruebas](03-arquitectura-entornos-y-pruebas.md).
+Las experiencias por rol y el diseño seguro del modo offline se encuentran en
+[Experiencias por rol y continuidad del POS](04-experiencias-roles-y-modo-offline.md).
 Permanecen como decisiones abiertas para los modulos correspondientes:
 
 1. Reglas de sesiones, caja y autorizaciones administrativas.

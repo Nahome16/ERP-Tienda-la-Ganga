@@ -21,14 +21,13 @@ confirmadas.
 
 La puesta en marcha está explicada en [Desarrollo local](docs/20-desarrollo-local.md).
 
-![Vista del primer hito conectado](docs/visualizations/la-ganga-hito-1-conectado.png)
-
 ## Documentacion actual
 
 - [Modulo 0 - Fundamentos](docs/00-modulo-fundamentos.md)
 - [Modulo 0 - Estados y transiciones](docs/01-estados-y-transiciones.md)
 - [Modulo 0 - Documentos, auditoria y modelo de datos](docs/02-documentos-auditoria-modelo-datos.md)
 - [Modulo 0 - Arquitectura, entornos y pruebas](docs/03-arquitectura-entornos-y-pruebas.md)
+- [Experiencias por rol y continuidad del POS](docs/04-experiencias-roles-y-modo-offline.md)
 - [Modulo 1 - Productos e inventario](docs/10-productos-inventario-especificacion.md)
 - [Modulo 1 - Pantallas y recorridos](docs/11-productos-inventario-ux.md)
 - [Modulo 1 - Modelo fisico de datos](docs/12-productos-inventario-modelo-fisico.md)

@@ -19,11 +19,11 @@ atómicas para las operaciones críticas.
 | API y reglas del negocio | ASP.NET Core 8 Web API |
 | Persistencia | PostgreSQL |
 | Acceso a datos | Entity Framework Core, propuesto |
-| Autenticación | JWT en cookies HttpOnly, con protección CSRF |
+| Autenticación | Cookie protegida HttpOnly, sesión revocable y protección CSRF |
 | Documentos PDF | QuestPDF |
 | Contenedores | Docker |
 | Imágenes | Cloudinary o Supabase Storage, pendiente |
-| Uso móvil | Diseño adaptable; PWA en una etapa posterior |
+| Uso móvil | Diseño adaptable; PWA para continuidad del POS |
 
 Las versiones exactas de paquetes se seleccionarán al iniciar la implementación,
 utilizando versiones estables y compatibles en ese momento.
@@ -55,6 +55,10 @@ flowchart LR
 
 La aplicación React presenta información y recoge acciones. La API es responsable
 de permisos, precios, descuentos, estados, existencias, saldos y transacciones.
+
+La interfaz ofrecerá dos espacios: `/admin` para módulos administrativos y
+`/pos` para la operación de venta. Ambos consumen la misma API, pero el servidor
+aplica permisos independientemente de la ruta o de los controles visibles.
 
 ## 4. Módulos internos
 
@@ -369,7 +373,7 @@ Una función no está terminada solamente porque aparece en pantalla. Debe cumpl
 | DEC-028 | Navegadores mínimos | Versiones actuales de Chrome, Edge y Safari móvil |
 | DEC-029 | Frecuencia y conservación de respaldos | Definir con el alojamiento y riesgo aceptable |
 | DEC-030 | Objetivos de recuperación | Definir pérdida máxima de datos y tiempo de recuperación |
-| DEC-031 | Funcionamiento sin conexión | No incluido inicialmente; conservar formularios cuando sea seguro |
+| DEC-031 | Funcionamiento sin conexión | Confirmado para el POS por etapas; la confirmación offline requiere cuota por variante y reglas aprobadas |
 
 ## 16. Cierre del Módulo 0
 
