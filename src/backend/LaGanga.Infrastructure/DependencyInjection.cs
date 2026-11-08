@@ -1,5 +1,6 @@
 using LaGanga.Application.Catalog;
 using LaGanga.Application.Identity;
+using LaGanga.Application.Users;
 using LaGanga.Domain.Identity;
 using LaGanga.Infrastructure.Catalog;
 using LaGanga.Infrastructure.Identity;
@@ -26,6 +27,8 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
         services.AddScoped<IPasswordService, PasswordService>();
         services.AddScoped<IdentityBootstrapper>();
+        services.AddScoped<RoleSynchronizer>();
+        services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<CatalogSeeder>();
         return services;

@@ -52,4 +52,26 @@ public sealed class UserAccount
     public void MarkLogin(DateTimeOffset loggedInAtUtc) => LastLoginAtUtc = loggedInAtUtc;
 
     public void AddRole(Role role) => _roles.Add(new UserRole(Id, role.Id));
+
+    public void ChangeDisplayName(string displayName) => DisplayName = displayName.Trim();
+
+    public void Activate() => IsActive = true;
+
+    public void Deactivate() => IsActive = false;
+
+    /// <summary>Reemplaza los roles por exactamente los indicados.</summary>
+    public void ReplaceRoles(IReadOnlyCollection<Role> roles)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+
+        var wanted = roles.Select(role => role.Id).ToHashSet();
+        _roles.RemoveAll(userRole => !wanted.Contains(userRole.RoleId));
+        foreach (var role in roles)
+        {
+            if (_roles.TrueForAll(userRole => userRole.RoleId != role.Id))
+            {
+                _roles.Add(new UserRole(Id, role.Id));
+            }
+        }
+    }
 }
