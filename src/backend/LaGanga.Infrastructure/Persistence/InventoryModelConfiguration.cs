@@ -93,3 +93,59 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
         builder.HasIndex(image => new { image.ProductId, image.SortOrder });
     }
 }
+
+public sealed class PartnerConfiguration : IEntityTypeConfiguration<Partner>
+{
+    public void Configure(EntityTypeBuilder<Partner> builder)
+    {
+        builder.ToTable("partners", "inventory");
+        builder.HasKey(partner => partner.Id);
+        builder.Property(partner => partner.Id).ValueGeneratedNever();
+        builder.Property(partner => partner.Name).HasMaxLength(Partner.NameMaxLength).IsRequired();
+        builder.Property(partner => partner.NormalizedName).HasMaxLength(Partner.NameMaxLength).IsRequired();
+        builder.Property(partner => partner.Phone).HasMaxLength(50);
+        builder.Property(partner => partner.Notes).HasMaxLength(500);
+        builder.Property(partner => partner.Version).IsConcurrencyToken();
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(partner => partner.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(partner => partner.NormalizedName).IsUnique();
+    }
+}
+
+public sealed class StockLotConfiguration : IEntityTypeConfiguration<StockLot>
+{
+    public void Configure(EntityTypeBuilder<StockLot> builder)
+    {
+        builder.ToTable("stock_lots", "inventory", table =>
+        {
+            table.HasCheckConstraint("CK_stock_lots_quantities", "\"QuantityIn\" > 0 AND \"QuantityRemaining\" >= 0 AND \"QuantityRemaining\" <= \"QuantityIn\"");
+            table.HasCheckConstraint("CK_stock_lots_money", "(\"UnitCost\" IS NULL OR \"UnitCost\" >= 0) AND (\"UnitPrice\" IS NULL OR \"UnitPrice\" >= 0)");
+        });
+        builder.HasKey(lot => lot.Id);
+        builder.Property(lot => lot.Id).ValueGeneratedNever();
+        builder.Property(lot => lot.Source).HasConversion<string>().HasMaxLength(20);
+        builder.Property(lot => lot.UnitCost).HasPrecision(18, 4);
+        builder.Property(lot => lot.UnitPrice).HasPrecision(18, 2);
+        builder.Property(lot => lot.Note).HasMaxLength(500);
+        builder.HasOne<ProductVariant>().WithMany().HasForeignKey(lot => lot.VariantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Partner>().WithMany().HasForeignKey(lot => lot.PartnerId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(lot => lot.EnteredBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(lot => new { lot.VariantId, lot.EnteredAtUtc });
+        builder.HasIndex(lot => lot.PartnerId);
+    }
+}
+
+public sealed class LotAllocationConfiguration : IEntityTypeConfiguration<LotAllocation>
+{
+    public void Configure(EntityTypeBuilder<LotAllocation> builder)
+    {
+        builder.ToTable("lot_allocations", "inventory", table =>
+            table.HasCheckConstraint("CK_lot_allocations_quantity", "\"Quantity\" > 0"));
+        builder.HasKey(allocation => allocation.Id);
+        builder.Property(allocation => allocation.Id).ValueGeneratedNever();
+        builder.Property(allocation => allocation.Kind).HasConversion<string>().HasMaxLength(10);
+        builder.HasOne<StockLot>().WithMany().HasForeignKey(allocation => allocation.LotId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ProductVariant>().WithMany().HasForeignKey(allocation => allocation.VariantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(allocation => allocation.LotId);
+        builder.HasIndex(allocation => allocation.SaleId);
+    }
+}

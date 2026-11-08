@@ -456,3 +456,69 @@ errores como JSON `problem+json` con 400).
 | `/api/v1/reports/cash?from&to` | `cash.report.read` | Cierres por caja, Consolidado por día, Transferencias por banco |
 
 Aún no hay reporte de compras (no existe el módulo).
+
+## 11. Socios e inversión (solo administrador)
+
+Cada **entrada de mercadería** (existencia inicial, importación, «Entrada» o ajuste
+positivo) crea una *entrada* (lote) con su **socio**, **costo unitario** y **precio dado**.
+Las ventas y pérdidas descuentan de la entrada más antigua primero (**PEPS**); así se sabe
+de qué socio es lo vendido. Anular una venta devuelve las unidades a su entrada original.
+Las existencias que ya había antes de esta función quedan como una entrada «Saldo inicial»
+sin socio. «Sin socio» es un grupo más. Todo el módulo exige permisos que **solo tiene el
+Administrador**: `investment.read` (ver) e `investment.manage` (crear/editar socios y entradas).
+
+```ts
+type Partner = { id: string; name: string; phone: string | null; notes: string | null; isActive: boolean; version: number }
+
+type PartnerSummary = {            // una fila por socio y una «Sin socio» (partnerId null)
+  partnerId: string | null; partnerName: string
+  unitsEntered: number             // unidades ingresadas en el período (por fecha de entrada)
+  investedNio: number              // Σ unidades × costo (solo entradas con costo)
+  unitsWithoutCost: number         // ingresadas sin costo (inversión incompleta)
+  unitsInStock: number             // existencias de HOY (no dependen del período)
+  stockAtCostNio: number; stockAtPriceNio: number   // al costo / al precio de venta actual
+  unitsSold: number; revenueNio: number             // en el período; ingresos con descuentos repartidos
+  costOfSoldNio: number
+  profitNio: number                // ingresos − costo (solo ventas con costo conocido)
+  soldUnitsWithoutCost: number     // si > 0, la ganancia es parcial
+  lossUnits: number; lossCostNio: number            // pérdidas/ajustes negativos
+}
+type InvestmentSummary = { from: string | null; to: string | null; partners: PartnerSummary[]; totals: PartnerSummary }
+type ProductBreakdown = { partnerId: string | null; partnerName: string; productId: string; productName: string
+  unitsEntered: number; investedNio: number; unitsInStock: number; stockAtCostNio: number
+  unitsSold: number; revenueNio: number; profitNio: number }
+type Lot = {
+  id: string; partnerId: string | null; partnerName: string
+  variantId: string; productId: string; productName: string; sizeName: string; colorName: string; barcode: string
+  enteredAtUtc: string; enteredByName: string
+  source: 'InitialStock' | 'Entry' | 'Adjustment' | 'Import' | 'Opening' | 'Restock'; note: string | null
+  quantityIn: number; quantityRemaining: number; quantitySold: number; quantityLost: number
+  unitCost: number | null; unitPrice: number | null   // costo y precio dados al ingresar
+  currentPrice: number; investedNio: number; stockAtCostNio: number
+}
+```
+
+- `GET /investment/partners?status=active|all` — `investment.read` → `Partner[]` (también
+  alimenta los selectores al ingresar mercadería).
+- `POST /investment/partners` — `investment.manage`: `{ name, phone?, notes? }` → 201 `Partner`
+  (409 `duplicate_name`). `PUT /investment/partners/{id}`: `{ name, phone, notes, isActive }`.
+- `GET /investment/summary?from&to` (fechas `YYYY-MM-DD`, opcionales) → `InvestmentSummary`.
+- `GET /investment/breakdown?partnerId=<id>|none&from&to` → `ProductBreakdown[]`
+  (sin `partnerId`: todos los socios).
+- `GET /investment/lots?partnerId=<id>|none&search&onlyWithStock&from&to&page&pageSize` → página de `Lot`.
+- `PUT /investment/lots/{id}` — `investment.manage`: `{ partnerId: string|null, unitCost: number|null, unitPrice: number|null, note: string|null }`
+  → `Lot`. Sirve para asignar el socio o corregir el costo de una entrada ya registrada
+  (el cambio se aplica a todo su historial y queda en auditoría).
+- `GET /reports/investment?from&to` — `investment.read` → `.xlsx` (Resumen por socio, Por producto, Entradas).
+
+**Al ingresar mercadería** (solo con `investment.read`; con otro permiso, 403 `partner_not_allowed`):
+
+- `POST /inventory/adjustments`: nuevos campos opcionales `partnerId`, `unitCost`, `unitPrice`
+  (solo en entradas, `delta > 0`). Sin indicarlos: sin socio, costo = costo actual de la variante,
+  precio = precio actual.
+- `POST /products` y `POST /products/{id}/variants`: `variants[].partnerId` opcional (el `cost`
+  y el `priceOverride`/`basePrice` ya existen y quedan como costo/precio de esa entrada).
+- `POST /products/import`: `rows[].partner` (nombre del socio, opcional) y `createMissingPartners: boolean`.
+- `GET /inventory?partnerId=<id>|none`: filtra variantes con existencias de ese socio. Con
+  `investment.read`, cada fila trae `partners: { partnerId: string|null; name: string; units: number }[]`
+  y, si hay filtro, `partnerStock` (unidades de ese socio). Sin `investment.read` esos campos no se envían.

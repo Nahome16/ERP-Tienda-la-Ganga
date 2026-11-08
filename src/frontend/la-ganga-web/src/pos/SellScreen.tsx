@@ -241,6 +241,8 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       const localSale = buildLocalSale(request, lines, { session, sellerName: user.displayName, settings })
       // Primero a la cola local (IndexedDB); el envío al servidor ocurre en segundo plano.
       await engine.enqueue({ clientSaleId, userId: user.id, userName: user.displayName, request, localSale })
+      // El borrador se borra ya (no a los 400 ms): si se recarga justo ahora, la venta cobrada no debe reaparecer.
+      void clearCartDraft().catch(() => undefined)
       setLines([])
       setDiscountText('')
       setApproval(null)

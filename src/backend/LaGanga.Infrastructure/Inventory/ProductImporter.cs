@@ -15,6 +15,7 @@ namespace LaGanga.Infrastructure.Inventory;
 /// </summary>
 internal sealed class ProductImporter(
     LaGangaDbContext dbContext,
+    LotService lots,
     DateTimeOffset now,
     Actor actor,
     ImportRequest request)
@@ -28,6 +29,7 @@ internal sealed class ProductImporter(
     private readonly Dictionary<string, Cut> _cuts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Size> _sizes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Color> _colors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Partner> _partners = new(StringComparer.Ordinal);
 
     public async Task<ImportResult> RunAsync(CancellationToken cancellationToken)
     {
@@ -80,6 +82,19 @@ internal sealed class ProductImporter(
                 AddError(rowNumber, "Tu cuenta no puede registrar existencia inicial.");
             }
 
+            Partner? partner = null;
+            if (!string.IsNullOrWhiteSpace(row.Partner))
+            {
+                if (!actor.Has(PermissionNames.InvestmentRead))
+                {
+                    AddError(rowNumber, "Tu cuenta no puede asignar socios: dejá esa columna vacía.");
+                }
+                else
+                {
+                    partner = ResolvePartner(rowNumber, row.Partner, request.CreateMissingPartners);
+                }
+            }
+
             var barcode = row.Barcode?.Trim() ?? string.Empty;
             if (barcode.Length > 0)
             {
@@ -115,7 +130,7 @@ internal sealed class ProductImporter(
                 continue;
             }
 
-            group.Variants.Add(new VariantRow(size, color, barcode, row.Price!.Value, row.Cost, quantity));
+            group.Variants.Add(new VariantRow(size, color, barcode, row.Price!.Value, row.Cost, quantity, partner));
         }
 
         if (_errors.Count > 0)
@@ -157,6 +172,9 @@ internal sealed class ProductImporter(
                     dbContext.Movements.Add(new InventoryMovement(
                         Guid.NewGuid(), variant.Id, MovementType.InitialStock, variantRow.Quantity, variantRow.Quantity,
                         "Importación inicial", null, actor.UserId, now));
+                    lots.AddLot(
+                        variant.Id, variantRow.Partner?.Id, LotSource.Import, variantRow.Quantity, 0,
+                        variantRow.Cost, variantRow.Price, "Importación inicial", actor.UserId, now);
                 }
             }
         }
@@ -196,6 +214,11 @@ internal sealed class ProductImporter(
         {
             _colors.TryAdd(color.NormalizedName, color);
         }
+
+        foreach (var partner in await dbContext.Partners.AsNoTracking().Where(partner => partner.IsActive).ToListAsync(cancellationToken))
+        {
+            _partners.TryAdd(partner.NormalizedName, partner);
+        }
     }
 
     private Category? ResolveCategory(int row, string? name, bool create) =>
@@ -212,6 +235,38 @@ internal sealed class ProductImporter(
 
     private Color? ResolveColor(int row, string? name, bool create) =>
         Resolve(row, "color", name, _colors, create, "Color", clean => new Color(Guid.NewGuid(), clean, null, 0, actor.UserId, now));
+
+    private Partner? ResolvePartner(int row, string name, bool create)
+    {
+        var clean = CatalogText.CleanVisibleName(name);
+        var normalized = CatalogText.Normalize(clean);
+        if (_partners.TryGetValue(normalized, out var found))
+        {
+            return found;
+        }
+
+        if (!create)
+        {
+            AddError(row, $"El socio «{clean}» no existe. Creálo en Socios e inversión o marcá «crear los que falten».");
+            return null;
+        }
+
+        if (clean.Length is 0 or > Partner.NameMaxLength)
+        {
+            AddError(row, $"El nombre del socio «{clean}» no es válido.");
+            return null;
+        }
+
+        var partner = new Partner(Guid.NewGuid(), clean, null, null, actor.UserId, now);
+        _partners[normalized] = partner;
+        _catalogsCreated.Add(string.Create(CultureInfo.InvariantCulture, $"Socio: {partner.Name}"));
+        if (!request.DryRun)
+        {
+            dbContext.Partners.Add(partner);
+        }
+
+        return partner;
+    }
 
     private T? Resolve<T>(
         int row,
@@ -278,5 +333,5 @@ internal sealed class ProductImporter(
         public List<VariantRow> Variants { get; } = [];
     }
 
-    private sealed record VariantRow(Size Size, Color Color, string Barcode, decimal Price, decimal? Cost, int Quantity);
+    private sealed record VariantRow(Size Size, Color Color, string Barcode, decimal Price, decimal? Cost, int Quantity, Partner? Partner);
 }

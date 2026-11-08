@@ -97,12 +97,13 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
   const [progress, setProgress] = useState<string | null>(null)
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
+  const canPartners = hasPermission(user, 'investment.read')
   const [fields, setFields] = useState<ProductFields>({ name: '', categoryId: '', brandId: '', cutId: '', basePrice: '' })
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const built = builderToInputs(builder, catalogs.sizes, catalogs.colors, new Set(), canCost)
+  const built = builderToInputs(builder, catalogs.sizes, catalogs.colors, new Set(), canCost, canPartners)
   const needsInitialPermission = built.totalUnits > 0 && !canInitial
 
   async function submit(event: FormEvent) {
@@ -148,7 +149,7 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
     >
       <form id="create-product-form" className="adm-form" onSubmit={(event) => { void submit(event) }}>
         <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} />
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} />
+        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} />
         {canImages && <PendingImages onChange={setPending} />}
         {needsInitialPermission && <Notice tone="warn">Tu cuenta no tiene permiso para registrar existencia inicial: dejá las cantidades vacías.</Notice>}
         {error && <Notice tone="error">{error}</Notice>}
@@ -287,12 +288,13 @@ export function AddVariantsDialog({ product, catalogs, user, onClose, onDone, on
 }) {
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
+  const canPartners = hasPermission(user, 'investment.read')
   const existing = new Set(product.variants.map((variant) => `${variant.sizeId}|${variant.colorId}`))
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
-  const built = builderToInputs(builder, catalogs.sizes, catalogs.colors, existing, canCost)
+  const built = builderToInputs(builder, catalogs.sizes, catalogs.colors, existing, canCost, canPartners)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -332,7 +334,7 @@ export function AddVariantsDialog({ product, catalogs, user, onClose, onDone, on
       )}
     >
       <form id="add-variants-form" className="adm-form" onSubmit={(event) => { void submit(event) }}>
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} existing={existing} />
+        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} />
         {error && <Notice tone="error">{error}</Notice>}
       </form>
     </Dialog>

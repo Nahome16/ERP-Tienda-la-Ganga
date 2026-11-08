@@ -1,6 +1,7 @@
 using LaGanga.Application.Catalog;
 using LaGanga.Application.Common;
 using LaGanga.Application.Identity;
+using LaGanga.Application.Investment;
 using LaGanga.Application.Inventory;
 using LaGanga.Application.Sales;
 using LaGanga.Application.Settings;
@@ -43,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<ISettingsService, SettingsService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IInvestmentService, InvestmentService>();
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddSingleton<IImageStorage, LocalImageStorage>();
         services.AddScoped<IProductImageService, ProductImageService>();

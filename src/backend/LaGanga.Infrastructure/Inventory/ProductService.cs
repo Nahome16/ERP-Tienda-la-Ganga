@@ -9,11 +9,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LaGanga.Infrastructure.Inventory;
 
-public sealed class ProductService(
-    LaGangaDbContext dbContext,
-    IAuditWriter audit,
-    TimeProvider timeProvider) : IProductService
+public sealed class ProductService : IProductService
 {
+    private readonly LaGangaDbContext dbContext;
+    private readonly IAuditWriter audit;
+    private readonly TimeProvider timeProvider;
+    private readonly LotService lots;
+
+    public ProductService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider)
+    {
+        this.dbContext = dbContext;
+        this.audit = audit;
+        this.timeProvider = timeProvider;
+        lots = new LotService(dbContext);
+    }
+
     public async Task<PageResult<ProductListItemDto>> ListAsync(
         ProductListQuery query,
         CancellationToken cancellationToken)
@@ -356,7 +366,7 @@ public sealed class ProductService(
             return Result.Fail<ImportResult>(ServiceErrorKind.Validation, "validation_failed", $"Importá como máximo {ProductImporter.MaxRows} filas por archivo.", "rows");
         }
 
-        var importer = new ProductImporter(dbContext, timeProvider.GetUtcNow(), actor, request);
+        var importer = new ProductImporter(dbContext, lots, timeProvider.GetUtcNow(), actor, request);
         var result = await importer.RunAsync(cancellationToken);
         if (!request.DryRun && result.Errors.Count == 0)
         {
@@ -432,6 +442,19 @@ public sealed class ProductService(
                 return new ServiceError(ServiceErrorKind.Forbidden, "initial_stock_not_allowed", "Tu cuenta no puede registrar existencia inicial.", "variants");
             }
 
+            if (variant.PartnerId is { } partnerId)
+            {
+                if (!actor.Has(PermissionNames.InvestmentRead))
+                {
+                    return new ServiceError(ServiceErrorKind.Forbidden, "partner_not_allowed", "Tu cuenta no puede asignar un socio a la mercadería.", "variants");
+                }
+
+                if (!await dbContext.Partners.AnyAsync(partner => partner.Id == partnerId && partner.IsActive, cancellationToken))
+                {
+                    return new ServiceError(ServiceErrorKind.Validation, "validation_failed", "El socio elegido no existe o está inactivo.", "variants");
+                }
+            }
+
             var barcode = variant.Barcode?.Trim() ?? string.Empty;
             if (barcode.Length > 0)
             {
@@ -488,6 +511,9 @@ public sealed class ProductService(
             dbContext.Movements.Add(new InventoryMovement(
                 Guid.NewGuid(), variant.Id, MovementType.InitialStock, input.InitialQuantity, input.InitialQuantity,
                 "Existencia inicial", null, actor.UserId, now));
+            lots.AddLot(
+                variant.Id, input.PartnerId, LotSource.InitialStock, input.InitialQuantity, 0,
+                input.Cost, input.PriceOverride ?? product.BasePrice, "Existencia inicial", actor.UserId, now);
         }
     }
 

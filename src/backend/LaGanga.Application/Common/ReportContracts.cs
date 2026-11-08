@@ -10,5 +10,7 @@ public interface IReportService
 
     Task<ServiceResult<ReportFile>> MovementsAsync(DateOnly fromDate, DateOnly toDate, Actor actor, CancellationToken cancellationToken);
 
+    Task<ServiceResult<ReportFile>> InvestmentAsync(DateOnly fromDate, DateOnly toDate, Actor actor, CancellationToken cancellationToken);
+
     Task<ServiceResult<ReportFile>> CashAsync(DateOnly fromDate, DateOnly toDate, Actor actor, CancellationToken cancellationToken);
 }

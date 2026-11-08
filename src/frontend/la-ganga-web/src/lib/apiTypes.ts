@@ -275,6 +275,8 @@ export type ImportRow = {
   price: number
   cost: number | null
   quantity: number
+  /** Nombre del socio (solo con investment.read). */
+  partner?: string | null
 }
 
 export type ImportResult = {
@@ -306,6 +308,9 @@ export type InventoryRow = {
   stock: number
   cost?: number | null
   stockValue?: number | null
+  /** Solo con investment.read: existencias por socio y, con filtro de socio, las unidades de ese socio. */
+  partners?: PartnerUnits[]
+  partnerStock?: number
 }
 
 export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid'
@@ -329,3 +334,82 @@ export type AuditRow = {
   entityId: string
   summary: string
 }
+
+// ---- Socios e inversión (solo administrador) — ver docs/30, sección 11 ----
+
+export type Partner = {
+  id: string
+  name: string
+  phone: string | null
+  notes: string | null
+  isActive: boolean
+  version: number
+}
+
+export type PartnerSummary = {
+  partnerId: string | null
+  partnerName: string
+  unitsEntered: number
+  investedNio: number
+  unitsWithoutCost: number
+  unitsInStock: number
+  stockAtCostNio: number
+  stockAtPriceNio: number
+  unitsSold: number
+  revenueNio: number
+  costOfSoldNio: number
+  profitNio: number
+  soldUnitsWithoutCost: number
+  lossUnits: number
+  lossCostNio: number
+}
+
+export type InvestmentSummary = {
+  from: string | null
+  to: string | null
+  partners: PartnerSummary[]
+  totals: PartnerSummary
+}
+
+export type ProductBreakdown = {
+  partnerId: string | null
+  partnerName: string
+  productId: string
+  productName: string
+  unitsEntered: number
+  investedNio: number
+  unitsInStock: number
+  stockAtCostNio: number
+  unitsSold: number
+  revenueNio: number
+  profitNio: number
+}
+
+export type LotSource = 'InitialStock' | 'Entry' | 'Adjustment' | 'Import' | 'Opening' | 'Restock'
+
+export type Lot = {
+  id: string
+  partnerId: string | null
+  partnerName: string
+  variantId: string
+  productId: string
+  productName: string
+  sizeName: string
+  colorName: string
+  barcode: string
+  enteredAtUtc: string
+  enteredByName: string
+  source: LotSource
+  note: string | null
+  quantityIn: number
+  quantityRemaining: number
+  quantitySold: number
+  quantityLost: number
+  unitCost: number | null
+  unitPrice: number | null
+  currentPrice: number
+  investedNio: number
+  stockAtCostNio: number
+}
+
+export type PartnerUnits = { partnerId: string | null; name: string; units: number }

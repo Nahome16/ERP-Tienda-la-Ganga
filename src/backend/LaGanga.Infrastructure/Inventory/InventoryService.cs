@@ -2,17 +2,28 @@ using System.Globalization;
 using LaGanga.Application.Common;
 using LaGanga.Application.Inventory;
 using LaGanga.Application.Settings;
+using LaGanga.Domain.Identity;
 using LaGanga.Domain.Inventory;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace LaGanga.Infrastructure.Inventory;
 
-public sealed class InventoryService(
-    LaGangaDbContext dbContext,
-    IAuditWriter audit,
-    TimeProvider timeProvider) : IInventoryService
+public sealed class InventoryService : IInventoryService
 {
+    private readonly LaGangaDbContext dbContext;
+    private readonly IAuditWriter audit;
+    private readonly TimeProvider timeProvider;
+    private readonly LotService lots;
+
+    public InventoryService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider)
+    {
+        this.dbContext = dbContext;
+        this.audit = audit;
+        this.timeProvider = timeProvider;
+        lots = new LotService(dbContext);
+    }
+
     public async Task<InventorySummaryDto> GetSummaryAsync(CancellationToken cancellationToken)
     {
         var threshold = await dbContext.Settings.AsNoTracking().Select(settings => settings.LowStockThreshold).SingleAsync(cancellationToken);
@@ -60,6 +71,30 @@ public sealed class InventoryService(
                 variant.Cost,
             };
 
+        var canSeePartners = actor.Has(PermissionNames.InvestmentRead);
+        Guid? partnerFilter = null;
+        var withoutPartner = false;
+        if (canSeePartners && !string.IsNullOrWhiteSpace(query.PartnerId))
+        {
+            if (string.Equals(query.PartnerId.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+            {
+                withoutPartner = true;
+            }
+            else if (Guid.TryParse(query.PartnerId, out var parsedPartner))
+            {
+                partnerFilter = parsedPartner;
+            }
+        }
+
+        if (partnerFilter is { } filterPartner)
+        {
+            rows = rows.Where(row => dbContext.StockLots.Any(lot => lot.VariantId == row.VariantId && lot.PartnerId == filterPartner && lot.QuantityRemaining > 0));
+        }
+        else if (withoutPartner)
+        {
+            rows = rows.Where(row => dbContext.StockLots.Any(lot => lot.VariantId == row.VariantId && lot.PartnerId == null && lot.QuantityRemaining > 0));
+        }
+
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = $"%{query.Search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal)}%";
@@ -90,6 +125,26 @@ public sealed class InventoryService(
             .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
             .ToListAsync(cancellationToken);
         var includeCost = actor.CanSeeCosts;
+        var pageVariantIds = page.Select(row => row.VariantId).ToArray();
+        var partnerUnits = new Dictionary<Guid, List<PartnerUnitsDto>>();
+        if (canSeePartners && pageVariantIds.Length > 0)
+        {
+            var lotRows = await (
+                from lot in dbContext.StockLots.AsNoTracking()
+                where pageVariantIds.Contains(lot.VariantId) && lot.QuantityRemaining > 0
+                join partner in dbContext.Partners on lot.PartnerId equals partner.Id into partners
+                from partner in partners.DefaultIfEmpty()
+                select new { lot.VariantId, lot.PartnerId, Name = partner == null ? "Sin socio" : partner.Name, lot.QuantityRemaining })
+                .ToListAsync(cancellationToken);
+            foreach (var group in lotRows.GroupBy(lot => lot.VariantId))
+            {
+                partnerUnits[group.Key] = group
+                    .GroupBy(lot => new { lot.PartnerId, lot.Name })
+                    .Select(unit => new PartnerUnitsDto(unit.Key.PartnerId, unit.Key.Name, unit.Sum(lot => lot.QuantityRemaining)))
+                    .OrderByDescending(unit => unit.Units).ToList();
+            }
+        }
+
         var items = page.Select(row => new InventoryRowDto(
             row.VariantId,
             row.ProductId,
@@ -101,7 +156,11 @@ public sealed class InventoryService(
             row.Price,
             row.Stock,
             includeCost ? row.Cost : null,
-            includeCost && row.Cost is { } cost ? Math.Round(cost * row.Stock, 2) : null)).ToArray();
+            includeCost && row.Cost is { } cost ? Math.Round(cost * row.Stock, 2) : null,
+            canSeePartners && (partnerFilter is not null || withoutPartner)
+                ? partnerUnits.GetValueOrDefault(row.VariantId)?.Where(unit => unit.PartnerId == partnerFilter).Sum(unit => unit.Units) ?? 0
+                : null,
+            canSeePartners ? partnerUnits.GetValueOrDefault(row.VariantId) ?? [] : null)).ToArray();
         return Paging.Create(items, query.Page, query.PageSize, total);
     }
 
@@ -171,6 +230,29 @@ public sealed class InventoryService(
             return Result.Fail<AdjustmentResultDto>(ServiceErrorKind.NotFound, "not_found", "No encontramos esa variante.");
         }
 
+        // Socio, costo y precio de la entrada: solo quien administra la inversión puede indicarlos.
+        var hasInvestmentData = input.PartnerId is not null || input.UnitCost is not null || input.UnitPrice is not null;
+        if (hasInvestmentData && !actor.Has(PermissionNames.InvestmentRead))
+        {
+            return Result.Fail<AdjustmentResultDto>(ServiceErrorKind.Forbidden, "partner_not_allowed", "Tu cuenta no puede indicar socio, costo ni precio al ingresar mercadería.");
+        }
+
+        if (hasInvestmentData && input.Delta < 0)
+        {
+            return Result.Fail<AdjustmentResultDto>(ServiceErrorKind.Validation, "validation_failed", "El socio, el costo y el precio solo aplican a entradas de mercadería.", "partnerId");
+        }
+
+        if (input.UnitCost is < 0 || input.UnitPrice is < 0)
+        {
+            return Result.Fail<AdjustmentResultDto>(ServiceErrorKind.Validation, "validation_failed", "El costo y el precio no pueden ser negativos.", "unitCost");
+        }
+
+        if (input.PartnerId is { } partnerId &&
+            !await dbContext.Partners.AnyAsync(partner => partner.Id == partnerId && partner.IsActive, cancellationToken))
+        {
+            return Result.Fail<AdjustmentResultDto>(ServiceErrorKind.Validation, "validation_failed", "El socio elegido no existe o está inactivo.", "partnerId");
+        }
+
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var balance = await dbContext.StockBalances
             .FromSqlInterpolated($"SELECT * FROM inventory.stock_balances WHERE \"VariantId\" = {input.VariantId} FOR UPDATE")
@@ -190,7 +272,30 @@ public sealed class InventoryService(
                 $"El ajuste dejaría el saldo en {newQuantity}. Hay {balance.Quantity} unidades disponibles.");
         }
 
+        var balanceBefore = balance.Quantity;
         balance.Quantity = newQuantity;
+        var now = timeProvider.GetUtcNow();
+        if (input.Delta > 0)
+        {
+            var basePrice = await dbContext.Products.Where(product => product.Id == variant.ProductId).Select(product => product.BasePrice).SingleAsync(cancellationToken);
+            lots.AddLot(
+                variant.Id,
+                input.PartnerId,
+                input.Kind == AdjustmentKind.Entry ? LotSource.Entry : LotSource.Adjustment,
+                input.Delta,
+                balanceBefore,
+                input.UnitCost ?? variant.Cost,
+                input.UnitPrice ?? variant.PriceOverride ?? basePrice,
+                reason,
+                actor.UserId,
+                now);
+        }
+        else
+        {
+            await lots.ConsumeAsync(variant.Id, -input.Delta, AllocationKind.Loss, null, null, now, cancellationToken);
+        }
+
+        await lots.ReconcileAsync(variant.Id, newQuantity, now, cancellationToken);
         var type = input.Kind switch
         {
             AdjustmentKind.Entry => MovementType.Entry,
@@ -198,7 +303,7 @@ public sealed class InventoryService(
             _ => MovementType.Adjustment,
         };
         dbContext.Movements.Add(new InventoryMovement(
-            Guid.NewGuid(), input.VariantId, type, input.Delta, newQuantity, reason, null, actor.UserId, timeProvider.GetUtcNow()));
+            Guid.NewGuid(), input.VariantId, type, input.Delta, newQuantity, reason, null, actor.UserId, now));
         audit.Add(
             actor.UserId,
             "inventory.adjusted",

@@ -5,7 +5,7 @@ export const sellerRole = 'Vendedor'
 
 /** Orden en que se ofrecen las pantallas en el menú. */
 export const allViews: AppView[] = [
-  'panel', 'pos', 'caja', 'ventas', 'reportes', 'productos', 'inventario', 'catalogos',
+  'panel', 'pos', 'caja', 'ventas', 'reportes', 'productos', 'inventario', 'socios', 'catalogos',
   'equipo', 'configuracion', 'auditoria',
 ]
 
@@ -24,6 +24,7 @@ const viewPermissions: Record<AppView, string[]> = {
   reportes: ['sale.read', 'inventory.kardex.read', 'cash.report.read'],
   productos: ['product.create', 'product.edit'],
   inventario: ['inventory.adjust', 'inventory.kardex.read'],
+  socios: ['investment.read'],
   catalogos: ['catalog.manage'],
   equipo: ['user.manage'],
   configuracion: ['settings.manage'],

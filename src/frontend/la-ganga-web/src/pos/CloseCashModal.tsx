@@ -243,13 +243,13 @@ export function CloseCashModal({
               <Row label="Efectivo (neto)" strong>{formatNio(totals.cashTotalNio)}</Row>
               {cashLines.map(([label, value]) => <Row key={label} label={`· ${label}`}>{value}</Row>)}
               <Row label="Transferencias" strong>{formatNio(totals.transferTotalNio)}</Row>
-              {totals.transferTotalNio > 0 && <Row label="· Recibido en C$">{formatNio(totals.transferNioTendered)}</Row>}
+              {totals.transferNioTendered > 0 && <Row label="· Recibido en C$">{formatNio(totals.transferNioTendered)}</Row>}
               {totals.transferUsdTendered > 0 && <Row label={`· Recibido en US$ (${formatNio(totals.transferUsdEquivalentNio)})`}>{formatUsd(totals.transferUsdTendered)}</Row>}
               {totals.transfersByBank.map((item) => (
                 <Row key={item.bank} label={`· ${item.bank}`}>{formatNio(item.totalNio)}{item.totalUsd > 0 ? ` (${formatUsd(item.totalUsd)})` : ''}</Row>
               ))}
               <Row label="Tarjeta (terminal)" strong>{formatNio(totals.cardTotalNio)}</Row>
-              {totals.cardTotalNio > 0 && <Row label="· Cobrado en C$">{formatNio(totals.cardNioTendered)}</Row>}
+              {totals.cardNioTendered > 0 && <Row label="· Cobrado en C$">{formatNio(totals.cardNioTendered)}</Row>}
               {totals.cardUsdTendered > 0 && <Row label={`· Cobrado en US$ (${formatNio(totals.cardUsdEquivalentNio)})`}>{formatUsd(totals.cardUsdTendered)}</Row>}
             </section>
           </div>

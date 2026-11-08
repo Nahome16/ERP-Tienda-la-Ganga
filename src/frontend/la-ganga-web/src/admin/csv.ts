@@ -85,23 +85,33 @@ export function parseDecimal(raw: string): number | null {
 
 export const templateHeaders = ['Producto', 'Categoría', 'Marca', 'Corte', 'Talla', 'Color', 'Código de barras', 'Precio', 'Costo', 'Cantidad'] as const
 
+/** Columna opcional, solo para quien tiene `investment.read`; va después de «Cantidad». */
+export const partnerHeader = 'Socio'
+export const templateHeadersWithPartner = [...templateHeaders, partnerHeader] as const
+
 const templateExample = [
   ['Camisa Oxford', 'Camisas', 'Bossini', 'Regular', 'M', 'Azul', '', '650', '380', '5'],
   ['Camisa Oxford', 'Camisas', 'Bossini', 'Regular', 'L', 'Azul', '', '650', '380', '3'],
   ['Pantalón Jean Slim', 'Pantalones', 'Levis', 'Slim', '32', 'Negro', '7501234567890', '1200,50', '700', '2'],
 ]
+const templatePartners = ['Socio Ejemplo', 'Socio Ejemplo', '']
 
 function escapeField(value: string): string {
   return /[;"\n\r,]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
 }
 
-/** Plantilla con BOM UTF-8 y «;» (la abre bien Excel en español). */
-export function buildTemplateCsv(): string {
-  const lines = [templateHeaders as readonly string[], ...templateExample].map((row) => row.map(escapeField).join(';'))
+/**
+ * Plantilla con BOM UTF-8 y «;» (la abre bien Excel en español). Con `withPartner` agrega la
+ * columna «Socio» (solo para quien puede asignar socios).
+ */
+export function buildTemplateCsv(withPartner = false): string {
+  const header: readonly string[] = withPartner ? templateHeadersWithPartner : templateHeaders
+  const examples = withPartner ? templateExample.map((row, index) => [...row, templatePartners[index]]) : templateExample
+  const lines = [header, ...examples].map((row) => row.map(escapeField).join(';'))
   return `\ufeff${lines.join('\r\n')}\r\n`
 }
 
-type Field = 'productName' | 'category' | 'brand' | 'cut' | 'size' | 'color' | 'barcode' | 'price' | 'cost' | 'quantity'
+type Field = 'productName' | 'category' | 'brand' | 'cut' | 'size' | 'color' | 'barcode' | 'price' | 'cost' | 'quantity' | 'partner'
 
 const headerAliases: Record<Field, string[]> = {
   productName: ['producto', 'nombre', 'nombredelproducto', 'product', 'articulo'],
@@ -114,12 +124,13 @@ const headerAliases: Record<Field, string[]> = {
   price: ['precio', 'preciodeventa', 'price', 'pvp'],
   cost: ['costo', 'cost', 'preciodecosto'],
   quantity: ['cantidad', 'existencia', 'existencias', 'stock', 'qty', 'unidades'],
+  partner: ['socio', 'partner', 'socioqueingreso', 'socioqueingresolamercaderia'],
 }
 
 const requiredFields: Field[] = ['productName', 'category', 'brand', 'size', 'color', 'price']
 const fieldLabels: Record<Field, string> = {
   productName: 'Producto', category: 'Categoría', brand: 'Marca', cut: 'Corte', size: 'Talla',
-  color: 'Color', barcode: 'Código de barras', price: 'Precio', cost: 'Costo', quantity: 'Cantidad',
+  color: 'Color', barcode: 'Código de barras', price: 'Precio', cost: 'Costo', quantity: 'Cantidad', partner: 'Socio',
 }
 
 function normalizeHeader(value: string): string {
@@ -128,6 +139,8 @@ function normalizeHeader(value: string): string {
 
 export type ParsedImport = {
   delimiter: Delimiter
+  /** El archivo trae la columna opcional «Socio». */
+  hasPartnerColumn: boolean
   /** Filas válidas y no válidas con su posición (1 = primera fila de datos). */
   rows: { row: number; data: ImportRow | null; cells: string[] }[]
   errors: { row: number; message: string }[]
@@ -141,7 +154,7 @@ const scientific = /^\d+([.,]\d+)?e[+-]?\d+$/i
 export function parseImportCsv(text: string): ParsedImport {
   const delimiter = detectDelimiter(text)
   const table = parseCsv(text, delimiter)
-  const result: ParsedImport = { delimiter, rows: [], errors: [], fileErrors: [] }
+  const result: ParsedImport = { delimiter, hasPartnerColumn: false, rows: [], errors: [], fileErrors: [] }
   if (table.length === 0) {
     result.fileErrors.push('El archivo está vacío.')
     return result
@@ -158,6 +171,8 @@ export function parseImportCsv(text: string): ParsedImport {
     result.fileErrors.push(`Faltan columnas obligatorias: ${missing.map((field) => fieldLabels[field]).join(', ')}. Usá la plantilla para ver los nombres exactos.`)
     return result
   }
+
+  result.hasPartnerColumn = columns.has('partner')
 
   const get = (cells: string[], field: Field) => {
     const index = columns.get(field)
@@ -225,10 +240,24 @@ export function parseImportCsv(text: string): ParsedImport {
         price: price as number,
         cost,
         quantity: quantity as number,
+        ...(result.hasPartnerColumn ? { partner: get(cells, 'partner') || null } : {}),
       },
     })
   })
 
   if (result.rows.length === 0) result.fileErrors.push('El archivo no tiene filas de datos debajo del encabezado.')
   return result
+}
+
+/**
+ * Filas listas para enviar: quien no ve costos no manda costo y quien no tiene `investment.read`
+ * no manda socio (el servidor respondería 403 `partner_not_allowed`).
+ */
+export function prepareImportRows(parsed: ParsedImport | null, access: { canCost: boolean; canPartners: boolean }): ImportRow[] {
+  return (parsed?.rows ?? []).flatMap((item) => {
+    if (!item.data) return []
+    const { partner, ...rest } = item.data
+    const row: ImportRow = access.canCost ? rest : { ...rest, cost: null }
+    return [access.canPartners && partner !== undefined ? { ...row, partner } : row]
+  })
 }

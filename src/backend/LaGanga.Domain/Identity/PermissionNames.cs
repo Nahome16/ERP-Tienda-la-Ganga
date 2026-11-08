@@ -25,6 +25,8 @@ public static class PermissionNames
     public const string CashReportRead = "cash.report.read";
     public const string SettingsManage = "settings.manage";
     public const string AuditRead = "audit.read";
+    public const string InvestmentRead = "investment.read";
+    public const string InvestmentManage = "investment.manage";
 
     public static IReadOnlyCollection<string> All { get; } =
     [
@@ -51,5 +53,7 @@ public static class PermissionNames
         CashReportRead,
         SettingsManage,
         AuditRead,
+        InvestmentRead,
+        InvestmentManage,
     ];
 }

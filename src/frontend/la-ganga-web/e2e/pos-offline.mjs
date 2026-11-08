@@ -215,6 +215,16 @@ function check(name, condition, detail = '') {
   if (!condition) process.exitCode = 1
 }
 
+/** Repite una comprobación hasta que sea cierta (la pantalla se actualiza de forma asíncrona). */
+async function eventually(fn, ms = 4000) {
+  const limit = Date.now() + ms
+  for (;;) {
+    try { if (await fn()) return true } catch { /* aún no */ }
+    if (Date.now() > limit) return false
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+
 async function waitForServer(url, ms = 20000) {
   const limit = Date.now() + ms
   while (Date.now() < limit) {
@@ -376,8 +386,8 @@ try {
   check('La cola sobrevive a la recarga', (await pendingText()).startsWith('1 pendiente'))
   // Sin existencias no se vende: ni siquiera sin conexión (ya no existe «vender de todos modos»)
   await scan('7000000000042')
-  check('Sin stock: aviso y la prenda no entra al carrito', await page.getByText(/Sin existencias de/).first().isVisible()
-    && await page.getByTestId('cart-total').innerText() === 'C$ 0.00',
+  check('Sin stock: aviso y la prenda no entra al carrito', await eventually(async () => await page.getByText(/Sin existencias de/).first().isVisible()
+    && await page.getByTestId('cart-total').innerText() === 'C$ 0.00'),
   `total=${await page.getByTestId('cart-total').innerText()} aviso=${await page.locator('.pv-scan-feedback, [role=status], .pv-toast').allInnerTexts()}`)
   await scan('7000000000035')
   await payExactAndFinish()
@@ -422,24 +432,25 @@ try {
   await closeDialog.getByText('Esperado por el sistema').first().waitFor()
   check('El cierre consulta lo esperado al servidor', server.summaryCalls >= 1)
   // Esperado: C$ 500 de fondo + 350 + 1140 + 600 = 2,590; US$ 5; transferencia US$ 4 (Banpro); tarjeta C$ 259.60 + US$ 3
-  const closeText = await closeDialog.innerText()
-  check('Muestra lo esperado en efectivo, transferencias y tarjeta',
-    /C\$ 2,590\.00/.test(closeText) && /US\$ 5\.00/.test(closeText) && /C\$ 259\.60/.test(closeText) && /US\$ 3\.00/.test(closeText))
+  check('Muestra lo esperado en efectivo, transferencias y tarjeta', await eventually(async () => {
+    const text = await closeDialog.innerText()
+    return /C\$ 2,590\.00/.test(text) && /US\$ 5\.00/.test(text) && /C\$ 259\.60/.test(text) && /US\$ 3\.00/.test(text)
+  }))
   check('Desglose por banco (Banpro con US$ 4 en dólares)', await closeDialog.getByRole('list', { name: 'Desglose por banco' }).innerText().then((t) => /Banpro/.test(t) && /US\$ 4\.00/.test(t)))
   await closeDialog.getByLabel('Cantidad de billetes o monedas de 1000 córdobas').fill('2')
   await closeDialog.getByLabel('Cantidad de billetes o monedas de 500 córdobas').fill('1')
   await closeDialog.getByLabel('Cantidad de billetes o monedas de 50 córdobas').fill('1')
   await closeDialog.getByLabel('Cantidad de billetes o monedas de 20 córdobas').fill('1')
-  check('Diferencia de efectivo en vivo: falta C$ 20', await closeDialog.getByText('Falta C$ 20.00').first().isVisible())
+  check('Diferencia de efectivo en vivo: falta C$ 20', await eventually(() => closeDialog.getByText('Falta C$ 20.00').first().isVisible()))
   await closeDialog.getByLabel('Cantidad de billetes o monedas de 20 córdobas').fill('2')
   await closeDialog.getByLabel('Total en dólares').fill('5')
-  check('Efectivo cuadra', (await closeDialog.getByText('Cuadra').count()) >= 2)
+  check('Efectivo cuadra', await eventually(async () => (await closeDialog.getByText('Cuadra').count()) >= 2))
   // Transferencias: verificado en el banco US$ 4 (cuadra); tarjeta: lote C$ 259.60 y US$ 2 (falta US$ 1)
   const section = (name) => closeDialog.locator(`section[aria-label="${name}"]`)
   await section('Transferencias').getByLabel(/US\$/).fill('4')
   await section('Tarjeta (POS)').getByLabel(/C\$/).fill('259.60')
   await section('Tarjeta (POS)').getByLabel(/US\$/).fill('2')
-  check('Diferencia de tarjeta en vivo: falta US$ 1', await section('Tarjeta (POS)').getByText('Falta US$ 1.00').isVisible())
+  check('Diferencia de tarjeta en vivo: falta US$ 1', await eventually(() => section('Tarjeta (POS)').getByText('Falta US$ 1.00').isVisible()))
   await shot('05a-cierre-form')
   await page.getByRole('button', { name: 'Cerrar caja' }).last().click()
   check('Resumen final antes de confirmar', await closeDialog.getByText('Transferencias (banco)').isVisible()

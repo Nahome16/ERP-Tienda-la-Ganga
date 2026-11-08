@@ -11,11 +11,21 @@ using Npgsql;
 
 namespace LaGanga.Infrastructure.Sales;
 
-public sealed class SalesService(
-    LaGangaDbContext dbContext,
-    IAuditWriter audit,
-    TimeProvider timeProvider) : ISalesService
+public sealed class SalesService : ISalesService
 {
+    private readonly LaGangaDbContext dbContext;
+    private readonly IAuditWriter audit;
+    private readonly TimeProvider timeProvider;
+    private readonly Inventory.LotService lots;
+
+    public SalesService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider)
+    {
+        this.dbContext = dbContext;
+        this.audit = audit;
+        this.timeProvider = timeProvider;
+        lots = new Inventory.LotService(dbContext);
+    }
+
     private const int MaxLines = 200;
     private const int MaxQuantity = 1000;
 
@@ -206,6 +216,17 @@ public sealed class SalesService(
                 Guid.NewGuid(), group.Key, MovementType.Sale, -quantity, balance.Quantity, null, sale.Id, actor.UserId, now));
         }
 
+        // Cada línea descuenta de las entradas más antiguas (PEPS): así se sabe de qué socio fue lo vendido.
+        foreach (var saleLine in sale.Lines)
+        {
+            await lots.ConsumeAsync(saleLine.VariantId, saleLine.Quantity, AllocationKind.Sale, sale.Id, saleLine.Id, now, cancellationToken);
+        }
+
+        foreach (var (variantId, balance) in balances)
+        {
+            await lots.ReconcileAsync(variantId, balance.Quantity, now, cancellationToken);
+        }
+
         foreach (var note in reviewNotes)
         {
             sale.FlagForReview(note);
@@ -387,6 +408,12 @@ public sealed class SalesService(
             balance.Quantity += quantity;
             dbContext.Movements.Add(new InventoryMovement(
                 Guid.NewGuid(), group.Key, MovementType.SaleVoid, quantity, balance.Quantity, $"Anulación: {reason}", sale.Id, actor.UserId, now));
+        }
+
+        await lots.RestoreSaleAsync(sale.Id, cancellationToken);
+        foreach (var (variantId, balance) in balances)
+        {
+            await lots.ReconcileAsync(variantId, balance.Quantity, now, cancellationToken);
         }
 
         sale.Void(actor.UserId, now, reason);

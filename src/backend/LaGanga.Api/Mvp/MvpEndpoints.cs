@@ -1,6 +1,7 @@
 using LaGanga.Api.Identity;
 using LaGanga.Application.Common;
 using LaGanga.Application.Inventory;
+using LaGanga.Application.Investment;
 using LaGanga.Application.Sales;
 using LaGanga.Application.Settings;
 using LaGanga.Domain.Identity;
@@ -28,6 +29,7 @@ public static class MvpEndpoints
         MapProducts(endpoints);
         MapImages(endpoints);
         MapReports(endpoints);
+        MapInvestment(endpoints);
         MapInventory(endpoints);
         MapAudit(endpoints);
         return endpoints;
@@ -375,6 +377,70 @@ public static class MvpEndpoints
         return buffer.ToArray();
     }
 
+    private static void MapInvestment(IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/investment").WithTags("Investment");
+
+        group.MapGet("/partners", async ([FromQuery] string? status, IInvestmentService service, CancellationToken ct) =>
+                Results.Ok(await service.ListPartnersAsync(status, ct)))
+            .RequireAuthorization(PermissionNames.InvestmentRead);
+
+        group.MapPost("/partners", async (PartnerInput input, IInvestmentService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null
+                    ? ApiHelpers.Unauthorized401()
+                    : (await service.CreatePartnerAsync(input, actor, ct)).ToHttp(partner => Results.Created($"/api/v1/investment/partners/{partner.Id}", partner));
+            })
+            .RequireAuthorization(PermissionNames.InvestmentManage)
+            .RequireCsrf();
+
+        group.MapPut("/partners/{id:guid}", async (Guid id, PartnerInput input, IInvestmentService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.UpdatePartnerAsync(id, input, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.InvestmentManage)
+            .RequireCsrf();
+
+        group.MapGet("/summary", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IInvestmentService service, CancellationToken ct) =>
+                Results.Ok(await service.GetSummaryAsync(from, to, ct)))
+            .RequireAuthorization(PermissionNames.InvestmentRead);
+
+        group.MapGet("/breakdown", async (
+                [FromQuery] string? partnerId,
+                [FromQuery] DateOnly? from,
+                [FromQuery] DateOnly? to,
+                IInvestmentService service,
+                CancellationToken ct) =>
+                Results.Ok(await service.GetBreakdownAsync(partnerId, from, to, ct)))
+            .RequireAuthorization(PermissionNames.InvestmentRead);
+
+        group.MapGet("/lots", async (
+                [FromQuery] string? partnerId,
+                [FromQuery] string? search,
+                [FromQuery] bool? onlyWithStock,
+                [FromQuery] DateOnly? from,
+                [FromQuery] DateOnly? to,
+                [FromQuery] int? page,
+                [FromQuery] int? pageSize,
+                IInvestmentService service,
+                CancellationToken ct) =>
+            {
+                var (p, size) = Paging.Normalize(page, pageSize);
+                return Results.Ok(await service.ListLotsAsync(new LotQuery(partnerId, search, onlyWithStock ?? false, from, to, p, size), ct));
+            })
+            .RequireAuthorization(PermissionNames.InvestmentRead);
+
+        group.MapPut("/lots/{id:guid}", async (Guid id, UpdateLotInput input, IInvestmentService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.UpdateLotAsync(id, input, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.InvestmentManage)
+            .RequireCsrf();
+    }
+
     private static void MapReports(IEndpointRouteBuilder endpoints)
     {
         const string xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -412,6 +478,14 @@ public static class MvpEndpoints
             })
             .RequireAuthorization(PermissionNames.InventoryKardexRead);
 
+        group.MapGet("/investment", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IReportService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                var (start, end) = Range(from, to);
+                return actor is null ? ApiHelpers.Unauthorized401() : File(await service.InvestmentAsync(start, end, actor, ct));
+            })
+            .RequireAuthorization(PermissionNames.InvestmentRead);
+
         group.MapGet("/cash", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IReportService service, HttpContext http, CancellationToken ct) =>
             {
                 var actor = http.User.GetActor();
@@ -432,6 +506,7 @@ public static class MvpEndpoints
         group.MapGet("/", async (
                 [FromQuery] string? search,
                 [FromQuery] string? filter,
+                [FromQuery] string? partnerId,
                 [FromQuery] int? page,
                 [FromQuery] int? pageSize,
                 IInventoryService service,
@@ -445,7 +520,7 @@ public static class MvpEndpoints
                 }
 
                 var (p, size) = Paging.Normalize(page, pageSize);
-                return Results.Ok(await service.ListAsync(new InventoryQuery(search, filter, p, size), actor, ct));
+                return Results.Ok(await service.ListAsync(new InventoryQuery(search, filter, p, size, partnerId), actor, ct));
             })
             .RequireAuthorization(PermissionNames.InventoryRead);
 

@@ -18,6 +18,7 @@ const navigation: { label: string; view: AppView; icon: string }[] = [
   { label: 'Reportes', view: 'reportes', icon: '⌁' },
   { label: 'Productos', view: 'productos', icon: '♧' },
   { label: 'Inventario', view: 'inventario', icon: '⬡' },
+  { label: 'Socios e inversión', view: 'socios', icon: '◈' },
   { label: 'Catálogos', view: 'catalogos', icon: '☰' },
   { label: 'Equipo', view: 'equipo', icon: '♙' },
   { label: 'Configuración', view: 'configuracion', icon: '☷' },

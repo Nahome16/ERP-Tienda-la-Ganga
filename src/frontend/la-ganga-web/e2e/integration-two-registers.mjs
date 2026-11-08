@@ -61,6 +61,7 @@ async function sell(page, code, expectSent = true) {
   await page.locator('#pv-scan-input').press('Enter')
   await page.getByRole('dialog', { name: 'Cobrar' }).waitFor()
   await page.getByRole('button', { name: 'Exacto' }).click()
+  await page.getByRole('button', { name: /Agregar pago/ }).click()
   await page.getByRole('button', { name: /Confirmar cobro/ }).click()
   await page.getByTestId('sale-done').waitFor()
   if (expectSent) await page.waitForFunction(() => document.body.innerText.includes('Enviada al servidor'), null, { timeout: 15000 })

@@ -2,11 +2,35 @@ import type { CatalogItem } from '../lib/catalogApi'
 import { parseDecimal } from './csv'
 import type { VariantInput } from './adminApi'
 
-export type Draft = { qty: string; price: string; cost: string; barcode: string }
-export type BuilderState = { sizeIds: string[]; colorIds: string[]; drafts: Record<string, Draft> }
+/**
+ * `partnerId` por variante: '' = sigue el socio general, 'none' = «Sin socio» aunque haya uno general,
+ * o el id de un socio.
+ */
+export type Draft = { qty: string; price: string; cost: string; barcode: string; partnerId: string }
+/** `partnerId`: socio general de la matriz ('' = Sin socio). */
+export type BuilderState = { sizeIds: string[]; colorIds: string[]; drafts: Record<string, Draft>; partnerId: string }
 
-export const emptyBuilder: BuilderState = { sizeIds: [], colorIds: [], drafts: {} }
-export const emptyDraft: Draft = { qty: '', price: '', cost: '', barcode: '' }
+export const emptyBuilder: BuilderState = { sizeIds: [], colorIds: [], drafts: {}, partnerId: '' }
+export const emptyDraft: Draft = { qty: '', price: '', cost: '', barcode: '', partnerId: '' }
+export const draftSamePartner = ''
+export const draftNoPartner = 'none'
+
+/** Socio efectivo de una variante: el suyo si lo cambió, si no el general. null = sin socio. */
+export function resolveVariantPartner(general: string, draftPartner: string): string | null {
+  const chosen = draftPartner === draftSamePartner ? general : draftPartner === draftNoPartner ? '' : draftPartner
+  return chosen === '' ? null : chosen
+}
+
+/** Unidades iniciales escritas en las variantes nuevas (ignora lo que no es un entero válido). */
+export function totalInitialUnits(state: BuilderState, combos: Combo[], existing: Set<string> = new Set()): number {
+  let total = 0
+  for (const combo of combos) {
+    if (existing.has(combo.key)) continue
+    const value = parseDecimal(draftOf(state, combo.key).qty)
+    if (value !== null && Number.isInteger(value) && value > 0) total += value
+  }
+  return total
+}
 export const comboKey = (sizeId: string, colorId: string) => `${sizeId}|${colorId}`
 
 export type Combo = { key: string; size: CatalogItem; color: CatalogItem }
@@ -32,7 +56,7 @@ export function toggleId(list: string[], id: string, on: boolean): string[] {
 
 /** Convierte el borrador en variantes para la API y lista los problemas por variante. */
 export function builderToInputs(
-  state: BuilderState, sizes: CatalogItem[], colors: CatalogItem[], existing: Set<string>, canCost: boolean,
+  state: BuilderState, sizes: CatalogItem[], colors: CatalogItem[], existing: Set<string>, canCost: boolean, canPartners = false,
 ): { inputs: VariantInput[]; errors: string[]; totalUnits: number } {
   const inputs: VariantInput[] = []
   const errors: string[] = []
@@ -55,9 +79,11 @@ export function builderToInputs(
       if (other) errors.push(`${label}: el código ${barcode} se repite con ${other}.`)
       else barcodes.set(barcode, label)
     }
+    const partnerId = canPartners && (quantity ?? 0) > 0 ? resolveVariantPartner(state.partnerId, draft.partnerId) : null
     inputs.push({
       sizeId: combo.size.id, colorId: combo.color.id, barcode: barcode || null,
       priceOverride: price, cost, initialQuantity: quantity ?? 0,
+      ...(partnerId ? { partnerId } : {}),
     })
     totalUnits += quantity ?? 0
   }

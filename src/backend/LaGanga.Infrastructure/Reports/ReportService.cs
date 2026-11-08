@@ -1,6 +1,7 @@
 using System.Globalization;
 using ClosedXML.Excel;
 using LaGanga.Application.Common;
+using LaGanga.Application.Investment;
 using LaGanga.Application.Sales;
 using LaGanga.Domain.Inventory;
 using LaGanga.Domain.Sales;
@@ -13,6 +14,7 @@ namespace LaGanga.Infrastructure.Reports;
 public sealed class ReportService(
     LaGangaDbContext dbContext,
     ICashService cashService,
+    IInvestmentService investmentService,
     TimeProvider timeProvider) : IReportService
 {
     private const int MaxDays = 366;
@@ -381,6 +383,84 @@ public sealed class ReportService(
 
         return Result.Ok(Save(workbook, $"cierres_de_caja_{Iso(fromDate)}_a_{Iso(toDate)}.xlsx"));
     }
+
+    public async Task<ServiceResult<ReportFile>> InvestmentAsync(DateOnly fromDate, DateOnly toDate, Actor actor, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var range = ValidateRange(fromDate, toDate);
+        if (range is not null)
+        {
+            return Result.Fail<ReportFile>(range);
+        }
+
+        var summary = await investmentService.GetSummaryAsync(fromDate, toDate, cancellationToken);
+        var breakdown = await investmentService.GetBreakdownAsync(null, fromDate, toDate, cancellationToken);
+        var lots = new List<LotDto>();
+        for (var page = 1; ; page++)
+        {
+            var batch = await investmentService.ListLotsAsync(new LotQuery(null, null, false, fromDate, toDate, page, Paging.MaxPageSize), cancellationToken);
+            lots.AddRange(batch.Items);
+            if (page >= batch.TotalPages || lots.Count >= MaxRows)
+            {
+                break;
+            }
+        }
+
+        using var workbook = new XLWorkbook();
+        var sheet = new XlsxSheet(workbook, "Resumen por socio");
+        sheet.Title("Socios e inversión", $"Entradas y ventas del {Format(fromDate)} al {Format(toDate)} · las existencias son las de hoy · generado {GeneratedAt()}");
+        sheet.Header(
+        [
+            "Socio", "Unidades ingresadas", "Inversión C$ (costo × unidades)", "Unidades sin costo", "Existencias (unid.)", "Existencias al costo C$", "Existencias a precio de venta C$",
+            "Unidades vendidas", "Vendido C$ (con descuentos)", "Costo de lo vendido C$", "GANANCIA C$", "Vendidas sin costo (ganancia parcial)", "Pérdidas (unid.)", "Costo de pérdidas C$",
+        ],
+        [26, 12, 18, 11, 12, 16, 18, 11, 17, 16, 15, 16, 11, 15], freeze: false);
+        var first = sheet.NextRow;
+        foreach (var row in summary.Partners.Append(summary.Totals))
+        {
+            sheet.Row(
+                row.PartnerName, row.UnitsEntered, row.InvestedNio, row.UnitsWithoutCost, row.UnitsInStock, row.StockAtCostNio, row.StockAtPriceNio,
+                row.UnitsSold, row.RevenueNio, row.CostOfSoldNio, row.ProfitNio, row.SoldUnitsWithoutCost, row.LossUnits, row.LossCostNio);
+        }
+
+        sheet.FinishTable(first);
+
+        var products = new XlsxSheet(workbook, "Por producto");
+        products.Header(["Socio", "Producto", "Unidades ingresadas", "Inversión C$", "Existencias (unid.)", "Existencias al costo C$", "Unidades vendidas", "Vendido C$", "Ganancia C$"], [26, 38, 12, 14, 12, 16, 11, 14, 14]);
+        first = products.NextRow;
+        foreach (var row in breakdown)
+        {
+            products.Row(row.PartnerName, row.ProductName, row.UnitsEntered, row.InvestedNio, row.UnitsInStock, row.StockAtCostNio, row.UnitsSold, row.RevenueNio, row.ProfitNio);
+        }
+
+        products.FinishTable(first);
+
+        var entries = new XlsxSheet(workbook, "Entradas");
+        entries.Header(
+            ["Fecha", "Socio", "Producto", "Talla", "Color", "Código de barras", "Origen", "Ingresó", "Cantidad ingresada", "Quedan", "Vendidas", "Pérdidas", "Costo unitario C$", "Precio dado C$", "Precio actual C$", "Inversión C$", "Nota"],
+            [17, 22, 36, 8, 14, 18, 14, 20, 11, 9, 10, 10, 13, 13, 13, 14, 30]);
+        first = entries.NextRow;
+        foreach (var lot in lots.OrderBy(lot => lot.EnteredAtUtc))
+        {
+            entries.Row(
+                Local(lot.EnteredAtUtc), lot.PartnerName, lot.ProductName, lot.SizeName, lot.ColorName, lot.Barcode, SourceName(lot.Source), lot.EnteredByName,
+                lot.QuantityIn, lot.QuantityRemaining, lot.QuantitySold, lot.QuantityLost, lot.UnitCost, lot.UnitPrice, lot.CurrentPrice, lot.InvestedNio, lot.Note);
+        }
+
+        entries.FinishTable(first);
+        return Result.Ok(Save(workbook, $"socios_e_inversion_{Iso(fromDate)}_a_{Iso(toDate)}.xlsx"));
+    }
+
+    private static string SourceName(string source) => source switch
+    {
+        "InitialStock" => "Existencia inicial",
+        "Entry" => "Entrada",
+        "Adjustment" => "Ajuste",
+        "Import" => "Importación",
+        "Opening" => "Saldo inicial",
+        _ => "Unidades sin entrada",
+    };
 
     private static ServiceError? ValidateRange(DateOnly fromDate, DateOnly toDate)
     {

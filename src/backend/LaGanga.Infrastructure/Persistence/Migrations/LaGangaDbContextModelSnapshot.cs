@@ -569,6 +569,94 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LaGanga.Domain.Inventory.LotAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid?>("LotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SaleLineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LotId");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("VariantId");
+
+                    b.ToTable("lot_allocations", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_lot_allocations_quantity", "\"Quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Inventory.Partner", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("partners", "inventory");
+                });
+
             modelBuilder.Entity("LaGanga.Domain.Inventory.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -741,6 +829,62 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.HasKey("VariantId");
 
                     b.ToTable("stock_balances", "inventory");
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Inventory.StockLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("EnteredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EnteredBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("PartnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QuantityIn")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantityRemaining")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnteredBy");
+
+                    b.HasIndex("PartnerId");
+
+                    b.HasIndex("VariantId", "EnteredAtUtc");
+
+                    b.ToTable("stock_lots", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_stock_lots_money", "(\"UnitCost\" IS NULL OR \"UnitCost\" >= 0) AND (\"UnitPrice\" IS NULL OR \"UnitPrice\" >= 0)");
+
+                            t.HasCheckConstraint("CK_stock_lots_quantities", "\"QuantityIn\" > 0 AND \"QuantityRemaining\" >= 0 AND \"QuantityRemaining\" <= \"QuantityIn\"");
+                        });
                 });
 
             modelBuilder.Entity("LaGanga.Domain.Sales.CashRegister", b =>
@@ -1366,6 +1510,28 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("LaGanga.Domain.Inventory.LotAllocation", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Inventory.StockLot", null)
+                        .WithMany()
+                        .HasForeignKey("LotId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LaGanga.Domain.Inventory.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("VariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Inventory.Partner", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Identity.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("LaGanga.Domain.Inventory.Product", b =>
                 {
                     b.HasOne("LaGanga.Domain.Catalog.Brand", null)
@@ -1436,6 +1602,25 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.HasOne("LaGanga.Domain.Inventory.ProductVariant", null)
                         .WithOne("Balance")
                         .HasForeignKey("LaGanga.Domain.Inventory.StockBalance", "VariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Inventory.StockLot", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Identity.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("EnteredBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LaGanga.Domain.Inventory.Partner", null)
+                        .WithMany()
+                        .HasForeignKey("PartnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LaGanga.Domain.Inventory.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("VariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
