@@ -6,7 +6,10 @@ import type { CurrentUser } from '../types'
 import { adjustInventory, getKardex, getVariantByBarcode } from './adminApi'
 import { formatDateTime, kardexLabels, messageFrom } from './format'
 import { useFetch } from './hooks'
+import { buildEntryExtras } from './partners'
+import { PartnerSelect, PartnersHint } from './PartnerSelect'
 import { Dialog, LoadError, Notice, Pagination, Spinner, Tag } from './ui'
+import { usePartners } from './usePartners'
 
 export type PanelVariant = {
   variantId: string
@@ -35,14 +38,20 @@ export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged }
   const canKardex = hasPermission(user, 'inventory.kardex.read')
   const canAdjust = hasPermission(user, 'inventory.adjust')
   const canCost = hasPermission(user, 'inventory.cost.read')
+  const canPartners = hasPermission(user, 'investment.read')
   const [stock, setStock] = useState(variant.stock)
   const [page, setPage] = useState(1)
   const [kind, setKind] = useState<Kind>('Entry')
   const [quantity, setQuantity] = useState('')
   const [reason, setReason] = useState('')
+  const [partnerId, setPartnerId] = useState('')
+  const [unitCost, setUnitCost] = useState(variant.cost == null ? '' : String(variant.cost))
+  const [unitPrice, setUnitPrice] = useState(String(variant.price))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
+
+  const partnerList = usePartners('active', canPartners && canAdjust)
 
   const kardex = useFetch(
     `kardex|${variant.variantId}|${page}`,
@@ -55,6 +64,9 @@ export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged }
   const delta = !validAmount ? 0 : kind === 'Loss' ? -Math.abs(amount) : kind === 'Entry' ? Math.abs(amount) : amount
   const resulting = stock + delta
   const negative = validAmount && resulting < 0
+  // Socio, costo y precio solo aplican a las entradas (Entrada o ajuste con cantidad positiva).
+  const isEntry = kind === 'Entry' || (kind === 'Adjustment' && validAmount && amount > 0)
+  const showEntryFields = canPartners && (kind === 'Entry' || (kind === 'Adjustment' && !(validAmount && amount < 0)))
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -63,9 +75,15 @@ export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged }
     if (!validAmount) { setError(kind === 'Adjustment' ? 'Escribí una cantidad entera distinta de cero (con − para restar).' : 'Escribí una cantidad entera mayor que cero.'); return }
     if (reason.trim().length < 3) { setError('El motivo es obligatorio: contá brevemente qué pasó.'); return }
     if (negative) { setError('El saldo no puede quedar negativo con un ajuste manual.'); return }
+    let extras = {}
+    if (canPartners && isEntry) {
+      const built = buildEntryExtras({ partnerId, cost: unitCost, price: unitPrice })
+      if (built.error) { setError(built.error); return }
+      extras = built.extras
+    }
     setSaving(true)
     try {
-      await adjustInventory({ variantId: variant.variantId, kind, delta, reason: reason.trim() })
+      await adjustInventory({ variantId: variant.variantId, kind, delta, reason: reason.trim(), ...extras })
       let newStock = resulting
       try { newStock = (await getVariantByBarcode(variant.barcode)).stock } catch { /* se usa el saldo calculado */ }
       setStock(newStock)
@@ -149,6 +167,25 @@ export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged }
                 <span>Motivo (obligatorio)</span>
                 <textarea value={reason} maxLength={300} onChange={(event) => setReason(event.target.value)} placeholder="Ej. Llegó pedido, conteo físico, prenda dañada" />
               </label>
+              {showEntryFields && (
+                <fieldset className="adm-section inv-entry-fields">
+                  <legend>Datos de la entrada</legend>
+                  <PartnersHint error={partnerList.error} empty={!partnerList.loading && !partnerList.error && partnerList.partners.length === 0} onRetry={partnerList.reload} />
+                  {partnerList.partners.length > 0 && <PartnerSelect partners={partnerList.partners} value={partnerId} onChange={setPartnerId} />}
+                  <div className="adm-grid-2">
+                    <label className="adm-field">
+                      <span>Costo unitario (C$)</span>
+                      <input type="number" min={0} step="0.01" inputMode="decimal" value={unitCost} onChange={(event) => setUnitCost(event.target.value)} />
+                      <small>{variant.cost == null ? 'Vacío = sin costo registrado.' : 'Vacío = costo actual de la variante.'}</small>
+                    </label>
+                    <label className="adm-field">
+                      <span>Precio de venta dado (C$)</span>
+                      <input type="number" min={0} step="0.01" inputMode="decimal" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} />
+                      <small>Vacío = precio actual ({formatNio(variant.price)}).</small>
+                    </label>
+                  </div>
+                </fieldset>
+              )}
               <div className="adm-row strong">
                 <span>Saldo resultante</span>
                 <b className={negative ? 'adm-neg' : undefined}>{stock} → {validAmount ? resulting : stock}</b>
