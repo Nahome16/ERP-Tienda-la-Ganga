@@ -13,11 +13,20 @@ confirmadas.
 
 ## Estado actual
 
-- Solución ASP.NET Core 8 separada en API, aplicación, dominio e infraestructura.
-- Interfaz React + TypeScript adaptable a celular y computadora.
-- Comprobación de conexión entre la interfaz y la API.
-- PostgreSQL 16 preparado para desarrollo local con Docker.
-- Proyectos de pruebas unitarias y de integración.
+**MVP operativo (objetivo: 10 de noviembre de 2026)** — todo lo visible es funcional:
+
+- Punto de venta con escáner, descuentos, pagos mixtos (efectivo C$/US$, transferencia, tarjeta) y recibo interno opcional.
+- **Modo sin conexión**: el POS abre sin internet (PWA), vende contra una copia local y sincroniza solo, sin duplicar ventas.
+- Dos cajas independientes (Caja 1 y Caja 2) con apertura, cierre y arqueo por moneda, más cierre consolidado.
+- Productos con variantes talla/color, código de barras (EAN-13 interno si no trae), etiquetas e importación desde Excel/CSV.
+- Inventario con Kardex, ajustes con motivo y alertas de stock.
+- Ventas: historial, anulación con reversión de inventario y revisión de ventas con diferencias.
+- Roles y permisos validados en el servidor, auditoría de acciones sensibles y configuración (tasa del dólar, bancos, datos del recibo).
+- Kit de despliegue para VPS (Docker, SSL automático, respaldos): ver [Despliegue](docs/21-despliegue-hostinger.md).
+
+Base técnica: ASP.NET Core 8 (API, aplicación, dominio, infraestructura), React + TypeScript, PostgreSQL 16, pruebas unitarias y de integración en CI.
+
+Fuera del MVP (siguientes fases): catálogo digital, compras, clientes y CRM, reportes avanzados, devoluciones parciales, 2FA.
 
 La puesta en marcha está explicada en [Desarrollo local](docs/20-desarrollo-local.md).
 
@@ -36,6 +45,8 @@ La puesta en marcha está explicada en [Desarrollo local](docs/20-desarrollo-loc
 - [Modulo 1 - Contratos de API](docs/13-productos-inventario-api.md)
 - [Modulo 1 - Decisiones y backlog tecnico](docs/14-productos-inventario-decisiones-backlog.md)
 - [Desarrollo local](docs/20-desarrollo-local.md)
+- [MVP - Contrato de API](docs/30-mvp-contrato-api.md)
+- [Despliegue en VPS (Hostinger)](docs/21-despliegue-hostinger.md)
 - [Prototipo navegable del Modulo 1](docs/visualizations/modulo-1-productos-inventario.html)
 
 ## Primer lanzamiento

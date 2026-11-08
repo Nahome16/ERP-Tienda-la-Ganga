@@ -121,7 +121,6 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
     if (!state.loaded || booted.current) return
     booted.current = true
     // Arranque asíncrono: los estados se actualizan cuando responden la caja y la instantánea.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void boot()
   }, [state.loaded, boot])
 

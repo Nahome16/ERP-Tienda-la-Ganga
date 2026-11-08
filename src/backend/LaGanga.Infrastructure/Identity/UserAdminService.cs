@@ -1,4 +1,5 @@
 using LaGanga.Application.Identity;
+using LaGanga.Application.Settings;
 using LaGanga.Application.Users;
 using LaGanga.Domain.Identity;
 using LaGanga.Infrastructure.Persistence;
@@ -10,6 +11,7 @@ namespace LaGanga.Infrastructure.Identity;
 public sealed class UserAdminService(
     LaGangaDbContext dbContext,
     IPasswordService passwordService,
+    IAuditWriter audit,
     TimeProvider timeProvider) : IUserAdminService
 {
     public async Task<IReadOnlyList<UserSummaryDto>> ListUsersAsync(CancellationToken cancellationToken)
@@ -43,6 +45,7 @@ public sealed class UserAdminService(
 
     public async Task<UserAdminResult<UserSummaryDto>> CreateAsync(
         CreateUserInput input,
+        Guid actorId,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -87,6 +90,7 @@ public sealed class UserAdminService(
         }
 
         dbContext.Users.Add(user);
+        audit.Add(actorId, "user.created", "User", user.Id.ToString(), $"Cuenta «{user.Username}» creada con rol(es): {string.Join(", ", roles.Select(role => role.Name))}.");
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -177,6 +181,7 @@ public sealed class UserAdminService(
             await RevokeSessionsAsync(user.Id, "user_deactivated", cancellationToken);
         }
 
+        audit.Add(actorId, "user.updated", "User", user.Id.ToString(), $"Cuenta «{user.Username}» actualizada ({(willBeActive ? "activa" : "inactiva")}).");
         await dbContext.SaveChangesAsync(cancellationToken);
         return await ReloadAsync(user.Id, cancellationToken);
     }
@@ -184,6 +189,7 @@ public sealed class UserAdminService(
     public async Task<UserAdminResult<UserSummaryDto>> ResetPasswordAsync(
         Guid userId,
         string? newPassword,
+        Guid actorId,
         CancellationToken cancellationToken)
     {
         var user = await dbContext.Users.SingleOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken);
@@ -200,6 +206,7 @@ public sealed class UserAdminService(
 
         user.SetPasswordHash(passwordService.HashPassword(user, newPassword!));
         await RevokeSessionsAsync(user.Id, "password_reset", cancellationToken);
+        audit.Add(actorId, "user.password_reset", "User", user.Id.ToString(), $"Contraseña de «{user.Username}» restablecida.");
         await dbContext.SaveChangesAsync(cancellationToken);
         return await ReloadAsync(user.Id, cancellationToken);
     }

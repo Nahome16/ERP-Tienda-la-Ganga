@@ -12,7 +12,9 @@ implementación en entregas pequeñas, comprobables y reversibles.
 | 1 — Base técnica | Terminado | Incluye integración continua en GitHub Actions |
 | 2 — Acceso y permisos | Terminado | Roles Administrador, Vendedor y Encargado de inventario; pantalla **Equipo**; desactivar o cambiar contraseña revoca sesiones |
 | 3 — Catálogos | Terminado | API `/api/v1/catalog/*`, pantalla **Catálogos**, datos iniciales y pruebas contra PostgreSQL |
-| 4 — Borradores y variantes | Siguiente | Incluye código de barras único por variante |
+| MVP (10 nov 2026) | Construido | Productos y variantes con código de barras, existencia inicial, Kardex y ajustes, importación CSV, cajas, POS con modo sin conexión, pagos, descuentos, cierres y auditoría. Ver [contrato](30-mvp-contrato-api.md) |
+| 4 — Borradores y variantes | Cubierto por el MVP (sin borradores) | Los productos nacen activos; los borradores y los cinco pasos quedan para después |
+| 5 — Imágenes | Pendiente | Se aplaza tras el primer flujo de venta |
 
 Decisiones aplicadas en el Hito 2:
 

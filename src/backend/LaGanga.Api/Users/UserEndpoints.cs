@@ -22,10 +22,17 @@ public static class UserEndpoints
         group.MapPost("/", async (
                 CreateUserRequest request,
                 IUserAdminService service,
+                ClaimsPrincipal principal,
                 CancellationToken cancellationToken) =>
             {
+                if (!Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var actorId))
+                {
+                    return Results.Unauthorized();
+                }
+
                 var result = await service.CreateAsync(
                     new CreateUserInput(request.Username, request.DisplayName, request.Password, request.RoleIds),
+                    actorId,
                     cancellationToken);
                 return ToResult(result, user => Results.Created($"/api/v1/users/{user.Id}", user));
             })
@@ -56,9 +63,15 @@ public static class UserEndpoints
                 Guid id,
                 ResetPasswordRequest request,
                 IUserAdminService service,
+                ClaimsPrincipal principal,
                 CancellationToken cancellationToken) =>
             {
-                var result = await service.ResetPasswordAsync(id, request.Password, cancellationToken);
+                if (!Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var actorId))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var result = await service.ResetPasswordAsync(id, request.Password, actorId, cancellationToken);
                 return ToResult(result, user => Results.Ok(user));
             })
             .RequireCsrf();

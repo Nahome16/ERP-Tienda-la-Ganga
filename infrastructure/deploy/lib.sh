@@ -11,7 +11,7 @@ COMPOSE_FILE="$DEPLOY_DIR/compose.prod.yml"
 TZ_LOCAL="America/Managua"
 
 # cron usa un PATH mínimo; nos aseguramos de encontrar docker, flock, etc.
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+export PATH="$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 if [[ -t 1 ]]; then
   C_RED=$'\033[31m'; C_GRN=$'\033[32m'; C_YEL=$'\033[33m'; C_BLD=$'\033[1m'; C_OFF=$'\033[0m'

@@ -76,7 +76,7 @@ export function DashboardView({ user, onNavigate }: { user: CurrentUser; onNavig
             <Kpi label="Efectivo" value={formatNio(totals.cashTotalNio)} />
             <Kpi label="Transferencia" value={formatNio(totals.transferTotalNio)} />
             <Kpi label="POS / Tarjeta" value={formatNio(totals.cardTotalNio)} />
-            <Kpi label="Cajas abiertas" value={cash.data.openSessionsCount} hint={`de ${cash.data.sessions.length} abierta${cash.data.sessions.length === 1 ? '' : 's'} hoy`} tone={cash.data.openSessionsCount > 0 ? 'warn' : undefined} />
+            <Kpi label="Cajas abiertas" value={cash.data.openSessionsCount} hint={`${cash.data.sessions.length} turno${cash.data.sessions.length === 1 ? '' : 's'} hoy`} tone={cash.data.openSessionsCount > 0 ? 'warn' : undefined} />
             <Kpi label="Ventas por revisar" value={totals.reviewCount} tone={totals.reviewCount > 0 ? 'danger' : 'ok'} />
           </div>
         </>

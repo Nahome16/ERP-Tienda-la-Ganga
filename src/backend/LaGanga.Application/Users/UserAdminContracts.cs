@@ -83,6 +83,7 @@ public interface IUserAdminService
 
     Task<UserAdminResult<UserSummaryDto>> CreateAsync(
         CreateUserInput input,
+        Guid actorId,
         CancellationToken cancellationToken);
 
     Task<UserAdminResult<UserSummaryDto>> UpdateAsync(
@@ -94,5 +95,6 @@ public interface IUserAdminService
     Task<UserAdminResult<UserSummaryDto>> ResetPasswordAsync(
         Guid userId,
         string? newPassword,
+        Guid actorId,
         CancellationToken cancellationToken);
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminShell } from './components/AdminShell'
 import { allowedViews, isAppView, landingView, resolveView, shellViews } from './lib/access'
+import { clearCachedUser, restoreOfflineUser, saveCachedUser } from './lib/session'
 import type { ApiState, AppView, AuthState, CurrentUser, HealthStatus } from './types'
 import { CatalogsView } from './views/CatalogsView'
 import { DashboardView } from './views/DashboardView'
@@ -71,6 +72,8 @@ function App() {
   const [view, setView] = useState<AppView>(() => viewFromHash())
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // true cuando el usuario se restauró desde este equipo porque no había red al abrir la app.
+  const [offlineStart, setOfflineStart] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -109,12 +112,24 @@ function App() {
         const payload: unknown = await response.json()
         if (!isCurrentUser(payload)) throw new Error('Respuesta de sesión inválida')
         setAuth({ kind: 'authenticated', user: payload })
+        void saveCachedUser(payload).catch(() => undefined)
         const nextView = resolveView(payload, viewFromHash()) ?? 'panel'
         setView(nextView)
         window.history.replaceState(null, '', `#${nextView}`)
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return
-        // TODO(offline): si no hay red y existe un usuario guardado en el equipo, entrar en modo sin conexión.
+        // Sin red (o servidor caído): si hay un usuario y una caja abierta guardados en este equipo,
+        // se entra directo al POS en modo sin conexión. No se guardan contraseñas ni cookies.
+        const cachedUser = await restoreOfflineUser()
+        if (controller.signal.aborted) return
+        if (cachedUser) {
+          setOfflineStart(true)
+          setAuth({ kind: 'authenticated', user: cachedUser })
+          setView('pos')
+          window.history.replaceState(null, '', '#pos')
+          return
+        }
+        setLoginError('Sin conexión con el servidor. Para entrar necesitás conexión al menos una vez; después el punto de venta funciona aunque se caiga la red.')
         setAuth({ kind: 'unauthenticated' })
       }
     }
@@ -166,7 +181,9 @@ function App() {
       }
       const user = loginResponseUser(payload)
       if (!user) throw new Error('La respuesta del servidor no contiene una sesión válida.')
+      setOfflineStart(false)
       setAuth({ kind: 'authenticated', user })
+      void saveCachedUser(user).catch(() => undefined)
       navigate(landingView(user) ?? 'panel', user)
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'No fue posible iniciar sesión.')
@@ -178,19 +195,44 @@ function App() {
   async function logout() {
     if (auth.kind !== 'authenticated') return
     const csrfToken = readCookie('la_ganga_csrf')
-    if (!csrfToken) return
+    if (!csrfToken) {
+      // Sin cookie de sesión (venció o se entró sin conexión): solo se cierra en este equipo.
+      void clearCachedUser().catch(() => undefined)
+      setOfflineStart(false)
+      setAuth({ kind: 'unauthenticated' })
+      navigate('panel')
+      return
+    }
     try {
       const response = await fetch('/api/v1/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'X-CSRF-Token': csrfToken },
       })
-      if (!response.ok) throw new Error(`Estado HTTP inesperado: ${response.status}`)
+      if (!response.ok && response.status !== 401) throw new Error(`Estado HTTP inesperado: ${response.status}`)
+      void clearCachedUser().catch(() => undefined)
+      setOfflineStart(false)
       setAuth({ kind: 'unauthenticated' })
       navigate('panel')
-    } catch {
+    } catch (error) {
+      if (error instanceof TypeError) {
+        // Sin red: se cierra la sesión en este equipo (la cola de ventas pendientes se conserva).
+        void clearCachedUser().catch(() => undefined)
+        setOfflineStart(false)
+        setAuth({ kind: 'unauthenticated' })
+        navigate('panel')
+        return
+      }
       setLoginError('No se pudo cerrar la sesión. Comprobá la conexión e intentá nuevamente.')
     }
+  }
+
+  /** La sesión venció: se vuelve al inicio de sesión sin tocar la cola de ventas ni la caja guardada. */
+  function sessionExpired() {
+    void clearCachedUser().catch(() => undefined)
+    setOfflineStart(false)
+    setLoginError('Tu sesión venció: iniciá sesión de nuevo para sincronizar tus ventas pendientes.')
+    setAuth({ kind: 'unauthenticated' })
   }
 
   if (auth.kind === 'loading') return <SessionLoader />
@@ -230,6 +272,8 @@ function App() {
         canReturnToAdmin={panelViews.length > 0}
         onNavigate={navigate}
         onLogout={() => { void logout() }}
+        offlineStart={offlineStart}
+        onSessionExpired={sessionExpired}
       />
     )
   }
