@@ -330,9 +330,15 @@
 .inv-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 4px; }
 .inv-section-head .adm-card-title { margin: 0; }
 .inv-kpis { margin-bottom: 16px; }
-.inv-kpis .adm-kpi > strong { white-space: normal; overflow-wrap: anywhere; }
+.inv-kpis { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+.inv-kpis .adm-kpi > strong { font-size: clamp(1.05rem, 1.5vw, 1.3rem); white-space: nowrap; }
 .inv-kpis .adm-kpi > small { overflow-wrap: anywhere; }
 .inv-table td, .inv-table th { vertical-align: top; }
+.inv-table td.numeric { white-space: nowrap; }
+.inv-table td.numeric small { display: block; width: 130px; margin-left: auto; white-space: normal; text-align: right; }
+.inv-table.inv-summary th, .inv-table.inv-summary td { padding: 8px 6px; font-size: .78rem; }
+.inv-table.inv-summary th { font-size: .62rem; }
+.inv-table .inv-partner-link { white-space: nowrap; }
 .inv-table td .row-title { white-space: normal; }
 .inv-table tfoot td { vertical-align: top; }
 .inv-check-col { width: 1%; text-align: center; }
@@ -340,7 +346,7 @@
 .inv-nocost td { background: #fff6e0; }
 .inv-nocost:hover td { background: #ffeecb; }
 .inv-warn { color: #8a4b00; font-weight: 700; }
-.inv-partial { color: #8a4b00; font-weight: 700; white-space: nowrap; }
+.inv-partial { color: #8a4b00; font-weight: 700; }
 .inv-dash { color: var(--muted); }
 .inv-partner-link { padding: 0; text-align: left; font-weight: 800; }
 .inv-assign { display: block; padding: 2px 0 0; font-size: .72rem; text-align: left; }

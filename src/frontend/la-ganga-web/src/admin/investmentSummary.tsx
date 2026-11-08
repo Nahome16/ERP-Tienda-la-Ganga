@@ -43,18 +43,18 @@ export function SummaryPanel({ summary, loading, error, onRetry, onOpen, onAssig
           <TotalsCards row={summary.totals} title="Totales de todos los socios" />
           <Section title="Resumen por socio" hint="Hacé clic en un socio para ver sus productos y sus entradas de mercadería.">
             <div className="table-scroll" aria-busy={loading}>
-              <table className="adm-table inv-table" aria-label="Resumen por socio">
+              <table className="adm-table inv-table inv-summary" aria-label="Resumen por socio">
                 <thead>
                   <tr>
                     <th>Socio</th>
-                    <th className="numeric">Unid. ingresadas</th>
+                    <th className="numeric">Ingresadas</th>
                     <th className="numeric">Inversión</th>
-                    <th className="numeric">Existencias (unid.)</th>
+                    <th className="numeric">Exist. (unid.)</th>
                     <th className="numeric">Exist. al costo</th>
                     <th className="numeric">Exist. a precio</th>
-                    <th className="numeric">Unid. vendidas</th>
+                    <th className="numeric">Vendidas</th>
                     <th className="numeric">Vendido</th>
-                    <th className="numeric">Costo de lo vendido</th>
+                    <th className="numeric">Costo vendido</th>
                     <th className="numeric">Ganancia</th>
                     <th className="numeric">Pérdidas</th>
                   </tr>

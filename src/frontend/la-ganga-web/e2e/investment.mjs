@@ -180,6 +180,24 @@ async function open(hash = 'socios', { user = investUser, viewport = { width: 13
   return { page, context, state, reportCalls }
 }
 
+/** Espera (hasta 5 s) a que la API simulada haya recibido un pedido que cumpla la condición. */
+async function seen(state, predicate, timeout = 5000) {
+  const end = Date.now() + timeout
+  while (Date.now() < end) {
+    if (state.calls.some(predicate)) return true
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return false
+}
+/** Reintenta una comprobación asíncrona hasta 4 s (la pantalla tarda un instante en repintar). */
+async function eventually(fn, timeout = 4000) {
+  const end = Date.now() + timeout
+  while (Date.now() < end) {
+    if (await fn()) return true
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return false
+}
 const lastCall = (state, predicate) => [...state.calls].reverse().find(predicate)
 const tab = (page, name) => page.getByRole('tab', { name })
 
@@ -214,7 +232,7 @@ console.log('Filtro de fechas')
   const { page, context, state } = await open()
   await visible(page.getByRole('table', { name: 'Resumen por socio' }))
   await page.getByRole('button', { name: 'Este mes', exact: true }).click()
-  await page.waitForResponse((r) => r.url().includes('/investment/summary') && r.url().includes('from='))
+  await seen(state, (c) => c.path === '/summary' && c.query.from === monthStart)
   let call = lastCall(state, (c) => c.path === '/summary')
   check(call.query.from === monthStart && call.query.to === today, `Este mes pide ${monthStart} a ${today}`)
   check(await page.getByLabel('Desde').inputValue() === monthStart, 'llena el campo Desde')
@@ -222,17 +240,17 @@ console.log('Filtro de fechas')
   check(await visible(page.getByText(/corresponden al período elegido/)), 'explica el período')
 
   await page.getByRole('button', { name: 'Mes pasado', exact: true }).click()
-  await page.waitForResponse((r) => r.url().includes('/investment/summary') && r.url().includes(`to=${addDays(monthStart, -1)}`))
+  await seen(state, (c) => c.path === '/summary' && c.query.to === addDays(monthStart, -1))
   call = lastCall(state, (c) => c.path === '/summary')
   check(call.query.to === addDays(monthStart, -1) && call.query.from === `${addDays(monthStart, -1).slice(0, 7)}-01`, 'Mes pasado pide el mes anterior completo')
 
   await page.getByRole('button', { name: 'Hoy', exact: true }).click()
-  await page.waitForResponse((r) => r.url().includes('/investment/summary') && r.url().includes(`from=${today}`))
+  await seen(state, (c) => c.path === '/summary' && c.query.from === today)
   call = lastCall(state, (c) => c.path === '/summary')
   check(call.query.from === today && call.query.to === today, 'Hoy pide solo hoy')
 
   await page.getByRole('button', { name: 'Todo', exact: true }).click()
-  await page.waitForResponse((r) => r.url().includes('/investment/summary') && !r.url().includes('from='))
+  await seen(state, (c) => c.path === '/summary' && c.query.from === undefined && state.calls.indexOf(c) > state.calls.findLastIndex((x) => x.path === '/summary' && x.query.from === today))
   call = lastCall(state, (c) => c.path === '/summary')
   check(call.query.from === undefined && call.query.to === undefined, 'Todo quita las fechas')
 
@@ -269,11 +287,11 @@ console.log('Detalle de socio')
   check(await visible(lots.getByText('cambió')), 'avisa que el precio actual cambió respecto al dado (950 vs 900)')
 
   await page.getByLabel('Solo con existencias').check()
-  await page.waitForResponse((r) => r.url().includes('onlyWithStock=true'))
-  check(await lots.getByRole('row', { name: /Jean Slim/ }).count() === 0, '«solo con existencias» oculta lo agotado')
+  await seen(state, (c) => c.path === '/lots' && c.query.onlyWithStock === 'true')
+  check(await eventually(async () => await lots.getByRole('row', { name: /Jean Slim/ }).count() === 0), '«solo con existencias» oculta lo agotado')
   await page.getByLabel('Buscar').fill('polo')
-  await page.waitForResponse((r) => r.url().includes('search=polo'))
-  check(await lots.getByRole('row', { name: /Camisa Oxford/ }).count() === 0 && await lots.getByRole('row', { name: /Polo Básico/ }).count() === 1, 'la búsqueda filtra por producto')
+  await seen(state, (c) => c.path === '/lots' && c.query.search === 'polo')
+  check(await eventually(async () => await lots.getByRole('row', { name: /Camisa Oxford/ }).count() === 0 && await lots.getByRole('row', { name: /Polo Básico/ }).count() === 1), 'la búsqueda filtra por producto')
   await page.screenshot({ path: join(shots, 'detalle-escritorio.png'), fullPage: true })
 
   await page.getByRole('button', { name: '← Volver al resumen' }).click()
@@ -310,7 +328,7 @@ console.log('Editar una entrada')
   const put = lastCall(state, (c) => c.method === 'PUT' && c.path === '/lots/l3')
   check(put && put.body.partnerId === 'p2' && put.body.unitCost === 150.5 && put.body.unitPrice === 300 && put.body.note === 'Corregido por Rosa', 'PUT /lots/l3 con socio, costo, precio y nota')
   check(await visible(page.getByText(/Guardamos los cambios de la entrada/)), 'confirma el guardado')
-  check(await lots.getByRole('row', { name: /Polo Básico/ }).count() === 0, 'la entrada ya no aparece en el socio anterior (recarga)')
+  check(await eventually(async () => await lots.getByRole('row', { name: /Polo Básico/ }).count() === 0), 'la entrada ya no aparece en el socio anterior (recarga)')
 
   // Vaciar costo y precio los manda como null.
   await lots.getByRole('button', { name: /Editar entrada de Camisa Oxford/ }).click()
@@ -333,9 +351,9 @@ console.log('Todas las entradas y asignación de socio')
   check(await visible(lots.getByRole('columnheader', { name: 'Socio' })), 'muestra la columna Socio')
   check(await visible(lots.getByText('Saldo inicial').first()) && await visible(lots.getByText('Sin entrada registrada').first()) && await visible(lots.getByText('Existencia inicial')), 'traduce Saldo inicial / Sin entrada registrada / Existencia inicial')
   check(lastCall(state, (c) => c.path === '/lots').query.partnerId === undefined, 'sin filtro de socio no manda partnerId')
-  await page.getByLabel('Socio', { exact: true }).selectOption('none')
-  await page.waitForResponse((r) => r.url().includes('partnerId=none'))
-  check(await lots.getByRole('row', { name: /Blusa Floral/ }).count() === 0, 'el selector filtra por «Sin socio»')
+  await page.locator('.inv-lots select').selectOption('none')
+  await seen(state, (c) => c.path === '/lots' && c.query.partnerId === 'none')
+  check(await eventually(async () => await lots.getByRole('row', { name: /Blusa Floral/ }).count() === 0), 'el selector filtra por «Sin socio»')
   await page.screenshot({ path: join(shots, 'entradas-sin-socio.png'), fullPage: true })
 
   const assignButton = page.getByRole('button', { name: /Asignar socio a las seleccionadas/ })
@@ -365,7 +383,7 @@ console.log('Acción rápida desde el resumen')
   const { page, context } = await open()
   await page.getByRole('button', { name: 'Asignar socio a estas entradas' }).click()
   check(await visible(page.getByRole('table', { name: 'Todas las entradas de mercadería' })), 'lleva a «Todas las entradas»')
-  check(await page.getByLabel('Socio', { exact: true }).inputValue() === 'none', 'con el filtro «Sin socio» ya elegido')
+  check(await page.locator('.inv-lots select').inputValue() === 'none', 'con el filtro «Sin socio» ya elegido')
   await context.close()
 }
 

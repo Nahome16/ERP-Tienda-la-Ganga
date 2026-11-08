@@ -20,6 +20,7 @@ confirmadas.
 - Dos cajas independientes (Caja 1 y Caja 2) con apertura, cierre y arqueo por moneda, más cierre consolidado.
 - Productos con variantes talla/color, código de barras (EAN-13 interno si no trae), **fotos (hasta 4 por producto, también visibles en el POS y sin conexión)**, etiquetas e importación desde Excel/CSV.
 - Inventario con Kardex, ajustes con motivo y alertas de stock.
+- **Socios e inversión** (solo administrador): cada entrada de mercadería lleva su socio, costo y precio; las ventas salen de la entrada más antigua (PEPS); resumen de inversión, existencias, vendido y ganancia por socio, con Excel.
 - **Reportes en Excel (.xlsx)** por rango de fechas: ventas, existencias, movimientos de inventario y cierres de caja.
 - Ventas: historial, anulación con reversión de inventario y revisión de ventas con diferencias.
 - Roles y permisos validados en el servidor, auditoría de acciones sensibles y configuración (tasa del dólar, bancos, datos del recibo).
