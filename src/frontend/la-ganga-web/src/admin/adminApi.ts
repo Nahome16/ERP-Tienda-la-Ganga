@@ -1,8 +1,8 @@
 // Llamadas tipadas de las pantallas administrativas. Contrato: docs/30-mvp-contrato-api.md
 import { apiRequest } from '../lib/api'
 import type {
-  AuditRow, CashConsolidated, CashSummary, ImportResult, ImportRow, InventoryRow, InventorySummary,
-  KardexRow, PageResult, ProductDetail, ProductListItem, Sale, StoreSettings, Variant,
+  AuditRow, CashConsolidated, CashSummary, CloseSessionRequest, ImportResult, ImportRow, InventoryRow, InventorySummary,
+  KardexRow, PageResult, Partner, ProductDetail, ProductListItem, Sale, StoreSettings, Variant,
 } from '../lib/apiTypes'
 
 const v1 = '/api/v1'
@@ -28,7 +28,7 @@ export const getSessionSummary = (id: string, signal?: AbortSignal) =>
   apiRequest<CashSummary>(`${v1}/cash/sessions/${id}/summary`, { signal })
 export const listSessions = (from: string, to: string, signal?: AbortSignal) =>
   apiRequest<CashSummary[]>(`${v1}/cash/sessions${query({ from, to })}`, { signal })
-export const closeSession = (id: string, body: { countedCashNio: number; countedCashUsd: number; notes: string }) =>
+export const closeSession = (id: string, body: CloseSessionRequest) =>
   apiRequest<CashSummary>(`${v1}/cash/sessions/${id}/close`, { method: 'POST', body })
 
 // ---- Ventas ----
@@ -52,6 +52,8 @@ export const getProduct = (id: string, signal?: AbortSignal) => apiRequest<Produ
 export type VariantInput = {
   sizeId: string; colorId: string; barcode: string | null; priceOverride: number | null
   cost: number | null; initialQuantity: number
+  /** Socio que ingresó la existencia inicial (solo con investment.read). */
+  partnerId?: string
 }
 export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number }
 
@@ -70,18 +72,28 @@ export type VariantByBarcode = Variant & { productName: string }
 export const getVariantByBarcode = (barcode: string, signal?: AbortSignal) =>
   apiRequest<VariantByBarcode>(`${v1}/variants/by-barcode/${encodeURIComponent(barcode)}`, { signal })
 
-export const importProducts = (body: { dryRun: boolean; createMissingCatalogs: boolean; rows: ImportRow[] }) =>
+export const importProducts = (body: { dryRun: boolean; createMissingCatalogs: boolean; createMissingPartners?: boolean; rows: ImportRow[] }) =>
   apiRequest<ImportResult>(`${v1}/products/import`, { method: 'POST', body })
 
 // ---- Inventario ----
 export const getInventorySummary = (signal?: AbortSignal) => apiRequest<InventorySummary>(`${v1}/inventory/summary`, { signal })
-export type InventoryFilter = { search: string; filter: string; page: number; pageSize: number }
+/** `partnerId`: id de un socio o `none` (sin socio); solo con investment.read. */
+export type InventoryFilter = { search: string; filter: string; page: number; pageSize: number; partnerId?: string }
 export const listInventory = (filter: InventoryFilter, signal?: AbortSignal) =>
   apiRequest<PageResult<InventoryRow>>(`${v1}/inventory${query({ ...filter, search: filter.search.trim() })}`, { signal })
 export const getKardex = (variantId: string, page: number, pageSize: number, signal?: AbortSignal) =>
   apiRequest<PageResult<KardexRow>>(`${v1}/inventory/variants/${variantId}/kardex${query({ page, pageSize })}`, { signal })
-export const adjustInventory = (body: { variantId: string; kind: 'Entry' | 'Adjustment' | 'Loss'; delta: number; reason: string }) =>
+export type AdjustmentInput = {
+  variantId: string; kind: 'Entry' | 'Adjustment' | 'Loss'; delta: number; reason: string
+  /** Solo en entradas (delta > 0) y con investment.read. */
+  partnerId?: string; unitCost?: number; unitPrice?: number
+}
+export const adjustInventory = (body: AdjustmentInput) =>
   apiRequest<unknown>(`${v1}/inventory/adjustments`, { method: 'POST', body })
+
+// ---- Socios (solo para los selectores; la pantalla de socios tiene su propia API) ----
+export const listPartners = (status: 'active' | 'all', signal?: AbortSignal) =>
+  apiRequest<Partner[]>(`${v1}/investment/partners${query({ status })}`, { signal })
 
 // ---- Auditoría ----
 export type AuditFilter = { entityType: string; userId: string; from: string; to: string; page: number; pageSize: number }

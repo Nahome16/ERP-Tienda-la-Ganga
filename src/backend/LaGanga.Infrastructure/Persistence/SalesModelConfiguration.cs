@@ -44,6 +44,10 @@ public sealed class CashSessionConfiguration : IEntityTypeConfiguration<CashSess
         builder.Property(session => session.OpeningFloatUsd).HasPrecision(18, 2);
         builder.Property(session => session.CountedCashNio).HasPrecision(18, 2);
         builder.Property(session => session.CountedCashUsd).HasPrecision(18, 2);
+        builder.Property(session => session.CountedTransferNio).HasPrecision(18, 2);
+        builder.Property(session => session.CountedTransferUsd).HasPrecision(18, 2);
+        builder.Property(session => session.CountedCardNio).HasPrecision(18, 2);
+        builder.Property(session => session.CountedCardUsd).HasPrecision(18, 2);
         builder.Property(session => session.ClosingNotes).HasMaxLength(500);
         builder.HasOne(session => session.Register).WithMany().HasForeignKey(session => session.RegisterId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(session => session.OpenedByUserId).OnDelete(DeleteBehavior.Restrict);

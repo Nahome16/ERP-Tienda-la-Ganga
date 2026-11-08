@@ -69,7 +69,8 @@ public sealed record NewVariantInput(
     string? Barcode,
     decimal? PriceOverride,
     decimal? Cost,
-    int InitialQuantity);
+    int InitialQuantity,
+    Guid? PartnerId = null);
 
 public sealed record CreateProductInput(
     string? Name,
@@ -99,9 +100,10 @@ public sealed record ImportRowInput(
     string? Barcode,
     decimal? Price,
     decimal? Cost,
-    int? Quantity);
+    int? Quantity,
+    string? Partner = null);
 
-public sealed record ImportRequest(bool DryRun, bool CreateMissingCatalogs, IReadOnlyList<ImportRowInput>? Rows);
+public sealed record ImportRequest(bool DryRun, bool CreateMissingCatalogs, IReadOnlyList<ImportRowInput>? Rows, bool CreateMissingPartners = false);
 
 public sealed record ImportError(int Row, string Message);
 
@@ -173,9 +175,13 @@ public sealed record InventoryRowDto(
     decimal Price,
     int Stock,
     decimal? Cost,
-    decimal? StockValue);
+    decimal? StockValue,
+    int? PartnerStock = null,
+    IReadOnlyList<PartnerUnitsDto>? Partners = null);
 
-public sealed record InventoryQuery(string? Search, string? Filter, int Page, int PageSize);
+public sealed record PartnerUnitsDto(Guid? PartnerId, string Name, int Units);
+
+public sealed record InventoryQuery(string? Search, string? Filter, int Page, int PageSize, string? PartnerId = null);
 
 public sealed record KardexRowDto(
     MovementType Type,
@@ -193,7 +199,14 @@ public enum AdjustmentKind
     Loss,
 }
 
-public sealed record AdjustmentInput(Guid VariantId, AdjustmentKind Kind, int Delta, string? Reason);
+public sealed record AdjustmentInput(
+    Guid VariantId,
+    AdjustmentKind Kind,
+    int Delta,
+    string? Reason,
+    Guid? PartnerId = null,
+    decimal? UnitCost = null,
+    decimal? UnitPrice = null);
 
 public sealed record AdjustmentResultDto(Guid VariantId, int Delta, int NewStock);
 

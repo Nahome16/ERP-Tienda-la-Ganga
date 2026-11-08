@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
 import { addDays } from './format'
 
-export type ReportKind = 'sales' | 'inventory' | 'movements' | 'cash'
+export type ReportKind = 'sales' | 'inventory' | 'movements' | 'cash' | 'investment'
 export type DateRange = { from: string; to: string }
 export type RangePresetId = 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'lastMonth'
 

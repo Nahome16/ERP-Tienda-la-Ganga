@@ -88,21 +88,67 @@ export function createMock(options = {}) {
   ], 'p1')
   addProduct('Pantalón Jean Slim', 'c2', 'b2', 'k2', 1200, [{ sizeId: 's4', colorId: 'o1', initialQuantity: 8, cost: 700 }], 'p2')
 
-  const totals = (over = {}) => ({
-    salesCount: 12, voidedCount: 1, voidedTotalNio: 350, reviewCount: 2, grossTotalNio: 9800, discountTotalNio: 300, netTotalNio: 9500,
-    cashNioTendered: 6000, cashUsdTendered: 40, cashUsdEquivalentNio: 1468, changeGivenNio: 300, cashTotalNio: 7168,
-    transferTotalNio: 1500, cardTotalNio: 832, transfersByBank: [{ bank: 'BAC', totalNio: 1000 }, { bank: 'Lafise', totalNio: 500 }],
-    byChannel: [{ channel: 'Store', salesCount: 10, totalNio: 8000 }, { channel: 'WhatsApp', salesCount: 2, totalNio: 1500 }], ...over,
-  })
-  const session = (id, registerName, closed) => ({
+  // Totales por caja (cada caja cuadra: efectivo + transferencia + tarjeta = total vendido, todo en C$ equivalentes).
+  const emptyTotals = {
+    salesCount: 0, voidedCount: 0, voidedTotalNio: 0, reviewCount: 0, grossTotalNio: 0, discountTotalNio: 0, netTotalNio: 0,
+    cashNioTendered: 0, cashUsdTendered: 0, cashUsdEquivalentNio: 0, changeGivenNio: 0, cashTotalNio: 0,
+    transferTotalNio: 0, cardTotalNio: 0, transferNioTendered: 0, transferUsdTendered: 0, transferUsdEquivalentNio: 0,
+    cardNioTendered: 0, cardUsdTendered: 0, cardUsdEquivalentNio: 0, transfersByBank: [], byChannel: [],
+  }
+  const sumTotals = (list) => {
+    const out = { ...emptyTotals, transfersByBank: [], byChannel: [] }
+    for (const t of list) {
+      for (const key of Object.keys(emptyTotals)) if (typeof emptyTotals[key] === 'number') out[key] += t[key]
+      for (const bank of t.transfersByBank) {
+        const found = out.transfersByBank.find((x) => x.bank === bank.bank)
+        if (found) { found.totalNio += bank.totalNio; found.totalUsd += bank.totalUsd } else out.transfersByBank.push({ ...bank })
+      }
+      for (const channel of t.byChannel) {
+        const found = out.byChannel.find((x) => x.channel === channel.channel)
+        if (found) { found.salesCount += channel.salesCount; found.totalNio += channel.totalNio } else out.byChannel.push({ ...channel })
+      }
+    }
+    return out
+  }
+  const totals1 = {
+    ...emptyTotals, salesCount: 8, voidedCount: 1, voidedTotalNio: 350, reviewCount: 1, grossTotalNio: 6200, discountTotalNio: 200, netTotalNio: 6000,
+    cashNioTendered: 4000, cashUsdTendered: 20, cashUsdEquivalentNio: 734, changeGivenNio: 100, cashTotalNio: 4634,
+    transferNioTendered: 600, transferUsdTendered: 10, transferUsdEquivalentNio: 367, transferTotalNio: 967,
+    cardNioTendered: 399, cardUsdTendered: 0, cardUsdEquivalentNio: 0, cardTotalNio: 399,
+    transfersByBank: [{ bank: 'BAC', totalNio: 667, totalUsd: 10 }, { bank: 'Lafise', totalNio: 300, totalUsd: 0 }],
+    byChannel: [{ channel: 'Store', salesCount: 6, totalNio: 4500 }, { channel: 'WhatsApp', salesCount: 2, totalNio: 1500 }],
+  }
+  const totals2 = {
+    ...emptyTotals, salesCount: 4, voidedCount: 0, voidedTotalNio: 0, reviewCount: 1, grossTotalNio: 3600, discountTotalNio: 100, netTotalNio: 3500,
+    cashNioTendered: 1500, cashUsdTendered: 0, cashUsdEquivalentNio: 0, changeGivenNio: 0, cashTotalNio: 1500,
+    transferNioTendered: 0, transferUsdTendered: 20, transferUsdEquivalentNio: 734, transferTotalNio: 734,
+    cardNioTendered: 532, cardUsdTendered: 20, cardUsdEquivalentNio: 734, cardTotalNio: 1266,
+    transfersByBank: [{ bank: 'BAC', totalNio: 734, totalUsd: 20 }],
+    byChannel: [{ channel: 'Store', salesCount: 4, totalNio: 3500 }],
+  }
+  const session = (id, registerName, closed, extra = {}) => ({
     id, registerId: `r-${id}`, registerName, openedAtUtc: '2026-11-08T14:00:00Z', openedByUserId: 'u-s', openedByName: id === 'cs1' ? 'Marta Pérez' : 'Luis Gómez',
     openingFloatNio: 500, openingFloatUsd: 20, closedAtUtc: closed ? '2026-11-08T23:30:00Z' : null, closedByName: closed ? 'Administrador' : null,
-    countedCashNio: closed ? 6180 : null, countedCashUsd: closed ? 60 : null, closingNotes: closed ? 'Faltan C$ 20' : null,
+    countedCashNio: closed ? 4380 : null, countedCashUsd: closed ? 40 : null, closingNotes: closed ? 'Faltan C$ 20' : null,
+    countedTransferNio: closed ? 600 : null, countedTransferUsd: closed ? 10 : null,
+    countedCardNio: closed ? 390 : null, countedCardUsd: closed ? 0 : null, ...extra,
   })
-  s.cash = {
-    cs1: { session: session('cs1', 'Caja 1', true), totals: totals({ netTotalNio: 6000, reviewCount: 1 }), expectedCashNio: 6200, expectedCashUsd: 60, differenceCashNio: -20, differenceCashUsd: 0 },
-    cs2: { session: session('cs2', 'Caja 2', false), totals: totals({ netTotalNio: 3500, reviewCount: 1 }), expectedCashNio: 1500, expectedCashUsd: 20, differenceCashNio: null, differenceCashUsd: null },
+  const diff = (counted, expected) => (counted === null || counted === undefined ? null : Math.round((counted - expected) * 100) / 100)
+  // Resumen de una caja: lo esperado sale de los totales; las diferencias, de lo verificado.
+  const summarize = (sess, t) => {
+    const expected = {
+      expectedCashNio: sess.openingFloatNio + t.cashNioTendered - t.changeGivenNio, expectedCashUsd: sess.openingFloatUsd + t.cashUsdTendered,
+      expectedTransferNio: t.transferNioTendered, expectedTransferUsd: t.transferUsdTendered,
+      expectedCardNio: t.cardNioTendered, expectedCardUsd: t.cardUsdTendered,
+    }
+    return {
+      session: sess, totals: t, ...expected,
+      differenceCashNio: diff(sess.countedCashNio, expected.expectedCashNio), differenceCashUsd: diff(sess.countedCashUsd, expected.expectedCashUsd),
+      differenceTransferNio: diff(sess.countedTransferNio, expected.expectedTransferNio), differenceTransferUsd: diff(sess.countedTransferUsd, expected.expectedTransferUsd),
+      differenceCardNio: diff(sess.countedCardNio, expected.expectedCardNio), differenceCardUsd: diff(sess.countedCardUsd, expected.expectedCardUsd),
+    }
   }
+  s.cash = { cs1: summarize(session('cs1', 'Caja 1', true), totals1), cs2: summarize(session('cs2', 'Caja 2', false), totals2) }
   const mkSale = (n, extra = {}) => ({
     id: `sale${n}`, number: `V-${String(n).padStart(6, '0')}`, clientSaleId: `cid${n}`, status: 'Confirmed', channel: 'Store', cashSessionId: 'cs1', registerName: 'Caja 1', sellerName: 'Marta Pérez',
     createdAtUtc: '2026-11-08T15:00:00Z', receivedAtUtc: '2026-11-08T15:00:05Z', isOffline: false, subtotalNio: 650, discountType: null, discountValue: null, discountNio: 0, totalNio: 650, changeNio: 50,
@@ -110,7 +156,11 @@ export function createMock(options = {}) {
     lines: [{ variantId: 'v1', productName: 'Camisa Oxford', sizeName: 'M', colorName: 'Azul', barcode: '4006381333931', quantity: 1, unitPrice: 650, lineTotalNio: 650 }],
     payments: [{ method: 'Cash', currency: 'NIO', amount: 700, exchangeRate: null, amountNio: 700, bank: null, reference: null }], ...extra,
   })
-  s.sales = [mkSale(1), mkSale(2, { requiresReview: true, reviewNote: 'Stock insuficiente al sincronizar.', isOffline: true }), mkSale(3, { status: 'Voided', voidReason: 'Error de precio', voidedByName: 'Administrador', voidedAtUtc: now() })]
+  s.sales = [mkSale(1), mkSale(2, {
+    requiresReview: true, reviewNote: 'Stock insuficiente al sincronizar.', isOffline: true, subtotalNio: 734, totalNio: 734, changeNio: 0,
+    lines: [{ variantId: 'v1', productName: 'Camisa Oxford', sizeName: 'M', colorName: 'Azul', barcode: '4006381333931', quantity: 1, unitPrice: 734, lineTotalNio: 734 }],
+    payments: [{ method: 'Transfer', currency: 'USD', amount: 20, exchangeRate: 36.7, amountNio: 734, bank: 'BAC', reference: 'TX-778' }],
+  }), mkSale(3, { status: 'Voided', voidReason: 'Error de precio', voidedByName: 'Administrador', voidedAtUtc: now() })]
   s.audit = Array.from({ length: 35 }, (_, i) => ({ id: `a${i}`, occurredAtUtc: now(), userName: i % 2 ? 'Administrador' : 'Marta Pérez', action: i % 3 ? 'sale.confirmed' : 'inventory.adjusted', entityType: i % 3 ? 'Sale' : 'InventoryMovement', entityId: `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`, summary: `Registro ${i}` }))
 
   const json = (route, status, body, headers = {}) => route.fulfill({ status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body), headers })
@@ -226,18 +276,30 @@ export function createMock(options = {}) {
     if (path === '/api/v1/cash/consolidated') {
       const sessions = Object.values(s.cash)
       const open = sessions.filter((x) => !x.session.closedAtUtc).length
+      const sum = (pick) => sessions.reduce((a, x) => a + pick(x), 0)
+      // Verificado: null si hay cajas abiertas o alguna no verificó ese monto.
+      const verified = (pick) => (open || sessions.some((x) => pick(x.session) === null || pick(x.session) === undefined) ? null : sum((x) => pick(x.session)))
       return json(route, 200, {
-        date: q.get('date'), sessions, totals: totals(), expectedCashNio: sessions.reduce((a, x) => a + x.expectedCashNio, 0), expectedCashUsd: sessions.reduce((a, x) => a + x.expectedCashUsd, 0),
-        countedCashNio: open ? null : sessions.reduce((a, x) => a + x.session.countedCashNio, 0), countedCashUsd: open ? null : sessions.reduce((a, x) => a + x.session.countedCashUsd, 0), openSessionsCount: open,
+        date: q.get('date'), sessions, totals: sumTotals(sessions.map((x) => x.totals)), openSessionsCount: open,
+        expectedCashNio: sum((x) => x.expectedCashNio), expectedCashUsd: sum((x) => x.expectedCashUsd),
+        countedCashNio: verified((x) => x.countedCashNio), countedCashUsd: verified((x) => x.countedCashUsd),
+        expectedTransferNio: sum((x) => x.expectedTransferNio), expectedTransferUsd: sum((x) => x.expectedTransferUsd),
+        countedTransferNio: verified((x) => x.countedTransferNio), countedTransferUsd: verified((x) => x.countedTransferUsd),
+        expectedCardNio: sum((x) => x.expectedCardNio), expectedCardUsd: sum((x) => x.expectedCardUsd),
+        countedCardNio: verified((x) => x.countedCardNio), countedCardUsd: verified((x) => x.countedCardUsd),
       })
     }
     if ((r = m(/^\/api\/v1\/cash\/sessions\/([^/]+)\/summary$/))) return json(route, 200, s.cash[r[1]])
     if ((r = m(/^\/api\/v1\/cash\/sessions\/([^/]+)\/close$/))) {
       const c = s.cash[r[1]]
-      Object.assign(c.session, { closedAtUtc: now(), closedByName: 'Administrador', countedCashNio: body.countedCashNio, countedCashUsd: body.countedCashUsd, closingNotes: body.notes })
-      c.differenceCashNio = body.countedCashNio - c.expectedCashNio
-      c.differenceCashUsd = body.countedCashUsd - c.expectedCashUsd
-      return json(route, 200, c)
+      const val = (v) => (v === undefined ? null : v)
+      Object.assign(c.session, {
+        closedAtUtc: now(), closedByName: 'Administrador', countedCashNio: body.countedCashNio, countedCashUsd: body.countedCashUsd, closingNotes: body.notes,
+        countedTransferNio: val(body.countedTransferNio), countedTransferUsd: val(body.countedTransferUsd),
+        countedCardNio: val(body.countedCardNio), countedCardUsd: val(body.countedCardUsd),
+      })
+      s.cash[r[1]] = summarize(c.session, c.totals)
+      return json(route, 200, s.cash[r[1]])
     }
     if (path === '/api/v1/cash/sessions') return json(route, 200, Object.values(s.cash))
 

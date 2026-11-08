@@ -58,6 +58,11 @@ export type CashSession = {
   countedCashNio: number | null
   countedCashUsd: number | null
   closingNotes: string | null
+  /** Verificado en el banco / según la terminal; null = no se verificó. */
+  countedTransferNio: number | null
+  countedTransferUsd: number | null
+  countedCardNio: number | null
+  countedCardUsd: number | null
 }
 
 export type CashTotals = {
@@ -75,7 +80,13 @@ export type CashTotals = {
   cashTotalNio: number
   transferTotalNio: number
   cardTotalNio: number
-  transfersByBank: { bank: string; totalNio: number }[]
+  transferNioTendered: number
+  transferUsdTendered: number
+  transferUsdEquivalentNio: number
+  cardNioTendered: number
+  cardUsdTendered: number
+  cardUsdEquivalentNio: number
+  transfersByBank: { bank: string; totalNio: number; totalUsd: number }[]
   byChannel: { channel: SaleChannel; salesCount: number; totalNio: number }[]
 }
 
@@ -86,6 +97,14 @@ export type CashSummary = {
   expectedCashUsd: number
   differenceCashNio: number | null
   differenceCashUsd: number | null
+  expectedTransferNio: number
+  expectedTransferUsd: number
+  differenceTransferNio: number | null
+  differenceTransferUsd: number | null
+  expectedCardNio: number
+  expectedCardUsd: number
+  differenceCardNio: number | null
+  differenceCardUsd: number | null
 }
 
 export type CashConsolidated = {
@@ -97,6 +116,24 @@ export type CashConsolidated = {
   countedCashNio: number | null
   countedCashUsd: number | null
   openSessionsCount: number
+  expectedTransferNio: number
+  expectedTransferUsd: number
+  countedTransferNio: number | null
+  countedTransferUsd: number | null
+  expectedCardNio: number
+  expectedCardUsd: number
+  countedCardNio: number | null
+  countedCardUsd: number | null
+}
+
+export type CloseSessionRequest = {
+  countedCashNio: number
+  countedCashUsd: number
+  notes?: string | null
+  countedTransferNio?: number | null
+  countedTransferUsd?: number | null
+  countedCardNio?: number | null
+  countedCardUsd?: number | null
 }
 
 export type SaleRequestLine = { variantId: string; quantity: number; unitPrice: number }
@@ -238,6 +275,8 @@ export type ImportRow = {
   price: number
   cost: number | null
   quantity: number
+  /** Nombre del socio (solo con investment.read). */
+  partner?: string | null
 }
 
 export type ImportResult = {
@@ -269,6 +308,9 @@ export type InventoryRow = {
   stock: number
   cost?: number | null
   stockValue?: number | null
+  /** Solo con investment.read: existencias por socio y, con filtro de socio, las unidades de ese socio. */
+  partners?: PartnerUnits[]
+  partnerStock?: number
 }
 
 export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid'
@@ -292,3 +334,82 @@ export type AuditRow = {
   entityId: string
   summary: string
 }
+
+// ---- Socios e inversión (solo administrador) — ver docs/30, sección 11 ----
+
+export type Partner = {
+  id: string
+  name: string
+  phone: string | null
+  notes: string | null
+  isActive: boolean
+  version: number
+}
+
+export type PartnerSummary = {
+  partnerId: string | null
+  partnerName: string
+  unitsEntered: number
+  investedNio: number
+  unitsWithoutCost: number
+  unitsInStock: number
+  stockAtCostNio: number
+  stockAtPriceNio: number
+  unitsSold: number
+  revenueNio: number
+  costOfSoldNio: number
+  profitNio: number
+  soldUnitsWithoutCost: number
+  lossUnits: number
+  lossCostNio: number
+}
+
+export type InvestmentSummary = {
+  from: string | null
+  to: string | null
+  partners: PartnerSummary[]
+  totals: PartnerSummary
+}
+
+export type ProductBreakdown = {
+  partnerId: string | null
+  partnerName: string
+  productId: string
+  productName: string
+  unitsEntered: number
+  investedNio: number
+  unitsInStock: number
+  stockAtCostNio: number
+  unitsSold: number
+  revenueNio: number
+  profitNio: number
+}
+
+export type LotSource = 'InitialStock' | 'Entry' | 'Adjustment' | 'Import' | 'Opening' | 'Restock'
+
+export type Lot = {
+  id: string
+  partnerId: string | null
+  partnerName: string
+  variantId: string
+  productId: string
+  productName: string
+  sizeName: string
+  colorName: string
+  barcode: string
+  enteredAtUtc: string
+  enteredByName: string
+  source: LotSource
+  note: string | null
+  quantityIn: number
+  quantityRemaining: number
+  quantitySold: number
+  quantityLost: number
+  unitCost: number | null
+  unitPrice: number | null
+  currentPrice: number
+  investedNio: number
+  stockAtCostNio: number
+}
+
+export type PartnerUnits = { partnerId: string | null; name: string; units: number }

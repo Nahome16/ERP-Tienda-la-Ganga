@@ -48,6 +48,7 @@ try {
     await page.locator('#pv-scan-input').press('Enter')
     await page.getByRole('dialog', { name: 'Cobrar' }).waitFor()
     await page.getByRole('button', { name: 'Exacto' }).click()
+    await page.getByRole('button', { name: /Agregar pago/ }).click()
     await page.getByRole('button', { name: /Confirmar cobro/ }).click()
     await page.getByTestId('sale-done').waitFor()
   }

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { Catalogs } from './useCatalogs'
+import { PartnerSelect, PartnersHint } from './PartnerSelect'
 import { Swatch } from './ui'
+import { usePartners } from './usePartners'
 import {
-  combosOf, comboKey, draftOf, setDraft, toggleId, type BuilderState,
+  combosOf, comboKey, draftNoPartner, draftOf, draftSamePartner, setDraft, toggleId, totalInitialUnits, type BuilderState,
 } from './variantBuilder'
 
 type Props = {
@@ -10,17 +12,20 @@ type Props = {
   state: BuilderState
   onChange: (state: BuilderState) => void
   canCost: boolean
+  /** El usuario tiene `investment.read`: puede indicar el socio que ingresó la existencia inicial. */
+  canPartners?: boolean
   /** Combinaciones talla|color que el producto ya tiene (no se pueden repetir). */
   existing?: Set<string>
 }
 
 /** Elige tallas y colores y arma la matriz talla × color con cantidades iniciales. */
-export function VariantBuilder({ catalogs, state, onChange, canCost, existing }: Props) {
+export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners = false, existing }: Props) {
   const [groupId, setGroupId] = useState('')
   const [colorFilter, setColorFilter] = useState('')
   const [bulkQty, setBulkQty] = useState('')
   const [bulkCost, setBulkCost] = useState('')
   const taken = existing ?? new Set<string>()
+  const partnerList = usePartners('active', canPartners)
 
   const visibleSizes = useMemo(
     () => catalogs.sizes.filter((size) => !groupId || size.sizeGroupId === groupId),
@@ -35,6 +40,11 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, existing }:
   const chosenColors = catalogs.colors.filter((color) => state.colorIds.includes(color.id))
   const combos = combosOf(state, catalogs.sizes, catalogs.colors)
   const newCombos = combos.filter((combo) => !taken.has(combo.key))
+  const unitsToLoad = totalInitialUnits(state, combos, taken)
+  const hasPartners = partnerList.partners.length > 0
+  // El socio solo importa si hay existencia inicial; con la lista vacía o con error se avisa pero no se bloquea.
+  const askPartner = canPartners && unitsToLoad > 0
+  const showPartnerSelect = askPartner && hasPartners
   const allVisibleSizesOn = visibleSizes.length > 0 && visibleSizes.every((size) => state.sizeIds.includes(size.id))
 
   function applyBulk(field: 'qty' | 'cost', value: string) {
@@ -110,6 +120,18 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, existing }:
               </>
             )}
           </div>
+          {askPartner && (
+            <div className="inv-partner-row">
+              {showPartnerSelect && (
+                <PartnerSelect
+                  partners={partnerList.partners} value={state.partnerId} label="Socio que ingresó (todas las variantes)"
+                  onChange={(partnerId) => onChange({ ...state, partnerId })}
+                />
+              )}
+              <PartnersHint error={partnerList.error} empty={!partnerList.loading && !partnerList.error && !hasPartners} onRetry={partnerList.reload} />
+              {showPartnerSelect && <p className="adm-help" style={{ margin: 0 }}>La entrada se registra con el precio del producto (o el precio especial de la variante) y el costo de cada variante. Podés cambiar el socio de una variante en el detalle de abajo.</p>}
+            </div>
+          )}
           <div className="adm-matrix">
             <table aria-label="Matriz de tallas y colores">
               <thead>
@@ -147,11 +169,11 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, existing }:
           </div>
 
           <details style={{ marginTop: 10 }}>
-            <summary style={{ cursor: 'pointer', fontSize: '.82rem', fontWeight: 800 }}>Precio especial{canCost ? ', costo' : ''} y código de barras por variante (opcional)</summary>
+            <summary style={{ cursor: 'pointer', fontSize: '.82rem', fontWeight: 800 }}>Precio especial{canCost ? ', costo' : ''}{showPartnerSelect ? ', socio' : ''} y código de barras por variante (opcional)</summary>
             <p className="adm-help">Dejá el precio especial vacío para usar el precio base. Si dejás el código vacío, el sistema genera uno (EAN-13 interno que empieza en 20).</p>
             <div className="table-scroll">
               <table className="adm-table">
-                <thead><tr><th>Talla</th><th>Color</th><th>Precio especial</th>{canCost && <th>Costo</th>}<th>Código de barras</th></tr></thead>
+                <thead><tr><th>Talla</th><th>Color</th><th>Precio especial</th>{canCost && <th>Costo</th>}{showPartnerSelect && <th>Socio</th>}<th>Código de barras</th></tr></thead>
                 <tbody>
                   {newCombos.map((combo) => {
                     const draft = draftOf(state, combo.key)
@@ -162,6 +184,17 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, existing }:
                         <td>{combo.color.name}</td>
                         <td><input type="number" min={0} step="0.01" value={draft.price} aria-label={`Precio especial ${label}`} onChange={(event) => onChange(setDraft(state, combo.key, { price: event.target.value }))} /></td>
                         {canCost && <td><input type="number" min={0} step="0.01" value={draft.cost} aria-label={`Costo ${label}`} onChange={(event) => onChange(setDraft(state, combo.key, { cost: event.target.value }))} /></td>}
+                        {showPartnerSelect && (
+                          <td>
+                            <PartnerSelect
+                              compact noneOption={false} partners={partnerList.partners} value={draft.partnerId} ariaLabel={`Socio ${label}`}
+                              onChange={(partnerId) => onChange(setDraft(state, combo.key, { partnerId }))}
+                            >
+                              <option value={draftSamePartner}>Igual al general</option>
+                              <option value={draftNoPartner}>Sin socio</option>
+                            </PartnerSelect>
+                          </td>
+                        )}
                         <td><input type="text" value={draft.barcode} aria-label={`Código de barras ${label}`} onChange={(event) => onChange(setDraft(state, combo.key, { barcode: event.target.value }))} /></td>
                       </tr>
                     )

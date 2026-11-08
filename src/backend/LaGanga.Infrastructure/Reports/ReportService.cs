@@ -1,6 +1,7 @@
 using System.Globalization;
 using ClosedXML.Excel;
 using LaGanga.Application.Common;
+using LaGanga.Application.Investment;
 using LaGanga.Application.Sales;
 using LaGanga.Domain.Inventory;
 using LaGanga.Domain.Sales;
@@ -13,6 +14,7 @@ namespace LaGanga.Infrastructure.Reports;
 public sealed class ReportService(
     LaGangaDbContext dbContext,
     ICashService cashService,
+    IInvestmentService investmentService,
     TimeProvider timeProvider) : IReportService
 {
     private const int MaxDays = 366;
@@ -72,8 +74,12 @@ public sealed class ReportService(
         summary.KeyValue("   Dólares recibidos US$", totals.CashUsdTendered);
         summary.KeyValue("   Dólares convertidos a C$", totals.CashUsdEquivalentNio);
         summary.KeyValue("   Cambio entregado C$", totals.ChangeGivenNio);
-        summary.KeyValue("Transferencia C$", totals.TransferTotalNio);
-        summary.KeyValue("Tarjeta / POS C$", totals.CardTotalNio);
+        summary.KeyValue("Transferencia (equiv. C$)", totals.TransferTotalNio);
+        summary.KeyValue("   Recibido en córdobas C$", totals.TransferNioTendered);
+        summary.KeyValue("   Recibido en dólares US$", totals.TransferUsdTendered);
+        summary.KeyValue("Tarjeta / POS (equiv. C$)", totals.CardTotalNio);
+        summary.KeyValue("   Cobrado en córdobas C$", totals.CardNioTendered);
+        summary.KeyValue("   Cobrado en dólares US$", totals.CardUsdTendered);
         summary.Blank();
         summary.SectionTitle("Por canal");
         foreach (var channel in totals.ByChannel)
@@ -303,10 +309,13 @@ public sealed class ReportService(
         sessions.Header(
         [
             "Fecha", "Caja", "Cajero/a", "Apertura", "Cierre", "Estado", "Fondo C$", "Fondo US$", "Ventas", "Anuladas",
-            "Bruto C$", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia C$", "Tarjeta / POS C$",
-            "Esperado C$", "Contado C$", "Diferencia C$", "Esperado US$", "Contado US$", "Diferencia US$", "Notas",
+            "Bruto C$", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia (equiv. C$)", "Tarjeta / POS (equiv. C$)",
+            "EFECTIVO esperado C$", "Efectivo contado C$", "Efectivo diferencia C$", "EFECTIVO esperado US$", "Efectivo contado US$", "Efectivo diferencia US$",
+            "TRANSFERENCIA esperada C$", "Transferencia verificada C$", "Transferencia diferencia C$", "TRANSFERENCIA esperada US$", "Transferencia verificada US$", "Transferencia diferencia US$",
+            "TARJETA esperada C$", "Tarjeta terminal C$", "Tarjeta diferencia C$", "TARJETA esperada US$", "Tarjeta terminal US$", "Tarjeta diferencia US$",
+            "Notas",
         ],
-        [11, 9, 20, 17, 17, 10, 11, 11, 8, 9, 13, 13, 17, 15, 15, 15, 13, 13, 13, 12, 12, 12, 32]);
+        [11, 9, 20, 17, 17, 10, 11, 11, 8, 9, 13, 13, 17, 15, 17, 17, 15, 14, 14, 14, 14, 14, 16, 16, 16, 16, 16, 16, 14, 14, 14, 14, 14, 14, 32]);
         var first = sessions.NextRow;
         foreach (var summary in summaries)
         {
@@ -318,19 +327,26 @@ public sealed class ReportService(
                 session.OpeningFloatNio, session.OpeningFloatUsd, totals.SalesCount, totals.VoidedCount,
                 totals.GrossTotalNio, totals.DiscountTotalNio, totals.NetTotalNio, totals.CashTotalNio, totals.TransferTotalNio, totals.CardTotalNio,
                 summary.ExpectedCashNio, session.CountedCashNio, summary.DifferenceCashNio,
-                summary.ExpectedCashUsd, session.CountedCashUsd, summary.DifferenceCashUsd, session.ClosingNotes);
+                summary.ExpectedCashUsd, session.CountedCashUsd, summary.DifferenceCashUsd,
+                summary.ExpectedTransferNio, session.CountedTransferNio, summary.DifferenceTransferNio,
+                summary.ExpectedTransferUsd, session.CountedTransferUsd, summary.DifferenceTransferUsd,
+                summary.ExpectedCardNio, session.CountedCardNio, summary.DifferenceCardNio,
+                summary.ExpectedCardUsd, session.CountedCardUsd, summary.DifferenceCardUsd,
+                session.ClosingNotes);
         }
 
         sessions.FinishTable(first);
 
         var days = new XlsxSheet(workbook, "Consolidado por día");
-        days.Title("Consolidado por día (todas las cajas)");
+        days.Title("Consolidado por día (todas las cajas)", "Esperado = lo que el sistema registró. Contado/verificado = lo que se contó en caja, se verificó en el banco o marcó la terminal al cerrar.");
         days.Header(
         [
-            "Fecha", "Cajas", "Ventas", "Anuladas", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia C$", "Tarjeta / POS C$",
-            "Esperado C$", "Contado C$", "Diferencia C$", "Esperado US$", "Contado US$", "Diferencia US$", "Cajas abiertas",
+            "Fecha", "Cajas", "Ventas", "Anuladas", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia (equiv. C$)", "Tarjeta / POS (equiv. C$)",
+            "EFECTIVO esperado C$", "Efectivo contado C$", "Efectivo diferencia C$", "EFECTIVO esperado US$", "Efectivo contado US$", "Efectivo diferencia US$",
+            "TRANSFERENCIA esperada C$", "Transferencia verificada C$", "TRANSFERENCIA esperada US$", "Transferencia verificada US$",
+            "TARJETA esperada C$", "Tarjeta terminal C$", "TARJETA esperada US$", "Tarjeta terminal US$", "Cajas abiertas",
         ],
-        [11, 8, 8, 9, 13, 17, 15, 15, 15, 13, 13, 13, 12, 12, 12, 13], freeze: false);
+        [11, 8, 8, 9, 13, 17, 15, 17, 17, 15, 14, 14, 14, 14, 14, 16, 16, 16, 16, 14, 14, 14, 14, 13], freeze: false);
         first = days.NextRow;
         foreach (var day in summaries.GroupBy(summary => BusinessTime.ToBusinessDate(summary.Session.OpenedAtUtc)).OrderBy(group => group.Key))
         {
@@ -339,27 +355,112 @@ public sealed class ReportService(
             var expectedUsd = day.Sum(summary => summary.ExpectedCashUsd);
             decimal? countedNio = open > 0 ? null : day.Sum(summary => summary.Session.CountedCashNio ?? 0);
             decimal? countedUsd = open > 0 ? null : day.Sum(summary => summary.Session.CountedCashUsd ?? 0);
+            decimal? Verified(Func<CashSummaryDto, decimal?> selector) =>
+                open > 0 || day.Any(summary => selector(summary) is null) ? null : day.Sum(summary => selector(summary)!.Value);
             days.Row(
                 day.Key, day.Count(), day.Sum(s => s.Totals.SalesCount), day.Sum(s => s.Totals.VoidedCount), day.Sum(s => s.Totals.DiscountTotalNio),
                 day.Sum(s => s.Totals.NetTotalNio), day.Sum(s => s.Totals.CashTotalNio), day.Sum(s => s.Totals.TransferTotalNio), day.Sum(s => s.Totals.CardTotalNio),
-                expectedNio, countedNio, countedNio - expectedNio, expectedUsd, countedUsd, countedUsd - expectedUsd, open);
+                expectedNio, countedNio, countedNio - expectedNio, expectedUsd, countedUsd, countedUsd - expectedUsd,
+                day.Sum(s => s.ExpectedTransferNio), Verified(s => s.Session.CountedTransferNio),
+                day.Sum(s => s.ExpectedTransferUsd), Verified(s => s.Session.CountedTransferUsd),
+                day.Sum(s => s.ExpectedCardNio), Verified(s => s.Session.CountedCardNio),
+                day.Sum(s => s.ExpectedCardUsd), Verified(s => s.Session.CountedCardUsd),
+                open);
         }
 
         days.FinishTable(first);
 
         var banks = new XlsxSheet(workbook, "Transferencias por banco");
         banks.Title("Transferencias por banco", $"Del {Format(fromDate)} al {Format(toDate)}");
-        banks.Header(["Banco", "Total C$"], [28, 16], freeze: false);
+        banks.Header(["Banco", "Total (equiv. C$)", "De ese total, recibido en US$"], [28, 18, 24], freeze: false);
         foreach (var bank in summaries.SelectMany(summary => summary.Totals.TransfersByBank)
                      .GroupBy(bank => bank.Bank, StringComparer.OrdinalIgnoreCase)
-                     .Select(group => new BankTotalDto(group.Key, group.Sum(bank => bank.TotalNio)))
+                     .Select(group => new BankTotalDto(group.Key, group.Sum(bank => bank.TotalNio), group.Sum(bank => bank.TotalUsd)))
                      .OrderByDescending(bank => bank.TotalNio))
         {
-            banks.Row(bank.Bank, bank.TotalNio);
+            banks.Row(bank.Bank, bank.TotalNio, bank.TotalUsd);
         }
 
         return Result.Ok(Save(workbook, $"cierres_de_caja_{Iso(fromDate)}_a_{Iso(toDate)}.xlsx"));
     }
+
+    public async Task<ServiceResult<ReportFile>> InvestmentAsync(DateOnly fromDate, DateOnly toDate, Actor actor, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var range = ValidateRange(fromDate, toDate);
+        if (range is not null)
+        {
+            return Result.Fail<ReportFile>(range);
+        }
+
+        var summary = await investmentService.GetSummaryAsync(fromDate, toDate, cancellationToken);
+        var breakdown = await investmentService.GetBreakdownAsync(null, fromDate, toDate, cancellationToken);
+        var lots = new List<LotDto>();
+        for (var page = 1; ; page++)
+        {
+            var batch = await investmentService.ListLotsAsync(new LotQuery(null, null, false, fromDate, toDate, page, Paging.MaxPageSize), cancellationToken);
+            lots.AddRange(batch.Items);
+            if (page >= batch.TotalPages || lots.Count >= MaxRows)
+            {
+                break;
+            }
+        }
+
+        using var workbook = new XLWorkbook();
+        var sheet = new XlsxSheet(workbook, "Resumen por socio");
+        sheet.Title("Socios e inversión", $"Entradas y ventas del {Format(fromDate)} al {Format(toDate)} · las existencias son las de hoy · generado {GeneratedAt()}");
+        sheet.Header(
+        [
+            "Socio", "Unidades ingresadas", "Inversión C$ (costo × unidades)", "Unidades sin costo", "Existencias (unid.)", "Existencias al costo C$", "Existencias a precio de venta C$",
+            "Unidades vendidas", "Vendido C$ (con descuentos)", "Costo de lo vendido C$", "GANANCIA C$", "Vendidas sin costo (ganancia parcial)", "Pérdidas (unid.)", "Costo de pérdidas C$",
+        ],
+        [26, 12, 18, 11, 12, 16, 18, 11, 17, 16, 15, 16, 11, 15], freeze: false);
+        var first = sheet.NextRow;
+        foreach (var row in summary.Partners.Append(summary.Totals))
+        {
+            sheet.Row(
+                row.PartnerName, row.UnitsEntered, row.InvestedNio, row.UnitsWithoutCost, row.UnitsInStock, row.StockAtCostNio, row.StockAtPriceNio,
+                row.UnitsSold, row.RevenueNio, row.CostOfSoldNio, row.ProfitNio, row.SoldUnitsWithoutCost, row.LossUnits, row.LossCostNio);
+        }
+
+        sheet.FinishTable(first);
+
+        var products = new XlsxSheet(workbook, "Por producto");
+        products.Header(["Socio", "Producto", "Unidades ingresadas", "Inversión C$", "Existencias (unid.)", "Existencias al costo C$", "Unidades vendidas", "Vendido C$", "Ganancia C$"], [26, 38, 12, 14, 12, 16, 11, 14, 14]);
+        first = products.NextRow;
+        foreach (var row in breakdown)
+        {
+            products.Row(row.PartnerName, row.ProductName, row.UnitsEntered, row.InvestedNio, row.UnitsInStock, row.StockAtCostNio, row.UnitsSold, row.RevenueNio, row.ProfitNio);
+        }
+
+        products.FinishTable(first);
+
+        var entries = new XlsxSheet(workbook, "Entradas");
+        entries.Header(
+            ["Fecha", "Socio", "Producto", "Talla", "Color", "Código de barras", "Origen", "Ingresó", "Cantidad ingresada", "Quedan", "Vendidas", "Pérdidas", "Costo unitario C$", "Precio dado C$", "Precio actual C$", "Inversión C$", "Nota"],
+            [17, 22, 36, 8, 14, 18, 14, 20, 11, 9, 10, 10, 13, 13, 13, 14, 30]);
+        first = entries.NextRow;
+        foreach (var lot in lots.OrderBy(lot => lot.EnteredAtUtc))
+        {
+            entries.Row(
+                Local(lot.EnteredAtUtc), lot.PartnerName, lot.ProductName, lot.SizeName, lot.ColorName, lot.Barcode, SourceName(lot.Source), lot.EnteredByName,
+                lot.QuantityIn, lot.QuantityRemaining, lot.QuantitySold, lot.QuantityLost, lot.UnitCost, lot.UnitPrice, lot.CurrentPrice, lot.InvestedNio, lot.Note);
+        }
+
+        entries.FinishTable(first);
+        return Result.Ok(Save(workbook, $"socios_e_inversion_{Iso(fromDate)}_a_{Iso(toDate)}.xlsx"));
+    }
+
+    private static string SourceName(string source) => source switch
+    {
+        "InitialStock" => "Existencia inicial",
+        "Entry" => "Entrada",
+        "Adjustment" => "Ajuste",
+        "Import" => "Importación",
+        "Opening" => "Saldo inicial",
+        _ => "Unidades sin entrada",
+    };
 
     private static ServiceError? ValidateRange(DateOnly fromDate, DateOnly toDate)
     {

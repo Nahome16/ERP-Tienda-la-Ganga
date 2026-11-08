@@ -8,6 +8,9 @@
 .receipt-sheet .receipt-bold { font-weight: 700; }
 .receipt-sheet .receipt-small { font-size: 10px; }
 .receipt-sheet .receipt-sign { margin-top: 18px; }
+.receipt-sheet .receipt-ind > span:first-child { padding-left: 2ch; }
+.receipt-sheet .receipt-section { margin-top: 6px; }
+.receipt-sheet .receipt-recon { margin-bottom: 3px; }
 @media print {
   @page { margin: 0; }
   body.printing-receipt > *:not(.receipt-print-root) { display: none !important; }

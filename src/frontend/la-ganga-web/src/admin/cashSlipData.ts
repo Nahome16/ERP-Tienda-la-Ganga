@@ -2,6 +2,7 @@ import type { CashSummary } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
 import type { SlipData } from './CashSlip'
 import { formatDateTime } from './format'
+import { methodsFromSummary } from './reconciliation'
 
 export function printCashSlip() {
   document.body.classList.add('printing-cash')
@@ -25,10 +26,8 @@ export function slipFromSummary(storeName: string, summary: CashSummary): SlipDa
       ['Fondo inicial', `${formatNio(session.openingFloatNio)} / ${formatUsd(session.openingFloatUsd)}`],
     ],
     totals: summary.totals,
-    expectedNio: summary.expectedCashNio,
-    expectedUsd: summary.expectedCashUsd,
-    countedNio: session.countedCashNio,
-    countedUsd: session.countedCashUsd,
+    methods: methodsFromSummary(summary),
+    open: session.closedAtUtc === null,
     notes: session.closingNotes,
   }
 }

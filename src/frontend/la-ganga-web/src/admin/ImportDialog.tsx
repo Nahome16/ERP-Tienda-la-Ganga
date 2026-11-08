@@ -4,15 +4,16 @@ import type { ImportResult, ImportRow } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
 import { importProducts } from './adminApi'
-import { buildTemplateCsv, parseImportCsv, templateHeaders, type ParsedImport } from './csv'
+import { buildTemplateCsv, parseImportCsv, prepareImportRows, templateHeaders, templateHeadersWithPartner, type ParsedImport } from './csv'
 import { messageFrom } from './format'
+import { splitCreated } from './partners'
 import { Dialog, Notice } from './ui'
 
 const previewLimit = 60
 const errorLimit = 200
 
-function downloadTemplate() {
-  const blob = new Blob([buildTemplateCsv()], { type: 'text/csv;charset=utf-8' })
+function downloadTemplate(withPartner: boolean) {
+  const blob = new Blob([buildTemplateCsv(withPartner)], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -35,28 +36,44 @@ async function readText(file: File): Promise<string> {
 
 type Phase = 'choose' | 'preview' | 'done'
 
+/** «Se crearían N productos…» más, aparte, los socios y catálogos nuevos. */
+function CreatedLists({ created, verb }: { created: string[]; verb: 'Catálogos nuevos' | 'Catálogos creados' }) {
+  const { partners, catalogs } = splitCreated(created)
+  return (
+    <>
+      {catalogs.length > 0 && <> {verb}: {catalogs.join(', ')}.</>}
+      {partners.length > 0 && <> {verb === 'Catálogos nuevos' ? 'Socios nuevos' : 'Socios creados'}: {partners.join(', ')}.</>}
+    </>
+  )
+}
+
 export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser; onClose: () => void; onImported: () => void }) {
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
+  const canPartners = hasPermission(user, 'investment.read')
   const [phase, setPhase] = useState<Phase>('choose')
   const [fileName, setFileName] = useState('')
   const [parsed, setParsed] = useState<ParsedImport | null>(null)
   const [createMissing, setCreateMissing] = useState(false)
+  const [createMissingPartners, setCreateMissingPartners] = useState(false)
   const [dryRun, setDryRun] = useState<ImportResult | null>(null)
   const [final, setFinal] = useState<ImportResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const rows: ImportRow[] = (parsed?.rows ?? []).flatMap((item) => (item.data ? [canCost ? item.data : { ...item.data, cost: null }] : []))
+  const rows: ImportRow[] = prepareImportRows(parsed, { canCost, canPartners })
+  const showPartner = canPartners && Boolean(parsed?.hasPartnerColumn)
   const hasLocalErrors = Boolean(parsed && (parsed.errors.length > 0 || parsed.fileErrors.length > 0))
   const needsInitialPermission = !canInitial && rows.some((row) => row.quantity > 0)
 
-  async function validate(rowsToSend: ImportRow[], createMissingCatalogs: boolean) {
+  const partnerOption = (value: boolean) => (canPartners ? { createMissingPartners: value } : {})
+
+  async function validate(rowsToSend: ImportRow[], createMissingCatalogs: boolean, createPartners: boolean) {
     setBusy(true)
     setError(null)
     setDryRun(null)
     try {
-      setDryRun(await importProducts({ dryRun: true, createMissingCatalogs, rows: rowsToSend }))
+      setDryRun(await importProducts({ dryRun: true, createMissingCatalogs, ...partnerOption(createPartners), rows: rowsToSend }))
     } catch (caught) {
       setError(messageFrom(caught))
     } finally {
@@ -77,8 +94,7 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
       setFileName(file.name)
       setPhase('preview')
       if (result.errors.length === 0 && result.fileErrors.length === 0) {
-        const toSend = result.rows.flatMap((item) => (item.data ? [canCost ? item.data : { ...item.data, cost: null }] : []))
-        void validate(toSend, createMissing)
+        void validate(prepareImportRows(result, { canCost, canPartners }), createMissing, createMissingPartners)
       }
     } catch {
       setError('No se pudo leer el archivo. Guardalo como CSV desde Excel e intentá de nuevo.')
@@ -87,14 +103,19 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
 
   function toggleCreateMissing(value: boolean) {
     setCreateMissing(value)
-    if (parsed && !hasLocalErrors) void validate(rows, value)
+    if (parsed && !hasLocalErrors) void validate(rows, value, createMissingPartners)
+  }
+
+  function toggleCreateMissingPartners(value: boolean) {
+    setCreateMissingPartners(value)
+    if (parsed && !hasLocalErrors) void validate(rows, createMissing, value)
   }
 
   async function confirm() {
     setBusy(true)
     setError(null)
     try {
-      const result = await importProducts({ dryRun: false, createMissingCatalogs: createMissing, rows })
+      const result = await importProducts({ dryRun: false, createMissingCatalogs: createMissing, ...partnerOption(createMissingPartners), rows })
       setFinal(result)
       if (result.errors.length === 0) { setPhase('done'); onImported() }
     } catch (caught) {
@@ -140,10 +161,11 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
               <li>Una fila por cada talla y color. Las filas con el mismo producto, categoría y marca forman un solo producto.</li>
               <li>Guardá como <b>CSV</b> (delimitado por comas o por punto y coma) y subilo acá.</li>
             </ol>
-            <p style={{ marginTop: 8 }}>Columnas: {templateHeaders.join(' · ')}. Código de barras vacío = el sistema genera uno. Si el código tiene muchos dígitos, formateá esa columna como Texto en Excel.</p>
+            <p style={{ marginTop: 8 }}>Columnas: {(canPartners ? templateHeadersWithPartner : templateHeaders).join(' · ')}. Código de barras vacío = el sistema genera uno. Si el código tiene muchos dígitos, formateá esa columna como Texto en Excel.</p>
+            {canPartners && <p style={{ marginTop: 6 }}>La columna <b>Socio</b> es opcional: es el nombre del socio que ingresó esa mercadería (vacía = sin socio).</p>}
           </div>
           <div className="adm-actions">
-            <button type="button" className="secondary-button" onClick={downloadTemplate}>Descargar plantilla CSV</button>
+            <button type="button" className="secondary-button" onClick={() => downloadTemplate(canPartners)}>Descargar plantilla CSV</button>
             <label className="primary-button" style={{ display: 'inline-grid', placeItems: 'center', cursor: 'pointer' }}>
               Subir archivo CSV
               <input type="file" accept=".csv,.txt,text/csv" className="visually-hidden" onChange={(event) => { void handleFile(event) }} />
@@ -159,18 +181,25 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
           </p>
           {parsed.fileErrors.map((message) => <Notice key={message} tone="error">{message}</Notice>)}
           {!canCost && <Notice tone="info">Tu cuenta no puede ver costos: la columna Costo se ignora.</Notice>}
+          {!canPartners && parsed.hasPartnerColumn && <Notice tone="info">Tu cuenta no puede asignar socios: la columna Socio se ignora.</Notice>}
           {needsInitialPermission && <Notice tone="warn">Hay cantidades mayores que cero y tu cuenta no tiene permiso para registrar existencia inicial. Pedile a un administrador que importe el archivo.</Notice>}
           <label className="adm-chip" style={{ width: 'fit-content' }}>
             <input type="checkbox" checked={createMissing} disabled={busy} onChange={(event) => toggleCreateMissing(event.target.checked)} />
             Crear catálogos faltantes (categorías, marcas, cortes, tallas y colores nuevos)
           </label>
+          {showPartner && (
+            <label className="adm-chip" style={{ width: 'fit-content' }}>
+              <input type="checkbox" checked={createMissingPartners} disabled={busy} onChange={(event) => toggleCreateMissingPartners(event.target.checked)} />
+              Crear los socios que falten
+            </label>
+          )}
 
           {busy && !final && <p className="adm-loading">Validando con el servidor…</p>}
           {dryRun && dryRun.errors.length === 0 && !hasLocalErrors && (
             <Notice tone="ok">
               <span>
                 Todo en orden. Se crearían <b>{dryRun.productsCreated}</b> producto{dryRun.productsCreated === 1 ? '' : 's'}, <b>{dryRun.variantsCreated}</b> variante{dryRun.variantsCreated === 1 ? '' : 's'} y se cargarían <b>{dryRun.unitsLoaded}</b> unidades.
-                {dryRun.catalogsCreated.length > 0 && <> Catálogos nuevos: {dryRun.catalogsCreated.join(', ')}.</>}
+                <CreatedLists created={dryRun.catalogsCreated} verb="Catálogos nuevos" />
               </span>
             </Notice>
           )}
@@ -200,7 +229,7 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
                 <thead>
                   <tr>
                     <th className="numeric">Fila</th><th>Producto</th><th>Categoría</th><th>Marca</th><th>Corte</th><th>Talla</th><th>Color</th>
-                    <th>Código</th><th className="numeric">Precio</th>{canCost && <th className="numeric">Costo</th>}<th className="numeric">Cant.</th>
+                    <th>Código</th><th className="numeric">Precio</th>{canCost && <th className="numeric">Costo</th>}<th className="numeric">Cant.</th>{showPartner && <th>Socio</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -218,14 +247,15 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
                             <td className="numeric">{formatNio(data.price)}</td>
                             {canCost && <td className="numeric">{data.cost != null ? formatNio(data.cost) : ''}</td>}
                             <td className="numeric">{data.quantity}</td>
+                            {showPartner && <td>{data.partner ?? <span className="adm-muted">Sin socio</span>}</td>}
                           </>
                         ) : (
-                          <td colSpan={canCost ? 10 : 9} className="adm-mono">{item.cells.join(' ; ')}</td>
+                          <td colSpan={9 + (canCost ? 1 : 0) + (showPartner ? 1 : 0)} className="adm-mono">{item.cells.join(' ; ')}</td>
                         )}
                       </tr>
                     )
                   })}
-                  {parsed.rows.length > previewLimit && <tr><td colSpan={11} className="adm-empty">Se muestran las primeras {previewLimit} filas de {parsed.rows.length}.</td></tr>}
+                  {parsed.rows.length > previewLimit && <tr><td colSpan={11 + (showPartner ? 1 : 0)} className="adm-empty">Se muestran las primeras {previewLimit} filas de {parsed.rows.length}.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -237,7 +267,7 @@ export function ImportDialog({ user, onClose, onImported }: { user: CurrentUser;
         <Notice tone="ok">
           <span>
             Importación terminada: <b>{final.productsCreated}</b> producto{final.productsCreated === 1 ? '' : 's'}, <b>{final.variantsCreated}</b> variante{final.variantsCreated === 1 ? '' : 's'} y <b>{final.unitsLoaded}</b> unidades cargadas.
-            {final.catalogsCreated.length > 0 && <> Catálogos creados: {final.catalogsCreated.join(', ')}.</>}
+            <CreatedLists created={final.catalogsCreated} verb="Catálogos creados" />
           </span>
         </Notice>
       )}

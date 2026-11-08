@@ -146,13 +146,30 @@ public sealed class CashService(
             return Result.Fail<CashSummaryDto>(ServiceErrorKind.Validation, "validation_failed", "Las notas admiten hasta 500 caracteres.", "notes");
         }
 
-        session.Close(actor.UserId, timeProvider.GetUtcNow(), request.CountedCashNio.Value, request.CountedCashUsd.Value, request.Notes);
+        var verified = new[] { request.CountedTransferNio, request.CountedTransferUsd, request.CountedCardNio, request.CountedCardUsd };
+        if (verified.Any(amount => amount is < 0))
+        {
+            return Result.Fail<CashSummaryDto>(ServiceErrorKind.Validation, "validation_failed", "Los montos verificados no pueden ser negativos.", "countedTransferNio");
+        }
+
+        session.Close(
+            actor.UserId,
+            timeProvider.GetUtcNow(),
+            request.CountedCashNio.Value,
+            request.CountedCashUsd.Value,
+            request.Notes,
+            request.CountedTransferNio,
+            request.CountedTransferUsd,
+            request.CountedCardNio,
+            request.CountedCardUsd);
         audit.Add(
             actor.UserId,
             "cash.closed",
             "CashSession",
             session.Id.ToString(),
-            $"{session.Register.Name} cerrada: contado C$ {request.CountedCashNio} y US$ {request.CountedCashUsd}.");
+            $"{session.Register.Name} cerrada: efectivo contado C$ {request.CountedCashNio} y US$ {request.CountedCashUsd}"
+            + $"{(request.CountedTransferNio is null && request.CountedTransferUsd is null ? string.Empty : $", transferencias verificadas C$ {request.CountedTransferNio ?? 0} y US$ {request.CountedTransferUsd ?? 0}")}"
+            + $"{(request.CountedCardNio is null && request.CountedCardUsd is null ? string.Empty : $", tarjeta según terminal C$ {request.CountedCardNio ?? 0} y US$ {request.CountedCardUsd ?? 0}")}.");
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Ok((await SummarizeAsync([session], cancellationToken))[0]);
     }
@@ -188,7 +205,26 @@ public sealed class CashService(
             summaries.Sum(summary => summary.ExpectedCashUsd),
             open > 0 ? null : summaries.Sum(summary => summary.Session.CountedCashNio ?? 0),
             open > 0 ? null : summaries.Sum(summary => summary.Session.CountedCashUsd ?? 0),
-            open);
+            open,
+            summaries.Sum(summary => summary.ExpectedTransferNio),
+            summaries.Sum(summary => summary.ExpectedTransferUsd),
+            VerifiedSum(summaries, summary => summary.Session.CountedTransferNio),
+            VerifiedSum(summaries, summary => summary.Session.CountedTransferUsd),
+            summaries.Sum(summary => summary.ExpectedCardNio),
+            summaries.Sum(summary => summary.ExpectedCardUsd),
+            VerifiedSum(summaries, summary => summary.Session.CountedCardNio),
+            VerifiedSum(summaries, summary => summary.Session.CountedCardUsd));
+    }
+
+    /// <summary>Suma lo verificado; es null si alguna caja sigue abierta o no verificó ese monto.</summary>
+    private static decimal? VerifiedSum(IReadOnlyList<CashSummaryDto> summaries, Func<CashSummaryDto, decimal?> selector)
+    {
+        if (summaries.Count == 0 || summaries.Any(summary => summary.Session.ClosedAtUtc is null || selector(summary) is null))
+        {
+            return null;
+        }
+
+        return summaries.Sum(summary => selector(summary)!.Value);
     }
 
     internal static CashTotalsDto ComputeTotals(IReadOnlyCollection<Sale> sales)
@@ -202,9 +238,17 @@ public sealed class CashService(
         var cashUsdEquivalent = payments.Where(p => p is { Method: PaymentMethod.Cash, Currency: Currency.USD }).Sum(p => p.AmountNio);
         var change = confirmed.Sum(sale => sale.ChangeNio);
 
+        decimal Tendered(PaymentMethod method, Currency currency) =>
+            payments.Where(p => p.Method == method && p.Currency == currency).Sum(p => p.Amount);
+        decimal Equivalent(PaymentMethod method, Currency currency) =>
+            payments.Where(p => p.Method == method && p.Currency == currency).Sum(p => p.AmountNio);
+
         var banks = payments.Where(p => p.Method == PaymentMethod.Transfer)
             .GroupBy(p => string.IsNullOrWhiteSpace(p.Bank) ? "Sin banco" : p.Bank!, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new BankTotalDto(group.Key, group.Sum(p => p.AmountNio)))
+            .Select(group => new BankTotalDto(
+                group.Key,
+                group.Sum(p => p.AmountNio),
+                group.Where(p => p.Currency == Currency.USD).Sum(p => p.Amount)))
             .OrderByDescending(bank => bank.TotalNio).ToArray();
         var channels = confirmed.GroupBy(sale => sale.Channel)
             .Select(group => new ChannelTotalDto(group.Key, group.Count(), group.Sum(sale => sale.TotalNio)))
@@ -225,6 +269,12 @@ public sealed class CashService(
             cashNio + cashUsdEquivalent - change,
             payments.Where(p => p.Method == PaymentMethod.Transfer).Sum(p => p.AmountNio),
             payments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.AmountNio),
+            Tendered(PaymentMethod.Transfer, Currency.NIO),
+            Tendered(PaymentMethod.Transfer, Currency.USD),
+            Equivalent(PaymentMethod.Transfer, Currency.USD),
+            Tendered(PaymentMethod.Card, Currency.NIO),
+            Tendered(PaymentMethod.Card, Currency.USD),
+            Equivalent(PaymentMethod.Card, Currency.USD),
             banks,
             channels);
     }
@@ -251,7 +301,15 @@ public sealed class CashService(
                 expectedNio,
                 expectedUsd,
                 session.CountedCashNio is { } countedNio ? countedNio - expectedNio : null,
-                session.CountedCashUsd is { } countedUsd ? countedUsd - expectedUsd : null);
+                session.CountedCashUsd is { } countedUsd ? countedUsd - expectedUsd : null,
+                totals.TransferNioTendered,
+                totals.TransferUsdTendered,
+                session.CountedTransferNio is { } transferNio ? transferNio - totals.TransferNioTendered : null,
+                session.CountedTransferUsd is { } transferUsd ? transferUsd - totals.TransferUsdTendered : null,
+                totals.CardNioTendered,
+                totals.CardUsdTendered,
+                session.CountedCardNio is { } cardNio ? cardNio - totals.CardNioTendered : null,
+                session.CountedCardUsd is { } cardUsd ? cardUsd - totals.CardUsdTendered : null);
         }).ToArray();
     }
 
@@ -276,7 +334,11 @@ public sealed class CashService(
             session.ClosedByUserId is { } closedBy ? names[closedBy] : null,
             session.CountedCashNio,
             session.CountedCashUsd,
-            session.ClosingNotes)).ToArray();
+            session.ClosingNotes,
+            session.CountedTransferNio,
+            session.CountedTransferUsd,
+            session.CountedCardNio,
+            session.CountedCardUsd)).ToArray();
     }
 
     private async Task<Dictionary<Guid, string>> UserNamesAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)

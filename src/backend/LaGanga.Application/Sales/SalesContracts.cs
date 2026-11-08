@@ -47,7 +47,14 @@ public sealed record CashRegisterDto(Guid Id, string Name, OpenSessionInfoDto? O
 
 public sealed record OpenSessionRequest(Guid RegisterId, decimal? OpeningFloatNio, decimal? OpeningFloatUsd);
 
-public sealed record CloseSessionRequest(decimal? CountedCashNio, decimal? CountedCashUsd, string? Notes);
+public sealed record CloseSessionRequest(
+    decimal? CountedCashNio,
+    decimal? CountedCashUsd,
+    string? Notes,
+    decimal? CountedTransferNio = null,
+    decimal? CountedTransferUsd = null,
+    decimal? CountedCardNio = null,
+    decimal? CountedCardUsd = null);
 
 public sealed record CashSessionDto(
     Guid Id,
@@ -62,9 +69,13 @@ public sealed record CashSessionDto(
     string? ClosedByName,
     decimal? CountedCashNio,
     decimal? CountedCashUsd,
-    string? ClosingNotes);
+    string? ClosingNotes,
+    decimal? CountedTransferNio,
+    decimal? CountedTransferUsd,
+    decimal? CountedCardNio,
+    decimal? CountedCardUsd);
 
-public sealed record BankTotalDto(string Bank, decimal TotalNio);
+public sealed record BankTotalDto(string Bank, decimal TotalNio, decimal TotalUsd);
 
 public sealed record ChannelTotalDto(SaleChannel Channel, int SalesCount, decimal TotalNio);
 
@@ -83,6 +94,12 @@ public sealed record CashTotalsDto(
     decimal CashTotalNio,
     decimal TransferTotalNio,
     decimal CardTotalNio,
+    decimal TransferNioTendered,
+    decimal TransferUsdTendered,
+    decimal TransferUsdEquivalentNio,
+    decimal CardNioTendered,
+    decimal CardUsdTendered,
+    decimal CardUsdEquivalentNio,
     IReadOnlyList<BankTotalDto> TransfersByBank,
     IReadOnlyList<ChannelTotalDto> ByChannel);
 
@@ -92,7 +109,15 @@ public sealed record CashSummaryDto(
     decimal ExpectedCashNio,
     decimal ExpectedCashUsd,
     decimal? DifferenceCashNio,
-    decimal? DifferenceCashUsd);
+    decimal? DifferenceCashUsd,
+    decimal ExpectedTransferNio,
+    decimal ExpectedTransferUsd,
+    decimal? DifferenceTransferNio,
+    decimal? DifferenceTransferUsd,
+    decimal ExpectedCardNio,
+    decimal ExpectedCardUsd,
+    decimal? DifferenceCardNio,
+    decimal? DifferenceCardUsd);
 
 public sealed record CashConsolidatedDto(
     DateOnly Date,
@@ -102,7 +127,15 @@ public sealed record CashConsolidatedDto(
     decimal ExpectedCashUsd,
     decimal? CountedCashNio,
     decimal? CountedCashUsd,
-    int OpenSessionsCount);
+    int OpenSessionsCount,
+    decimal ExpectedTransferNio,
+    decimal ExpectedTransferUsd,
+    decimal? CountedTransferNio,
+    decimal? CountedTransferUsd,
+    decimal ExpectedCardNio,
+    decimal ExpectedCardUsd,
+    decimal? CountedCardNio,
+    decimal? CountedCardUsd);
 
 public interface ICashService
 {

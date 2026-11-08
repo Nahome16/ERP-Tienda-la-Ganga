@@ -270,3 +270,101 @@
 .img-add small { color: var(--muted); font-size: .72rem; }
 .img-empty, .img-hint { margin: 8px 0 0; font-size: .76rem; }
 .img-empty { grid-column: 1 / -1; }
+
+/* ---- Conciliación por método y moneda (Caja y cierres, venta) ---- */
+.adm-rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
+.adm-rec-card { min-width: 0; padding: 12px 14px 8px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.6); }
+.adm-rec-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; margin-bottom: 4px; }
+.adm-rec-head h3 { margin: 0; font-size: .92rem; }
+.adm-rec-currency { margin-top: 8px; padding-top: 6px; border-top: 1px solid #efe4d3; }
+.adm-rec-currency h4 { margin: 0 0 2px; color: #5e4b39; font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.adm-rec-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #efe7da; color: #5a554d; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+.adm-rec-pill.ok { color: #0d5a3d; background: #d9efe4; }
+.adm-rec-pill.bad { color: #7c2a1f; background: #fbe0da; }
+.adm-rec-badge { display: inline-block; font-size: .76rem; font-weight: 800; color: #5a554d; }
+.adm-rec-badge.ok { color: #0d5a3d; }
+.adm-rec-badge.bad { color: var(--danger); }
+.adm-rec-line { display: block; white-space: nowrap; }
+.adm-rec-fieldset { min-width: 0; }
+.adm-rec-fieldset > legend { padding: 0 6px; }
+.adm-rec-field > label { color: #5e4b39; font-size: .72rem; font-weight: 800; }
+.adm-rec-field > small { min-height: 1.1em; }
+.adm-pay-list { margin: 0; padding: 0; list-style: none; font-size: .82rem; }
+.adm-pay-list li { padding: 7px 0; border-bottom: 1px dashed #e7dbc8; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.adm-pay-list li:last-child { border-bottom: 0; }
+.cash-slip .slip-sub { margin-top: 3px; font-size: 11px; text-decoration: underline; }
+.cash-slip .slip-row > span:last-child { text-align: right; }
+.adm-table td.nowrap { white-space: nowrap; }
+
+/* ---- Socios en inventario, productos e importación (investment.read) ---- */
+.inv-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; margin-bottom: 14px; }
+.inv-filters .catalog-tabs { margin-bottom: 0; flex: 1 1 auto; min-width: 0; }
+.inv-partner-filter { display: grid; gap: 3px; flex: 0 1 220px; min-width: 0; font-size: .68rem; font-weight: 800; color: #5e4b39; }
+.inv-partner-filter > span { text-transform: uppercase; letter-spacing: .04em; }
+.inv-partner-filter select { width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: .82rem; }
+.inv-partners { min-width: 150px; }
+.inv-chip { display: inline-block; margin: 1px 4px 1px 0; padding: 2px 8px; border-radius: 999px; background: var(--teal-soft); color: var(--teal-dark); font-size: .7rem; font-weight: 700; white-space: nowrap; }
+.inv-chip.none { background: #efe7da; color: #5a554d; }
+.inv-entry-fields { min-width: 0; }
+.inv-entry-body { display: grid; gap: 10px; min-width: 0; }
+.inv-entry-body .adm-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.inv-entry-body .adm-field, .inv-entry-body .adm-field > * { min-width: 0; }
+.inv-entry-body .adm-field input, .inv-entry-body .adm-field select { width: 100%; min-width: 0; box-sizing: border-box; }
+@media (max-width: 680px) { .inv-entry-body .adm-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.inv-partner-row { display: grid; gap: 8px; max-width: 420px; margin-bottom: 10px; }
+.inv-partner-row .adm-field select { width: 100%; }
+.adm-table td select { min-height: 34px; max-width: 170px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font-size: .8rem; }
+@media (max-width: 680px) {
+  .inv-partner-filter { flex: 1 1 100%; }
+}
+
+/* ---- Socios e inversión (inv-*) ---- */
+.inv-page { min-width: 0; }
+.inv-download-status:empty { display: none; }
+.inv-download-status .adm-notice { overflow-wrap: anywhere; }
+.inv-filter { display: grid; gap: 8px; }
+.inv-range { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; min-width: 0; }
+.inv-dates { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 10px; min-width: 0; }
+.inv-range .rep-error { flex: 1 1 100%; }
+.inv-range-help { margin: 0; }
+.inv-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 4px; }
+.inv-section-head .adm-card-title { margin: 0; }
+.inv-kpis { margin-bottom: 16px; }
+.inv-kpis { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+.inv-kpis .adm-kpi > strong { font-size: clamp(1.05rem, 1.5vw, 1.3rem); white-space: nowrap; }
+.inv-kpis .adm-kpi > small { overflow-wrap: anywhere; }
+.inv-table td, .inv-table th { vertical-align: top; }
+.inv-table td.numeric { white-space: nowrap; }
+.inv-table td.numeric small { display: block; width: 130px; margin-left: auto; white-space: normal; text-align: right; }
+.inv-table.inv-summary th, .inv-table.inv-summary td { padding: 8px 6px; font-size: .78rem; }
+.inv-table.inv-summary th { font-size: .62rem; }
+.inv-table .inv-partner-link { white-space: nowrap; }
+.inv-table td .row-title { white-space: normal; }
+.inv-table tfoot td { vertical-align: top; }
+.inv-check-col { width: 1%; text-align: center; }
+.inv-check-col input { width: 18px; height: 18px; accent-color: var(--teal); }
+.inv-nocost td { background: #fff6e0; }
+.inv-nocost:hover td { background: #ffeecb; }
+.inv-warn { color: #8a4b00; font-weight: 700; }
+.inv-partial { color: #8a4b00; font-weight: 700; }
+.inv-dash { color: var(--muted); }
+.inv-partner-link { padding: 0; text-align: left; font-weight: 800; }
+.inv-assign { display: block; padding: 2px 0 0; font-size: .72rem; text-align: left; }
+.inv-notes { max-width: 320px; overflow-wrap: anywhere; }
+.inv-lot-facts { margin: 0; }
+.inv-failures { margin: 6px 0 0; padding-left: 18px; }
+.inv-detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 14px; }
+.inv-detail-head > div { flex: 1 1 260px; min-width: 0; }
+.inv-detail-title { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 1.5rem; overflow-wrap: anywhere; }
+.inv-detail-sub { margin: 2px 0 0; overflow-wrap: anywhere; }
+.inv-lots { min-width: 0; }
+.inv-lots .adm-field-inline select, .inv-lots .adm-field-inline input[type="search"] { min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: .82rem; }
+.inv-lots .adm-field-inline.grow { flex: 1 1 240px; min-width: 0; }
+.inv-lots .adm-field-inline.grow input { width: 100%; }
+@media (max-width: 640px) {
+  .inv-dates { grid-template-columns: 1fr 1fr; width: 100%; }
+  .inv-range { align-items: stretch; }
+  .inv-section-head > .primary-button, .inv-section-head > .adm-actions { width: 100%; }
+  .inv-lots .adm-toolbar > .primary-button { width: 100%; }
+  .inv-detail-head > .secondary-button { width: 100%; }
+}

@@ -1,0 +1,323 @@
+using System.Globalization;
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using ClosedXML.Excel;
+
+namespace LaGanga.Api.Tests;
+
+/// <summary>Socios, entradas de mercadería con costo y precio, salida PEPS y reportes de inversión.</summary>
+public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<CatalogApiFixture>
+{
+    private static int _counter;
+
+    private sealed record Seller(HttpClient Client, string Csrf);
+
+    [PostgresFact]
+    public async Task SalesConsumeTheOldestEntryFirstAndProfitIsAttributedToEachPartner()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var ana = await CreatePartnerAsync($"Ana {suffix}");
+        var beto = await CreatePartnerAsync($"Beto {suffix}");
+        var duplicate = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/investment/partners", new { name = $"ana {suffix}" });
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        // Entrada 1: Ana trae 5 a costo 100. Entrada 2: Beto trae 5 a costo 150 (precio dado 320).
+        var product = await CreateProductAsync($"Pantalón socios {suffix}", 300m, quantity: 5, cost: 100m, partnerId: ana);
+        var productId = product.GetProperty("id").GetGuid();
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        await Task.Delay(30);
+        var entry = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments",
+            new { variantId, kind = "Entry", delta = 5, reason = "Llegó mercadería de Beto", partnerId = beto, unitCost = 150m, unitPrice = 320m });
+        Assert.Equal(10, entry.GetProperty("newStock").GetInt32());
+
+        var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Pantalón socios {suffix}")}");
+        Assert.Equal(2, lots.GetProperty("totalCount").GetInt32());
+        var anaLot = lots.GetProperty("items").EnumerateArray().Single(lot => lot.GetProperty("partnerId").GetGuid() == ana);
+        Assert.Equal(100m, anaLot.GetProperty("unitCost").GetDecimal());
+        Assert.Equal(300m, anaLot.GetProperty("unitPrice").GetDecimal());
+        var betoLot = lots.GetProperty("items").EnumerateArray().Single(lot => lot.GetProperty("partnerId").GetGuid() == beto);
+        Assert.Equal(320m, betoLot.GetProperty("unitPrice").GetDecimal());
+
+        // Se venden 7: 5 salen de la entrada de Ana y 2 de la de Beto (PEPS).
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller);
+        var sale = await PostSaleAsync(seller, session, variantId, 7, 300m, null, 2100m);
+        var saleId = sale.GetProperty("sale").GetProperty("id").GetGuid();
+
+        var summary = await GetAsync(fixture.Admin, "/api/v1/investment/summary");
+        var anaRow = Row(summary, ana);
+        Assert.Equal(5, anaRow.GetProperty("unitsEntered").GetInt32());
+        Assert.Equal(500m, anaRow.GetProperty("investedNio").GetDecimal());
+        Assert.Equal(0, anaRow.GetProperty("unitsInStock").GetInt32());
+        Assert.Equal(5, anaRow.GetProperty("unitsSold").GetInt32());
+        Assert.Equal(1500m, anaRow.GetProperty("revenueNio").GetDecimal());
+        Assert.Equal(500m, anaRow.GetProperty("costOfSoldNio").GetDecimal());
+        Assert.Equal(1000m, anaRow.GetProperty("profitNio").GetDecimal());
+        var betoRow = Row(summary, beto);
+        Assert.Equal(750m, betoRow.GetProperty("investedNio").GetDecimal());
+        Assert.Equal(3, betoRow.GetProperty("unitsInStock").GetInt32());
+        Assert.Equal(450m, betoRow.GetProperty("stockAtCostNio").GetDecimal());
+        Assert.Equal(900m, betoRow.GetProperty("stockAtPriceNio").GetDecimal());
+        Assert.Equal(2, betoRow.GetProperty("unitsSold").GetInt32());
+        Assert.Equal(600m, betoRow.GetProperty("revenueNio").GetDecimal());
+        Assert.Equal(300m, betoRow.GetProperty("profitNio").GetDecimal());
+
+        // Anular devuelve las unidades a su entrada original y desaparece lo vendido.
+        _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/sales/{saleId}/void", new { reason = "Prueba de anulación" });
+        var afterVoid = await GetAsync(fixture.Admin, "/api/v1/investment/summary");
+        Assert.Equal(5, Row(afterVoid, ana).GetProperty("unitsInStock").GetInt32());
+        Assert.Equal(5, Row(afterVoid, beto).GetProperty("unitsInStock").GetInt32());
+        Assert.Equal(0, Row(afterVoid, ana).GetProperty("unitsSold").GetInt32());
+
+        // Venta con 10 % de descuento: el ingreso se reparte con el descuento aplicado.
+        _ = await PostSaleAsync(seller, session, variantId, 1, 300m, new { type = "Percent", value = 10m }, 270m);
+        var discounted = Row(await GetAsync(fixture.Admin, "/api/v1/investment/summary"), ana);
+        Assert.Equal(270m, discounted.GetProperty("revenueNio").GetDecimal());
+        Assert.Equal(170m, discounted.GetProperty("profitNio").GetDecimal());
+
+        // Una pérdida también sale de la entrada más antigua y se ve por socio.
+        _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Loss", delta = -2, reason = "Prenda manchada" });
+        var withLoss = Row(await GetAsync(fixture.Admin, "/api/v1/investment/summary"), ana);
+        Assert.Equal(2, withLoss.GetProperty("lossUnits").GetInt32());
+        Assert.Equal(200m, withLoss.GetProperty("lossCostNio").GetDecimal());
+
+        // El control por entradas siempre cuadra con la existencia real (10 − 1 − 2 = 7).
+        var detail = await GetAsync(fixture.Admin, $"/api/v1/products/{productId}");
+        Assert.Equal(7, detail.GetProperty("variants")[0].GetProperty("stock").GetInt32());
+        var remaining = (await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Pantalón socios {suffix}")}"))
+            .GetProperty("items").EnumerateArray().Sum(lot => lot.GetProperty("quantityRemaining").GetInt32());
+        Assert.Equal(7, remaining);
+
+        // Filtro del inventario por socio.
+        var filtered = await GetAsync(fixture.Admin, $"/api/v1/inventory?partnerId={beto}&pageSize=100");
+        var row = filtered.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("variantId").GetGuid() == variantId);
+        Assert.Equal(5, row.GetProperty("partnerStock").GetInt32());
+        Assert.Equal(2, row.GetProperty("partners").GetArrayLength());
+        var withoutPartner = await GetAsync(fixture.Admin, "/api/v1/inventory?partnerId=none&pageSize=100");
+        Assert.DoesNotContain(withoutPartner.GetProperty("items").EnumerateArray(), item => item.GetProperty("variantId").GetGuid() == variantId);
+
+        // Corregir una entrada cambia todo su historial.
+        var edited = await PutAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/investment/lots/{anaLot.GetProperty("id").GetGuid()}",
+            new { partnerId = ana, unitCost = 120m, unitPrice = 310m, note = "Costo corregido" });
+        Assert.Equal(120m, edited.GetProperty("unitCost").GetDecimal());
+        Assert.Equal(600m, Row(await GetAsync(fixture.Admin, "/api/v1/investment/summary"), ana).GetProperty("investedNio").GetDecimal());
+        var audit = await GetAsync(fixture.Admin, "/api/v1/audit?entityType=StockLot");
+        Assert.True(audit.GetProperty("totalCount").GetInt32() >= 1);
+
+        var breakdown = await GetAsync(fixture.Admin, $"/api/v1/investment/breakdown?partnerId={ana}");
+        Assert.Contains(breakdown.EnumerateArray(), item => item.GetProperty("productId").GetGuid() == productId);
+
+        var excel = await fixture.Admin.GetAsync(new Uri("/api/v1/reports/investment", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.OK, excel.StatusCode);
+        using var workbook = new XLWorkbook(new MemoryStream(await excel.Content.ReadAsByteArrayAsync()));
+        Assert.Equal(["Resumen por socio", "Por producto", "Entradas"], workbook.Worksheets.Select(sheet => sheet.Name).ToArray());
+        Assert.Contains(workbook.Worksheet("Resumen por socio").CellsUsed(), cell => cell.GetString() == $"Ana {suffix}");
+
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 270m, countedCashUsd = 0m });
+    }
+
+    [PostgresFact]
+    public async Task OfflineOversellDeficitIsCoveredByTheNextEntryAndLotsStayInSync()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var ana = await CreatePartnerAsync($"Ana deficit {suffix}");
+        var beto = await CreatePartnerAsync($"Beto deficit {suffix}");
+        var product = await CreateProductAsync($"Camisa deficit {suffix}", 500m, quantity: 1, cost: 200m, partnerId: ana);
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller);
+
+        // Venta sin conexión de 3 con una sola unidad: se acepta, queda en -2 y 2 unidades sin entrada.
+        using var offline = ApiTestHelpers.Build(HttpMethod.Post, "/api/v1/pos/sales", seller.Csrf, SaleBody(session, variantId, 3, 500m, null, 1500m, offline: true));
+        Assert.Equal(HttpStatusCode.Created, (await seller.Client.SendAsync(offline)).StatusCode);
+        Assert.Equal(-2, (await GetAsync(fixture.Admin, $"/api/v1/products/{product.GetProperty("id").GetGuid()}")).GetProperty("variants")[0].GetProperty("stock").GetInt32());
+        var noPartner = Row(await GetAsync(fixture.Admin, "/api/v1/investment/summary"), null);
+        Assert.True(noPartner.GetProperty("soldUnitsWithoutCost").GetInt32() >= 2);
+
+        // Llega mercadería de Beto: 5 unidades, 2 cubren el faltante y quedan 3.
+        var entry = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments",
+            new { variantId, kind = "Entry", delta = 5, reason = "Reposición", partnerId = beto, unitCost = 210m });
+        Assert.Equal(3, entry.GetProperty("newStock").GetInt32());
+        var lots = (await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Camisa deficit {suffix}")}")).GetProperty("items").EnumerateArray().ToArray();
+        Assert.Equal(3, lots.Sum(lot => lot.GetProperty("quantityRemaining").GetInt32()));
+        Assert.Equal(3, lots.Single(lot => lot.GetProperty("partnerId").ValueKind != JsonValueKind.Null && lot.GetProperty("partnerId").GetGuid() == beto).GetProperty("quantityRemaining").GetInt32());
+
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 1500m, countedCashUsd = 0m });
+    }
+
+    [PostgresFact]
+    public async Task OnlyTheAdministratorCanSeeOrAssignPartners()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var partner = await CreatePartnerAsync($"Socia privada {suffix}");
+        var product = await CreateProductAsync($"Blusa privada {suffix}", 400m, quantity: 2, cost: 150m, partnerId: partner);
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+
+        var roles = await GetAsync(fixture.Admin, "/api/v1/users/roles");
+        foreach (var roleName in new[] { "Encargado de inventario", "Vendedor" })
+        {
+            var roleId = roles.EnumerateArray().Single(role => role.GetProperty("name").GetString() == roleName).GetProperty("id").GetGuid();
+            var username = string.Create(CultureInfo.InvariantCulture, $"usuario.inv{Interlocked.Increment(ref _counter)}");
+            _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/users",
+                new { username, displayName = $"Usuario {roleName}", password = CatalogApiFixture.DefaultPassword, roleIds = new[] { roleId } }, HttpStatusCode.Created);
+            using var client = fixture.CreateClient();
+            var csrf = await ApiTestHelpers.LoginAsync(client, username, CatalogApiFixture.DefaultPassword);
+
+            foreach (var url in new[] { "/api/v1/investment/partners", "/api/v1/investment/summary", "/api/v1/investment/lots", "/api/v1/reports/investment" })
+            {
+                Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(new Uri(url, UriKind.Relative))).StatusCode);
+            }
+
+            Assert.Equal(HttpStatusCode.Forbidden, (await PostRawAsync(client, csrf, "/api/v1/investment/partners", new { name = "Intruso" })).StatusCode);
+
+            if (roleName == "Encargado de inventario")
+            {
+                // Puede ingresar mercadería, pero sin socio, costo ni precio de entrada.
+                var denied = await PostRawAsync(client, csrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Entry", delta = 1, reason = "Entrada", partnerId = partner });
+                Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+                Assert.Equal("partner_not_allowed", await ApiTestHelpers.ReadProblemCodeAsync(denied));
+                var plain = await PostAsync(client, csrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Entry", delta = 1, reason = "Entrada sin socio" });
+                Assert.Equal(3, plain.GetProperty("newStock").GetInt32());
+
+                var inventory = await GetAsync(client, "/api/v1/inventory?pageSize=100");
+                var row = inventory.GetProperty("items").EnumerateArray().First(item => item.GetProperty("variantId").GetGuid() == variantId);
+                Assert.False(row.TryGetProperty("partners", out var partners) && partners.ValueKind == JsonValueKind.Array);
+            }
+        }
+
+        // La entrada sin socio quedó asignable después por el administrador.
+        var unassigned = await GetAsync(fixture.Admin, "/api/v1/investment/lots?partnerId=none&pageSize=100");
+        var lot = unassigned.GetProperty("items").EnumerateArray().First(item => item.GetProperty("variantId").GetGuid() == variantId);
+        var assigned = await PutAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/investment/lots/{lot.GetProperty("id").GetGuid()}",
+            new { partnerId = partner, unitCost = 150m, unitPrice = 400m, note = "Asignada después" });
+        Assert.Equal(partner, assigned.GetProperty("partnerId").GetGuid());
+    }
+
+    [PostgresFact]
+    public async Task ImportCanAssignPartnersAndCreateTheMissingOnes()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var rows = new[]
+        {
+            new { productName = $"Short importado socio {suffix}", category = "Dama", brand = "Marca socio", cut = (string?)null, size = "S", color = "Negro", barcode = (string?)null, price = 350m, cost = (decimal?)120m, quantity = 4, partner = (string?)$"Carla {suffix}" },
+        };
+
+        var strict = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products/import", new { dryRun = true, createMissingCatalogs = true, createMissingPartners = false, rows });
+        Assert.Contains(strict.GetProperty("errors").EnumerateArray(), error => error.GetProperty("message").GetString()!.Contains("no existe", StringComparison.Ordinal));
+
+        var real = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products/import", new { dryRun = false, createMissingCatalogs = true, createMissingPartners = true, rows });
+        Assert.Empty(real.GetProperty("errors").EnumerateArray());
+        var partners = await GetAsync(fixture.Admin, "/api/v1/investment/partners");
+        Assert.Contains(partners.EnumerateArray(), item => item.GetProperty("name").GetString() == $"Carla {suffix}");
+        var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Short importado socio {suffix}")}");
+        var lot = Assert.Single(lots.GetProperty("items").EnumerateArray());
+        Assert.Equal($"Carla {suffix}", lot.GetProperty("partnerName").GetString());
+        Assert.Equal("Import", lot.GetProperty("source").GetString());
+        Assert.Equal(120m, lot.GetProperty("unitCost").GetDecimal());
+        Assert.Equal(350m, lot.GetProperty("unitPrice").GetDecimal());
+    }
+
+    // ---------------------------------------------------------------- ayudas
+
+    private static JsonElement Row(JsonElement summary, Guid? partnerId) =>
+        summary.GetProperty("partners").EnumerateArray().Single(row =>
+            partnerId is null ? row.GetProperty("partnerId").ValueKind == JsonValueKind.Null : row.GetProperty("partnerId").ValueKind != JsonValueKind.Null && row.GetProperty("partnerId").GetGuid() == partnerId);
+
+    private async Task<Guid> CreatePartnerAsync(string name) =>
+        (await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/investment/partners", new { name, phone = "8888-0000", notes = (string?)null }, HttpStatusCode.Created)).GetProperty("id").GetGuid();
+
+    private async Task<JsonElement> CreateProductAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId)
+    {
+        async Task<Guid[]> Ids(string kind)
+        {
+            var page = await GetAsync(fixture.Admin, $"/api/v1/catalog/{kind}?pageSize=100");
+            return page.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        }
+
+        return await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", new
+        {
+            name,
+            categoryId = (await Ids("categories"))[0],
+            brandId = (await Ids("brands"))[0],
+            cutId = (Guid?)null,
+            basePrice = price,
+            variants = new[] { new { sizeId = (await Ids("sizes"))[0], colorId = (await Ids("colors"))[0], barcode = (string?)null, priceOverride = (decimal?)null, cost, initialQuantity = quantity, partnerId } },
+        }, HttpStatusCode.Created);
+    }
+
+    private async Task<Seller> CreateSellerAsync()
+    {
+        var roles = await GetAsync(fixture.Admin, "/api/v1/users/roles");
+        var roleId = roles.EnumerateArray().Single(role => role.GetProperty("name").GetString() == "Vendedor").GetProperty("id").GetGuid();
+        var username = string.Create(CultureInfo.InvariantCulture, $"vendedor.socio{Interlocked.Increment(ref _counter)}");
+        _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/users",
+            new { username, displayName = $"Vendedor {username}", password = CatalogApiFixture.DefaultPassword, roleIds = new[] { roleId } }, HttpStatusCode.Created);
+        var client = fixture.CreateClient();
+        return new Seller(client, await ApiTestHelpers.LoginAsync(client, username, CatalogApiFixture.DefaultPassword));
+    }
+
+    private static async Task<Guid> OpenCashAsync(Seller seller)
+    {
+        var registers = await GetAsync(seller.Client, "/api/v1/cash/registers");
+        foreach (var register in registers.EnumerateArray().Where(register => register.GetProperty("openSession").ValueKind == JsonValueKind.Null))
+        {
+            var response = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/cash/sessions", new { registerId = register.GetProperty("id").GetGuid(), openingFloatNio = 0, openingFloatUsd = 0 });
+            if (response.StatusCode == HttpStatusCode.Created)
+            {
+                return (await ReadAsync(response)).GetProperty("id").GetGuid();
+            }
+        }
+
+        throw new InvalidOperationException("No hay una caja libre para la prueba.");
+    }
+
+    private static object SaleBody(Guid session, Guid variantId, int quantity, decimal price, object? discount, decimal paid, bool offline = false) =>
+        new
+        {
+            clientSaleId = Guid.NewGuid(),
+            cashSessionId = session,
+            channel = "Store",
+            createdAtUtc = DateTimeOffset.UtcNow,
+            isOffline = offline,
+            lines = new[] { new { variantId, quantity, unitPrice = price } },
+            discount,
+            discountApprovalId = (Guid?)null,
+            payments = new[] { new { method = "Cash", currency = "NIO", amount = paid, exchangeRate = (decimal?)null, bank = (string?)null, reference = (string?)null } },
+            note = (string?)null,
+        };
+
+    private static async Task<JsonElement> PostSaleAsync(Seller seller, Guid session, Guid variantId, int quantity, decimal price, object? discount, decimal paid) =>
+        await PostAsync(seller.Client, seller.Csrf, "/api/v1/pos/sales", SaleBody(session, variantId, quantity, price, discount, paid), HttpStatusCode.Created);
+
+    private static async Task<JsonElement> GetAsync(HttpClient client, string url)
+    {
+        using var response = await client.GetAsync(new Uri(url, UriKind.Relative));
+        Assert.True(response.IsSuccessStatusCode, $"GET {url} → {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return await ReadAsync(response);
+    }
+
+    private static async Task<JsonElement> PostAsync(HttpClient client, string csrf, string url, object body, HttpStatusCode expected = HttpStatusCode.OK)
+    {
+        using var response = await PostRawAsync(client, csrf, url, body);
+        Assert.True(response.StatusCode == expected, $"POST {url} → {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return await ReadAsync(response);
+    }
+
+    private static async Task<HttpResponseMessage> PostRawAsync(HttpClient client, string csrf, string url, object body)
+    {
+        using var request = ApiTestHelpers.Build(HttpMethod.Post, url, csrf, body);
+        return await client.SendAsync(request);
+    }
+
+    private static async Task<JsonElement> PutAsync(HttpClient client, string csrf, string url, object body)
+    {
+        using var request = ApiTestHelpers.Build(HttpMethod.Put, url, csrf, body);
+        using var response = await client.SendAsync(request);
+        Assert.True(response.IsSuccessStatusCode, $"PUT {url} → {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return await ReadAsync(response);
+    }
+
+    private static async Task<JsonElement> ReadAsync(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.Clone();
+}

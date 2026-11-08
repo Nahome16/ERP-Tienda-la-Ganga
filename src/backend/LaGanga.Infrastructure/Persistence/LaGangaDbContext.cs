@@ -40,6 +40,12 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
 
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
+    public DbSet<Partner> Partners => Set<Partner>();
+
+    public DbSet<StockLot> StockLots => Set<StockLot>();
+
+    public DbSet<LotAllocation> LotAllocations => Set<LotAllocation>();
+
     public DbSet<StockBalance> StockBalances => Set<StockBalance>();
 
     public DbSet<InventoryMovement> Movements => Set<InventoryMovement>();
@@ -102,6 +108,12 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
         foreach (var entry in ChangeTracker.Entries<Product>().Where(entry => entry.State == EntityState.Modified))
         {
             var version = entry.Property(product => product.Version);
+            version.CurrentValue = version.OriginalValue + 1;
+        }
+
+        foreach (var entry in ChangeTracker.Entries<Partner>().Where(entry => entry.State == EntityState.Modified))
+        {
+            var version = entry.Property(partner => partner.Version);
             version.CurrentValue = version.OriginalValue + 1;
         }
 

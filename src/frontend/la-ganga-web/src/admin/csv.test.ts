@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTemplateCsv, detectDelimiter, parseCsv, parseDecimal, parseImportCsv, templateHeaders } from './csv'
+import { buildTemplateCsv, detectDelimiter, parseCsv, parseDecimal, parseImportCsv, prepareImportRows, templateHeaders, templateHeadersWithPartner } from './csv'
 
 describe('parseDecimal', () => {
   it('acepta coma o punto decimal y separadores de miles', () => {
@@ -66,5 +66,61 @@ describe('parseImportCsv', () => {
   it('avisa cuando faltan columnas', () => {
     const result = parseImportCsv('Producto;Marca\nA;B')
     expect(result.fileErrors[0]).toContain('Faltan columnas obligatorias')
+  })
+})
+
+describe('columna Socio', () => {
+  const header = 'Producto;Categoría;Marca;Corte;Talla;Color;Código de barras;Precio;Costo;Cantidad'
+  const row = 'Camisa;Camisas;X;;M;Azul;;650;380;5'
+
+  it('la plantilla sin permiso de socios no trae la columna', () => {
+    const table = parseCsv(buildTemplateCsv())
+    expect(table[0]).toEqual([...templateHeaders])
+    expect(parseImportCsv(buildTemplateCsv()).hasPartnerColumn).toBe(false)
+  })
+  it('la plantilla con socios agrega «Socio» después de «Cantidad» y se lee sin errores', () => {
+    const table = parseCsv(buildTemplateCsv(true))
+    expect(table[0]).toEqual([...templateHeadersWithPartner])
+    expect(table[0].at(-1)).toBe('Socio')
+    expect(table[0].at(-2)).toBe('Cantidad')
+    const result = parseImportCsv(buildTemplateCsv(true))
+    expect(result.errors).toEqual([])
+    expect(result.hasPartnerColumn).toBe(true)
+    expect(result.rows.map((item) => item.data?.partner)).toEqual(['Socio Ejemplo', 'Socio Ejemplo', null])
+  })
+  it('reconoce la cabecera sin importar mayúsculas ni acentos', () => {
+    for (const name of ['Socio', 'SOCIO', 'socio', ' Sócio ', 'Partner']) {
+      const result = parseImportCsv(`${header};${name}\n${row};Ana López\n`)
+      expect(result.errors).toEqual([])
+      expect(result.hasPartnerColumn).toBe(true)
+      expect(result.rows[0].data?.partner).toBe('Ana López')
+    }
+  })
+  it('una celda vacía de Socio queda en null', () => {
+    const result = parseImportCsv(`${header};Socio\n${row};\n`)
+    expect(result.rows[0].data?.partner).toBeNull()
+  })
+  it('sin la columna no agrega `partner` a las filas', () => {
+    const result = parseImportCsv(`${header}\n${row}\n`)
+    expect(result.hasPartnerColumn).toBe(false)
+    expect(result.rows[0].data).not.toHaveProperty('partner')
+  })
+})
+
+describe('prepareImportRows', () => {
+  const csv = 'Producto;Categoría;Marca;Talla;Color;Precio;Costo;Cantidad;Socio\nCamisa;Camisas;X;M;Azul;650;380;5;Ana\nCamisa;Camisas;X;L;Azul;650;380;5;\n'
+  const parsed = parseImportCsv(csv)
+  it('con permisos manda costo y socio', () => {
+    const rows = prepareImportRows(parsed, { canCost: true, canPartners: true })
+    expect(rows.map((row) => [row.cost, row.partner])).toEqual([[380, 'Ana'], [380, null]])
+  })
+  it('sin investment.read ignora el socio', () => {
+    const rows = prepareImportRows(parsed, { canCost: true, canPartners: false })
+    expect(rows).toHaveLength(2)
+    for (const row of rows) expect(row).not.toHaveProperty('partner')
+  })
+  it('sin permiso de costos pone el costo en null pero conserva el socio', () => {
+    const rows = prepareImportRows(parsed, { canCost: false, canPartners: true })
+    expect(rows.map((row) => [row.cost, row.partner])).toEqual([[null, 'Ana'], [null, null]])
   })
 })

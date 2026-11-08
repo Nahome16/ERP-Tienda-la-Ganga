@@ -4,13 +4,15 @@ import type { CashConsolidated } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
 import type { CurrentUser } from '../types'
 import { getConsolidated, getSettings } from '../admin/adminApi'
-import { BreakdownTables, Difference, SessionDialog } from '../admin/CashDialogs'
+import { SessionDialog } from '../admin/CashDialogs'
+import { BreakdownTables, ReconBadge, ReconciliationBlock, TenderedBreakdown } from '../admin/CashReconciliation'
 import { PrintableCashSlip, type SlipData } from '../admin/CashSlip'
 import { printCashSlip } from '../admin/cashSlipData'
 import { addDays, formatIsoDate, formatTime, managuaToday } from '../admin/format'
 import { useFetch } from '../admin/hooks'
+import { methodsFromConsolidated, methodsFromSummary, methodStatus } from '../admin/reconciliation'
 import { ExcelShortcut } from '../admin/reportsUi'
-import { Kpi, LoadError, Notice, Row, Spinner, Tag } from '../admin/ui'
+import { Kpi, LoadError, Notice, Spinner, Tag } from '../admin/ui'
 
 function consolidatedSlip(storeName: string, data: CashConsolidated): SlipData {
   return {
@@ -18,15 +20,17 @@ function consolidatedSlip(storeName: string, data: CashConsolidated): SlipData {
     title: `Cierre del día ${formatIsoDate(data.date)}`,
     meta: [['Cajas', String(data.sessions.length)], ['Abiertas', String(data.openSessionsCount)]],
     totals: data.totals,
-    expectedNio: data.expectedCashNio,
-    expectedUsd: data.expectedCashUsd,
-    countedNio: data.countedCashNio,
-    countedUsd: data.countedCashUsd,
-    registers: data.sessions.map((item) => ({
-      name: item.session.registerName,
-      detail: `${item.session.openedByName} · ${item.session.closedAtUtc ? 'cerrada' : 'abierta'}`,
-      totalNio: item.totals.netTotalNio,
-    })),
+    methods: methodsFromConsolidated(data),
+    open: data.openSessionsCount > 0,
+    registers: data.sessions.map((item) => {
+      const isOpen = item.session.closedAtUtc === null
+      const states = methodsFromSummary(item).map((method) => `${method.key === 'cash' ? 'Efect.' : method.key === 'transfer' ? 'Transf.' : 'Tarj.'} ${methodStatus(method, isOpen).label}`)
+      return {
+        name: item.session.registerName,
+        detail: `${item.session.openedByName} · ${isOpen ? 'abierta' : 'cerrada'} · ${states.join(' · ')}`,
+        totalNio: item.totals.netTotalNio,
+      }
+    }),
   }
 }
 
@@ -41,7 +45,7 @@ export function CashView({ user }: { user: CurrentUser }) {
   const storeName = settings.data?.storeName ?? 'Tienda La Ganga'
   const totals = data?.totals
 
-  const countedKnown = data !== null && data.countedCashNio !== null && data.countedCashUsd !== null
+  const dayOpen = data !== null && data.openSessionsCount > 0
 
   return (
     <main className="admin-page adm-page">
@@ -49,7 +53,7 @@ export function CashView({ user }: { user: CurrentUser }) {
         <div>
           <p className="page-kicker">Operación · <b className="live-data">Datos reales</b></p>
           <h1>Caja y cierres</h1>
-          <p className="page-summary">Consolidado del día por caja, método de pago y banco. Fechas en hora de Managua.</p>
+          <p className="page-summary">Consolidado del día por caja, método de pago, moneda y banco, con lo esperado contra lo verificado. Fechas en hora de Managua.</p>
         </div>
         <div className="page-actions">
           <button type="button" className="secondary-button" onClick={reload}>Actualizar</button>
@@ -89,8 +93,8 @@ export function CashView({ user }: { user: CurrentUser }) {
           <div className="adm-kpis">
             <Kpi label="Total vendido" value={formatNio(totals.netTotalNio)} hint={`Bruto ${formatNio(totals.grossTotalNio)}`} />
             <Kpi label="Efectivo" value={formatNio(totals.cashTotalNio)} hint="Neto, ya descontado el cambio" />
-            <Kpi label="Transferencia" value={formatNio(totals.transferTotalNio)} />
-            <Kpi label="POS / Tarjeta" value={formatNio(totals.cardTotalNio)} />
+            <Kpi label="Transferencia" value={formatNio(totals.transferTotalNio)} hint={totals.transferUsdTendered > 0 ? `Incluye ${formatUsd(totals.transferUsdTendered)}` : 'Equivalente en C$'} />
+            <Kpi label="POS / Tarjeta" value={formatNio(totals.cardTotalNio)} hint={totals.cardUsdTendered > 0 ? `Incluye ${formatUsd(totals.cardUsdTendered)}` : 'Equivalente en C$'} />
             <Kpi label="Descuentos" value={formatNio(totals.discountTotalNio)} />
             <Kpi label="Ventas" value={totals.salesCount} hint={`${totals.voidedCount} anulada${totals.voidedCount === 1 ? '' : 's'} (${formatNio(totals.voidedTotalNio)})`} tone={totals.reviewCount > 0 ? 'warn' : undefined} />
           </div>
@@ -101,9 +105,9 @@ export function CashView({ user }: { user: CurrentUser }) {
               <table className="adm-table">
                 <thead>
                   <tr>
-                    <th>Caja</th><th>Cajero</th><th>Apertura</th><th>Estado</th><th className="numeric">Total vendido</th>
-                    <th className="numeric">Esperado C$</th><th className="numeric">Esperado US$</th>
-                    <th className="numeric">Contado C$ / US$</th><th>Diferencia</th>
+                    <th>Caja</th><th>Apertura</th><th>Estado</th><th className="numeric">Total vendido</th>
+                    <th className="numeric">Efectivo esperado</th><th className="numeric">Efectivo contado</th>
+                    <th>Efectivo</th><th>Transferencia</th><th>Tarjeta (POS)</th>
                     <th className="actions-col"><span className="visually-hidden">Acciones</span></th>
                   </tr>
                 </thead>
@@ -112,26 +116,20 @@ export function CashView({ user }: { user: CurrentUser }) {
                   {data.sessions.map((item) => {
                     const { session } = item
                     const isOpen = session.closedAtUtc === null
+                    const [cash, transfer, card] = methodsFromSummary(item)
                     return (
                       <tr key={session.id}>
-                        <td><strong>{session.registerName}</strong></td>
-                        <td>{session.openedByName}</td>
-                        <td>{formatTime(session.openedAtUtc)}{session.closedAtUtc && <small className="row-sub">cierre {formatTime(session.closedAtUtc)}</small>}</td>
+                        <td><strong>{session.registerName}</strong><small className="row-sub">{session.openedByName}</small></td>
+                        <td className="nowrap">{formatTime(session.openedAtUtc)}{session.closedAtUtc && <small className="row-sub">cierre {formatTime(session.closedAtUtc)}</small>}</td>
                         <td><Tag tone={isOpen ? 'warn' : 'ok'}>{isOpen ? 'Abierta' : 'Cerrada'}</Tag></td>
                         <td className="numeric">{formatNio(item.totals.netTotalNio)}{item.totals.reviewCount > 0 && <small className="row-sub adm-neg">{item.totals.reviewCount} por revisar</small>}</td>
-                        <td className="numeric">{formatNio(item.expectedCashNio)}</td>
-                        <td className="numeric">{formatUsd(item.expectedCashUsd)}</td>
+                        <td className="numeric">{formatNio(item.expectedCashNio)}<small className="row-sub">{formatUsd(item.expectedCashUsd)}</small></td>
                         <td className="numeric">
                           {session.countedCashNio === null ? '—' : <>{formatNio(session.countedCashNio)}<small className="row-sub">{formatUsd(session.countedCashUsd ?? 0)}</small></>}
                         </td>
-                        <td>
-                          {isOpen ? <span className="adm-muted">—</span> : (
-                            <>
-                              <Difference value={item.differenceCashNio} format={formatNio} />
-                              <small className="row-sub"><Difference value={item.differenceCashUsd} format={formatUsd} /></small>
-                            </>
-                          )}
-                        </td>
+                        <td><ReconBadge method={cash} open={isOpen} /></td>
+                        <td><ReconBadge method={transfer} open={isOpen} /></td>
+                        <td><ReconBadge method={card} open={isOpen} /></td>
                         <td className="actions-col">
                           <button type="button" className="link-button" onClick={() => setDetailId(session.id)}>{isOpen && canClose ? 'Detalle / Cerrar' : 'Detalle'}</button>
                         </td>
@@ -143,25 +141,16 @@ export function CashView({ user }: { user: CurrentUser }) {
             </div>
           </section>
 
-          <div className="adm-split">
-            <section className="panel-card adm-card">
-              <h2 className="adm-card-title">Efectivo esperado vs contado</h2>
-              <Row label="Esperado C$">{formatNio(data.expectedCashNio)}</Row>
-              <Row label="Contado C$">{data.countedCashNio === null ? 'Hay cajas abiertas' : formatNio(data.countedCashNio)}</Row>
-              <Row label="Diferencia C$">{<Difference value={data.countedCashNio === null ? null : data.countedCashNio - data.expectedCashNio} format={formatNio} />}</Row>
-              <Row label="Esperado US$">{formatUsd(data.expectedCashUsd)}</Row>
-              <Row label="Contado US$">{data.countedCashUsd === null ? 'Hay cajas abiertas' : formatUsd(data.countedCashUsd)}</Row>
-              <Row label="Diferencia US$">{<Difference value={data.countedCashUsd === null ? null : data.countedCashUsd - data.expectedCashUsd} format={formatUsd} />}</Row>
-              {!countedKnown && <p className="adm-help" style={{ marginTop: 8 }}>El contado aparece cuando todas las cajas del día están cerradas.</p>}
-            </section>
-            <section className="panel-card adm-card">
-              <h2 className="adm-card-title">Efectivo recibido</h2>
-              <Row label="C$ recibidos">{formatNio(totals.cashNioTendered)}</Row>
-              <Row label="US$ recibidos">{formatUsd(totals.cashUsdTendered)}</Row>
-              <Row label="US$ en córdobas">{formatNio(totals.cashUsdEquivalentNio)}</Row>
-              <Row label="Cambio entregado">{formatNio(totals.changeGivenNio)}</Row>
-            </section>
-          </div>
+          <section className="panel-card adm-card">
+            <h2 className="adm-card-title">Esperado vs verificado</h2>
+            <p className="adm-help">Efectivo contra el conteo físico, transferencias contra el banco y tarjeta contra el cierre de lote de la terminal, cada uno por moneda.{dayOpen ? ' Lo verificado aparece cuando todas las cajas del día están cerradas.' : ''}</p>
+            <ReconciliationBlock methods={methodsFromConsolidated(data)} open={dayOpen} scope="day" />
+          </section>
+
+          <section className="panel-card adm-card">
+            <h2 className="adm-card-title">Recibido por método y moneda</h2>
+            <TenderedBreakdown totals={totals} />
+          </section>
 
           <section className="panel-card adm-card"><BreakdownTables totals={totals} /></section>
         </>

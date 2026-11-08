@@ -3,8 +3,8 @@
  * (una de ellas vende sin conexión), cierre de ambas y verificación del consolidado y de
  * todas las pantallas administrativas.
  *
- * Requisitos: API en http://127.0.0.1:5185 con admin.local, vendedor.uno y vendedor.dos
- * (contraseña Clave-local-2026-ganga) y `npm run build` hecho. Levanta `vite preview` (4173).
+ * Requisitos: API en http://127.0.0.1:5185 con un administrador y dos vendedores
+ * (por defecto admin, maria y carlos; contraseña Clave-demo-2026-ganga; ver variables ADMIN_USER, SELLER1, SELLER2, API_PASSWORD) y `npm run build` hecho. Levanta `vite preview` (4173).
  */
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
@@ -13,7 +13,10 @@ import process from 'node:process'
 const require = createRequire(import.meta.url)
 const { chromium } = require('playwright')
 const BASE_URL = process.env.BASE_URL ?? 'http://127.0.0.1:4173'
-const PASSWORD = process.env.API_PASSWORD ?? 'Clave-local-2026-ganga'
+const PASSWORD = process.env.API_PASSWORD ?? 'Clave-demo-2026-ganga'
+const ADMIN = process.env.ADMIN_USER ?? 'admin'
+const SELLER1 = process.env.SELLER1 ?? 'maria'
+const SELLER2 = process.env.SELLER2 ?? 'carlos'
 const SHOTS = process.env.SHOTS ?? '/tmp/la-ganga-integration'
 let ok = 0
 let total = 0
@@ -61,6 +64,7 @@ async function sell(page, code, expectSent = true) {
   await page.locator('#pv-scan-input').press('Enter')
   await page.getByRole('dialog', { name: 'Cobrar' }).waitFor()
   await page.getByRole('button', { name: 'Exacto' }).click()
+  await page.getByRole('button', { name: /Agregar pago/ }).click()
   await page.getByRole('button', { name: /Confirmar cobro/ }).click()
   await page.getByTestId('sale-done').waitFor()
   if (expectSent) await page.waitForFunction(() => document.body.innerText.includes('Enviada al servidor'), null, { timeout: 15000 })
@@ -78,7 +82,7 @@ async function closeCash(page, thousands) {
 async function closeOpenSessions() {
   const context = await browser.newContext()
   const api = context.request
-  await api.post(`${BASE_URL}/api/v1/auth/login`, { data: { username: 'admin.local', password: PASSWORD } })
+  await api.post(`${BASE_URL}/api/v1/auth/login`, { data: { username: ADMIN, password: PASSWORD } })
   const csrf = (await context.cookies()).find((c) => c.name === 'la_ganga_csrf')?.value ?? ''
   const registers = await (await api.get(`${BASE_URL}/api/v1/cash/registers`)).json()
   for (const register of registers.filter((r) => r.openSession)) {
@@ -104,7 +108,7 @@ try {
   const code = await closeOpenSessions()
   const one = await newUser('caja1')
   const two = await newUser('caja2')
-  await Promise.all([login(one.page, 'vendedor.uno'), login(two.page, 'vendedor.dos')])
+  await Promise.all([login(one.page, SELLER1), login(two.page, SELLER2)])
   await openCash(one.page, 100, 'Caja 1')
   await openCash(two.page, 200, 'Caja 2')
   check('Dos cajas abiertas al mismo tiempo en equipos distintos', true)
@@ -123,7 +127,7 @@ try {
   check('Caja 2 sincroniza sola al volver la red (una sola vez)', true)
 
   const admin = await newUser('admin')
-  await login(admin.page, 'admin.local')
+  await login(admin.page, ADMIN)
   await admin.page.getByRole('navigation').waitFor({ timeout: 15000 })
   const consolidated = await admin.page.evaluate(async () => (await (await fetch('/api/v1/cash/consolidated')).json()))
   check('Consolidado incluye las dos cajas', consolidated.sessions.length >= 2 && consolidated.openSessionsCount >= 2, `${consolidated.sessions.length} cajas`)
@@ -136,7 +140,7 @@ try {
   check('Consolidado sin cajas abiertas y con efectivo contado', after.openSessionsCount === 0 && after.countedCashNio !== null, `contado ${after.countedCashNio}`)
 
   // Todas las pantallas administrativas cargan sin errores ni texto de «en construcción».
-  for (const view of ['panel', 'caja', 'ventas', 'productos', 'inventario', 'catalogos', 'equipo', 'configuracion', 'auditoria']) {
+  for (const view of ['panel', 'caja', 'ventas', 'productos', 'inventario', 'socios', 'catalogos', 'equipo', 'configuracion', 'auditoria']) {
     await admin.page.goto(`${BASE_URL}/#${view}`)
     await admin.page.reload()
     await admin.page.waitForTimeout(900)

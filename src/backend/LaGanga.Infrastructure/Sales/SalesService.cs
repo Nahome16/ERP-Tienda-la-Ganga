@@ -11,11 +11,21 @@ using Npgsql;
 
 namespace LaGanga.Infrastructure.Sales;
 
-public sealed class SalesService(
-    LaGangaDbContext dbContext,
-    IAuditWriter audit,
-    TimeProvider timeProvider) : ISalesService
+public sealed class SalesService : ISalesService
 {
+    private readonly LaGangaDbContext dbContext;
+    private readonly IAuditWriter audit;
+    private readonly TimeProvider timeProvider;
+    private readonly Inventory.LotService lots;
+
+    public SalesService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider)
+    {
+        this.dbContext = dbContext;
+        this.audit = audit;
+        this.timeProvider = timeProvider;
+        lots = new Inventory.LotService(dbContext);
+    }
+
     private const int MaxLines = 200;
     private const int MaxQuantity = 1000;
 
@@ -161,6 +171,30 @@ public sealed class SalesService(
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var balances = await LockBalancesAsync(variantIds, cancellationToken);
         var now = timeProvider.GetUtcNow();
+
+        // Regla: no se vende lo que no hay. Una venta hecha CON conexión se rechaza si no alcanza el
+        // stock (con las filas bloqueadas, así dos cajas no pueden llevarse la última unidad).
+        // Una venta hecha SIN conexión no se puede rechazar: la prenda y el dinero ya cambiaron de
+        // manos; se acepta y queda marcada para revisión (el POS ya la validó contra su copia local).
+        if (!request.IsOffline)
+        {
+            foreach (var group in lines.GroupBy(line => line.VariantId))
+            {
+                var wanted = group.Sum(line => line.Quantity);
+                var available = balances.TryGetValue(group.Key, out var current) ? current.Quantity : 0;
+                if (available < wanted)
+                {
+                    var info = variantInfo[group.Key];
+                    return Result.Fail<SaleResultDto>(
+                        ServiceErrorKind.Unprocessable,
+                        "insufficient_stock",
+                        available <= 0
+                            ? $"Sin existencias de {info.ProductName} ({info.SizeName}, {info.ColorName})."
+                            : $"Solo quedan {available} unidad(es) de {info.ProductName} ({info.SizeName}, {info.ColorName}) y se piden {wanted}.");
+                }
+            }
+        }
+
         foreach (var group in lines.GroupBy(line => line.VariantId))
         {
             var quantity = group.Sum(line => line.Quantity);
@@ -180,6 +214,17 @@ public sealed class SalesService(
 
             dbContext.Movements.Add(new InventoryMovement(
                 Guid.NewGuid(), group.Key, MovementType.Sale, -quantity, balance.Quantity, null, sale.Id, actor.UserId, now));
+        }
+
+        // Cada línea descuenta de las entradas más antiguas (PEPS): así se sabe de qué socio fue lo vendido.
+        foreach (var saleLine in sale.Lines)
+        {
+            await lots.ConsumeAsync(saleLine.VariantId, saleLine.Quantity, AllocationKind.Sale, sale.Id, saleLine.Id, now, cancellationToken);
+        }
+
+        foreach (var (variantId, balance) in balances)
+        {
+            await lots.ReconcileAsync(variantId, balance.Quantity, now, cancellationToken);
         }
 
         foreach (var note in reviewNotes)
@@ -365,6 +410,12 @@ public sealed class SalesService(
                 Guid.NewGuid(), group.Key, MovementType.SaleVoid, quantity, balance.Quantity, $"Anulación: {reason}", sale.Id, actor.UserId, now));
         }
 
+        await lots.RestoreSaleAsync(sale.Id, cancellationToken);
+        foreach (var (variantId, balance) in balances)
+        {
+            await lots.ReconcileAsync(variantId, balance.Quantity, now, cancellationToken);
+        }
+
         sale.Void(actor.UserId, now, reason);
         audit.Add(actor.UserId, "sale.voided", "Sale", sale.Id.ToString(), string.Create(CultureInfo.InvariantCulture, $"Venta {InventoryNumber(sale.Number)} anulada. Motivo: {reason}"));
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -442,9 +493,9 @@ public sealed class SalesService(
                 return Bad("Cada pago debe ser mayor que cero.", "payments");
             }
 
-            if (payment.Currency == Currency.USD && (payment.Method != PaymentMethod.Cash || payment.ExchangeRate is null or <= 0))
+            if (payment.Currency == Currency.USD && payment.ExchangeRate is null or <= 0)
             {
-                return Bad("Los dólares solo se reciben en efectivo y con la tasa usada.", "payments");
+                return Bad("Los pagos en dólares necesitan la tasa de cambio usada.", "payments");
             }
 
             if (payment.Currency == Currency.NIO && payment.ExchangeRate is not null && payment.ExchangeRate <= 0)

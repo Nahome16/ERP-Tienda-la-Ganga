@@ -152,14 +152,26 @@ Fotos y reportes:
 - Los reportes `.xlsx` se generan en el servidor desde **Reportes** (ventas,
   existencias, movimientos y cierres), con fechas de Managua.
 
+Socios e inversión (solo administrador):
+
+- En **Socios e inversión → Gestionar socios** se crean los socios. Al ingresar
+  mercadería (Inventario → Entrada, Productos o Importar) el administrador elige
+  el socio, el costo y el precio de esa entrada.
+- Las ventas descuentan de la entrada más antigua (PEPS); por eso el módulo sabe
+  de qué socio fue lo vendido. Las ventas anteriores a esta función no tienen socio.
+- Una venta hecha sin conexión que deje el saldo negativo queda «sin socio» hasta
+  que una entrada cubra el faltante.
+
 Reglas que conviene recordar:
 
 - La venta ya ocurrió físicamente: el servidor **siempre acepta** una venta válida
   y la marca *Requiere revisión* si el stock quedó negativo, el precio o la tasa
   no coinciden con los vigentes o la caja ya estaba cerrada.
+- No se vende sin existencias: el POS no deja agregar una prenda con stock 0 ni más unidades de las que hay; el servidor rechaza esas ventas. La única excepción es una venta hecha sin conexión, que no se puede rechazar y queda para revisión.
 - Descuentos hasta el límite del vendedor (10 % por defecto) se aplican solos;
   por encima requieren usuario y contraseña de un administrador (solo con conexión).
-- Los dólares solo se reciben en efectivo; el cambio siempre se entrega en córdobas.
+- Los dólares se aceptan en efectivo, transferencia y tarjeta; el cambio sale solo del efectivo y siempre en córdobas.
+- El cierre de caja concilia cada método contra su fuente: efectivo contra el conteo, transferencias contra el banco y tarjeta contra el cierre de lote de la terminal, por moneda.
 
 ## Alcance actual
 

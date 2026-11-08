@@ -32,7 +32,6 @@ type SellScreenProps = {
 type ModalState =
   | { kind: 'pay' }
   | { kind: 'approval' }
-  | { kind: 'overstock'; variantId: string; quantity: number; available: number; label: string }
   | { kind: 'done'; clientSaleId: string }
   | null
 
@@ -61,7 +60,6 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   const [discountType, setDiscountType] = useState<DiscountType>('Percent')
   const [discountText, setDiscountText] = useState('')
   const [approval, setApproval] = useState<DiscountApproval | null>(null)
-  const [overrides, setOverrides] = useState<string[]>([])
   const [modal, setModal] = useState<ModalState>(null)
   const [payBusy, setPayBusy] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
@@ -141,14 +139,17 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     if (tone === 'error') signal('error', soundEnabled)
   }
 
-  /** Cambia la cantidad de una variante. Si pasa del stock conocido, pide confirmación. */
+  /**
+   * Cambia la cantidad de una variante. Nunca se puede vender más de lo que hay en el sistema:
+   * si se pide más, la cantidad no cambia y se avisa cuántas unidades quedan.
+   */
   function requestQuantity(variantId: string, quantity: number, label: string) {
     const known = index.byId.get(variantId)
     const current = cartQuantity(lines, variantId)
     if (known && quantity > current) {
       const available = availableStock(known.stock, variantId, pending)
-      if (quantity > available && !overrides.includes(variantId)) {
-        setModal({ kind: 'overstock', variantId, quantity, available: Math.max(0, available), label })
+      if (quantity > available) {
+        announce('error', available <= 0 ? `Sin existencias de ${label}.` : `Solo quedan ${available} ${available === 1 ? 'unidad' : 'unidades'} de ${label}.`)
         return false
       }
     }
@@ -160,8 +161,8 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     const current = cartQuantity(lines, variant.variantId)
     if (current === 0) {
       const available = availableStock(variant.stock, variant.variantId, pending)
-      if (available < 1 && !overrides.includes(variant.variantId)) {
-        setModal({ kind: 'overstock', variantId: variant.variantId, quantity: 1, available: Math.max(0, available), label: variantLabel(variant) })
+      if (available < 1) {
+        announce('error', `Sin existencias de ${variantLabel(variant)}: no se puede vender.`)
         return
       }
       setLines((currentLines) => addToCart(currentLines, variant))
@@ -169,16 +170,6 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       return
     }
     announce('ok', `Agregado: ${variantLabel(variant)}`)
-  }
-
-  function confirmOverstock() {
-    if (modal?.kind !== 'overstock') return
-    const variant = index.byId.get(modal.variantId)
-    setOverrides((current) => (current.includes(modal.variantId) ? current : [...current, modal.variantId]))
-    if (cartQuantity(lines, modal.variantId) === 0 && variant) setLines((current) => addToCart(current, variant))
-    else setLines((current) => setLineQuantity(current, modal.variantId, modal.quantity))
-    announce('ok', `Agregado: ${modal.label}`)
-    setModal(null)
   }
 
   function submitScan(event: FormEvent) {
@@ -210,6 +201,16 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   // --- Cobro ---
   function openPayment() {
     if (lines.length === 0 || !settings) return
+    const short = lines.find((line) => {
+      const known = index.byId.get(line.variantId)
+      return known !== undefined && line.quantity > availableStock(known.stock, line.variantId, pending)
+    })
+    if (short) {
+      // El inventario cambió después de agregar la prenda (otra caja la vendió): hay que corregir antes de cobrar.
+      const left = Math.max(0, availableStock(index.byId.get(short.variantId)?.stock ?? 0, short.variantId, pending))
+      announce('error', `Ya no hay suficiente stock de ${variantLabel(short)}: quedan ${left}. Ajustá la cantidad o quitá la prenda.`)
+      return
+    }
     if (discountBlocked) {
       if (offline) announce('error', `Sin conexión: un descuento mayor a ${settings.sellerDiscountLimitPercent}% necesita aprobación del administrador. Bajalo o esperá la conexión.`)
       else setModal({ kind: 'approval' })
@@ -240,10 +241,11 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       const localSale = buildLocalSale(request, lines, { session, sellerName: user.displayName, settings })
       // Primero a la cola local (IndexedDB); el envío al servidor ocurre en segundo plano.
       await engine.enqueue({ clientSaleId, userId: user.id, userName: user.displayName, request, localSale })
+      // El borrador se borra ya (no a los 400 ms): si se recarga justo ahora, la venta cobrada no debe reaparecer.
+      void clearCartDraft().catch(() => undefined)
       setLines([])
       setDiscountText('')
       setApproval(null)
-      setOverrides([])
       setChannel('Store')
       setQuery('')
       setSelectedProductId(null)
@@ -350,6 +352,8 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                           <button
                             type="button" key={variant.variantId} className={`pv-size pv-size-${tone}`}
                             aria-label={`${variantLabel(variant)}, quedan ${left}`}
+                            disabled={left <= 0}
+                            title={left <= 0 ? 'Sin existencias' : undefined}
                             onClick={() => { addVariant(variant); focusScanner() }}
                           >
                             <span>{variant.sizeName}</span>
@@ -363,7 +367,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 )
               })}
             </div>
-            <p className="pv-legend"><span className="pv-dot pv-dot-ok" /> Hay <span className="pv-dot pv-dot-low" /> Quedan pocas <span className="pv-dot pv-dot-out" /> Sin stock en el sistema (se puede vender si la prenda está en la tienda)</p>
+            <p className="pv-legend"><span className="pv-dot pv-dot-ok" /> Hay <span className="pv-dot pv-dot-low" /> Quedan pocas <span className="pv-dot pv-dot-out" /> Sin existencias (no se puede vender)</p>
           </article>
         )}
 
@@ -397,7 +401,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
               type="button" className="pv-link"
               onClick={() => {
                 if (!confirmClear) { setConfirmClear(true); setTimeout(() => setConfirmClear(false), 3000); return }
-                setLines([]); setDiscountText(''); setApproval(null); setOverrides([]); setConfirmClear(false); focusScanner()
+                setLines([]); setDiscountText(''); setApproval(null); setConfirmClear(false); focusScanner()
               }}
             >{confirmClear ? '¿Seguro? Tocá otra vez' : 'Vaciar'}</button>
           )}
@@ -415,7 +419,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 <div className="pv-line-info">
                   <strong>{line.productName}</strong>
                   <small>{line.colorName} · {line.sizeName} · {formatNio(line.unitPrice)}</small>
-                  {over && <em>El sistema indica {Math.max(0, available)}; se vende igual.</em>}
+                  {over && <em>Solo quedan {Math.max(0, available)}: ajustá la cantidad antes de cobrar.</em>}
                 </div>
                 <div className="pv-qty">
                   <button type="button" aria-label={`Quitar una unidad de ${variantLabel(line)}`} onClick={() => { setLines((current) => setLineQuantity(current, line.variantId, line.quantity - 1)); focusScanner() }}>−</button>
@@ -506,23 +510,6 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
           onApproved={(result) => { setApproval(result); notify(`Descuento aprobado por ${result.approverName}.`, 'ok'); closeModal() }}
           onCancel={closeModal}
         />
-      )}
-
-      {modal?.kind === 'overstock' && (
-        <Modal
-          title="Stock insuficiente en el sistema"
-          size="sm"
-          onClose={closeModal}
-          footer={(
-            <>
-              <button type="button" className="pv-btn pv-btn-ghost" onClick={closeModal}>No, cancelar</button>
-              <button type="button" className="pv-btn pv-btn-primary" data-autofocus onClick={confirmOverstock}>Sí, vender de todos modos</button>
-            </>
-          )}
-        >
-          <p className="pv-confirm-big">El sistema indica <strong>{modal.available}</strong> {modal.available === 1 ? 'unidad' : 'unidades'} de «{modal.label}».</p>
-          <p className="pv-note">¿Vender de todos modos? La venta se acepta y queda marcada para revisión de inventario: el stock físico manda.</p>
-        </Modal>
       )}
 
       {modal?.kind === 'done' && (
