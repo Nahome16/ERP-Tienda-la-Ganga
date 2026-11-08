@@ -13,6 +13,7 @@ export type AppView =
   | 'contabilidad'
   | 'equipo'
   | 'configuracion'
+  | 'catalogos'
 
 export type HealthStatus = {
   service: string

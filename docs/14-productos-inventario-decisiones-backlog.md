@@ -1,8 +1,32 @@
 # Módulo 1 — Decisiones y backlog técnico
 
-Estado del documento: **Propuesta para aprobación antes de programar**  
+Estado del documento: **En implementación** — Hitos 1, 2 (parcial) y 3 construidos  
 Objetivo: separar decisiones bloqueantes de decisiones aplazables y ordenar la
 implementación en entregas pequeñas, comprobables y reversibles.
+
+## 0. Estado de avance
+
+| Hito | Estado | Notas |
+|---|---|---|
+| 0 — Decisiones | Resuelto para catálogos | Se parte de esta base (sin ZIP). Se aplican los valores recomendados de la sección 2 |
+| 1 — Base técnica | Terminado | Incluye integración continua en GitHub Actions |
+| 2 — Acceso y permisos | Parcial | Falta: roles Vendedor/Encargado de inventario, renovación de sesión y pruebas de revocación |
+| 3 — Catálogos | Terminado | API `/api/v1/catalog/*`, pantalla **Catálogos**, datos iniciales y pruebas contra PostgreSQL |
+| 4 — Borradores y variantes | Siguiente | Incluye código de barras único por variante |
+
+Decisiones aplicadas en el Hito 3:
+
+- `Sin marca` es un registro normal del catálogo de marcas.
+- Las categorías iniciales se cargaron como Dama, Caballero, Juvenil y Niños,
+  con Pantalones, Camisas y Blusas como subcategorías. Son editables.
+- Los colores iniciales no tienen muestra visual; se pueden agregar desde la
+  pantalla.
+- Una talla pertenece a un solo grupo (o a ninguno).
+- No se puede inactivar una categoría con subcategorías activas ni activar una
+  subcategoría cuya superior está inactiva.
+- Crear catálogos no exige `Idempotency-Key`: el nombre único ya impide
+  duplicados ante reintentos. Las ediciones exigen `If-Match` con la versión.
+- Toda operación de escritura de la API exige el encabezado CSRF.
 
 ## 1. Puerta de inicio
 
