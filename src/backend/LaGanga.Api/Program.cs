@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using LaGanga.Api.Catalog;
 using LaGanga.Api.Identity;
 using LaGanga.Application;
 using LaGanga.Application.Identity;
 using LaGanga.Domain.Identity;
 using LaGanga.Infrastructure;
+using LaGanga.Infrastructure.Catalog;
 using LaGanga.Infrastructure.Identity;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -94,15 +96,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             },
         };
     });
-builder.Services.AddAuthorizationBuilder()
+var authorization = builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AuthConstants.InventoryCostPolicy, policy =>
         policy.RequireClaim(AuthConstants.PermissionClaim, PermissionNames.InventoryCostRead));
+
+// Una política por permiso, con el mismo nombre: RequireAuthorization("catalog.read").
+foreach (var permission in PermissionNames.All)
+{
+    authorization.AddPolicy(permission, policy =>
+        policy.RequireClaim(AuthConstants.PermissionClaim, permission));
+}
 
 var app = builder.Build();
 
 if (args.Contains("--bootstrap-admin", StringComparer.OrdinalIgnoreCase))
 {
     await BootstrapAdministratorAsync(app.Services);
+    return;
+}
+
+if (args.Contains("--seed-catalogs", StringComparer.OrdinalIgnoreCase))
+{
+    await SeedCatalogsAsync(app.Services, null);
     return;
 }
 
@@ -117,6 +132,7 @@ app.MapGet("/api/health", () =>
 
 app.MapHealthChecks("/health");
 app.MapAuthenticationEndpoints();
+app.MapCatalogEndpoints();
 
 app.Run();
 
@@ -148,6 +164,28 @@ static async Task BootstrapAdministratorAsync(IServiceProvider services)
     Console.WriteLine(created
         ? "Initial administrator created. Remove the bootstrap environment variables now."
         : "Bootstrap skipped because at least one user already exists.");
+
+    if (created)
+    {
+        var normalizedUsername = UserAccount.NormalizeUsername(username);
+        var administratorId = await dbContext.Users
+            .Where(user => user.NormalizedUsername == normalizedUsername)
+            .Select(user => user.Id)
+            .SingleAsync();
+        await SeedCatalogsAsync(services, administratorId);
+    }
+}
+
+static async Task SeedCatalogsAsync(IServiceProvider services, Guid? createdBy)
+{
+    await using var scope = services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<LaGangaDbContext>();
+    await dbContext.Database.MigrateAsync();
+    var seeder = scope.ServiceProvider.GetRequiredService<CatalogSeeder>();
+    var inserted = await seeder.SeedAsync(createdBy, CancellationToken.None);
+    Console.WriteLine(inserted > 0
+        ? $"Catalogs seeded: {inserted} rows inserted."
+        : "Catalog seed skipped because the catalogs already have data.");
 }
 
 public partial class Program;

@@ -5,11 +5,6 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
-    inputs:
-      migration_name:
-        description: "Nombre de una migración EF a generar (opcional)"
-        required: false
-        default: ""
 
 permissions:
   contents: read
@@ -50,27 +45,30 @@ jobs:
         run: |
           dotnet tool restore
           dotnet restore LaGanga.sln
-      - name: Generar migración solicitada
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_name != '' }}
-        run: |
-          dotnet ef migrations add "${{ inputs.migration_name }}" \
-            --project src/backend/LaGanga.Infrastructure \
-            --startup-project src/backend/LaGanga.Api \
-            --output-dir Persistence/Migrations
-      - name: Publicar migración generada
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_name != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: migration
-          path: src/backend/LaGanga.Infrastructure/Persistence/Migrations/
       - name: Compilar
         run: dotnet build LaGanga.sln --no-restore --configuration Release
       - name: Verificar que no falten migraciones
+        id: pending
         run: |
           dotnet ef migrations has-pending-model-changes \
             --project src/backend/LaGanga.Infrastructure \
             --startup-project src/backend/LaGanga.Api \
             --configuration Release --no-build
+      # Si el modelo cambió sin migración, se genera una como artefacto para
+      # revisarla y agregarla al repositorio. El job sigue fallando.
+      - name: Generar la migración faltante
+        if: ${{ failure() && steps.pending.outcome == 'failure' }}
+        run: |
+          dotnet ef migrations add PendingModelChanges \
+            --project src/backend/LaGanga.Infrastructure \
+            --startup-project src/backend/LaGanga.Api \
+            --output-dir Persistence/Migrations
+      - name: Publicar la migración generada
+        if: ${{ failure() && steps.pending.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pending-migration
+          path: src/backend/LaGanga.Infrastructure/Persistence/Migrations/
       - name: Aplicar migraciones a una base vacía
         run: |
           dotnet ef database update \

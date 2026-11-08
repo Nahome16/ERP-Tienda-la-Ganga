@@ -121,6 +121,18 @@ public sealed class AuthService(
         return true;
     }
 
+    /// <summary>
+    /// Comprueba que el token CSRF enviado corresponde a la sesión indicada.
+    /// </summary>
+    public async Task<bool> ValidateCsrfAsync(
+        Guid sessionId,
+        string csrfToken,
+        CancellationToken cancellationToken)
+    {
+        var session = await identityStore.FindSessionAsync(sessionId, cancellationToken);
+        return session is not null && MatchesCsrfToken(session.CsrfTokenHash, csrfToken);
+    }
+
     private static string CreateCsrfToken() =>
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
