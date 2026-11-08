@@ -1,7 +1,7 @@
 // Llamadas tipadas de las pantallas administrativas. Contrato: docs/30-mvp-contrato-api.md
 import { apiRequest } from '../lib/api'
 import type {
-  AuditRow, CashConsolidated, CashSummary, ImportResult, ImportRow, InventoryRow, InventorySummary,
+  AuditRow, CashConsolidated, CashSummary, CloseSessionRequest, ImportResult, ImportRow, InventoryRow, InventorySummary,
   KardexRow, PageResult, ProductDetail, ProductListItem, Sale, StoreSettings, Variant,
 } from '../lib/apiTypes'
 
@@ -28,7 +28,7 @@ export const getSessionSummary = (id: string, signal?: AbortSignal) =>
   apiRequest<CashSummary>(`${v1}/cash/sessions/${id}/summary`, { signal })
 export const listSessions = (from: string, to: string, signal?: AbortSignal) =>
   apiRequest<CashSummary[]>(`${v1}/cash/sessions${query({ from, to })}`, { signal })
-export const closeSession = (id: string, body: { countedCashNio: number; countedCashUsd: number; notes: string }) =>
+export const closeSession = (id: string, body: CloseSessionRequest) =>
   apiRequest<CashSummary>(`${v1}/cash/sessions/${id}/close`, { method: 'POST', body })
 
 // ---- Ventas ----

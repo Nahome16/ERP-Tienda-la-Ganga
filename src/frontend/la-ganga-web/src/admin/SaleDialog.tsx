@@ -130,11 +130,16 @@ export function SaleDialog({ sale, user, onClose, onChanged }: {
           </section>
           <section>
             <h3 className="adm-card-title">Pagos</h3>
-            {sale.payments.map((payment, index) => (
-              <Row key={`${payment.method}-${index}`} label={`${methodLabels[payment.method] ?? payment.method}${payment.bank ? ` · ${payment.bank}` : ''}${payment.reference ? ` · ref. ${payment.reference}` : ''}`}>
-                {payment.currency === 'USD' ? `${formatUsd(payment.amount)} × ${payment.exchangeRate} = ${formatNio(payment.amountNio)}` : formatNio(payment.amountNio)}
-              </Row>
-            ))}
+            <ul className="adm-pay-list">
+              {sale.payments.map((payment, index) => (
+                <li key={`${payment.method}-${index}`}>
+                  <strong>{methodLabels[payment.method] ?? payment.method}{payment.bank ? ` ${payment.bank}` : ''}</strong>
+                  {' · '}
+                  {payment.currency === 'USD' ? `${formatUsd(payment.amount)} @ ${payment.exchangeRate ?? '—'} = ${formatNio(payment.amountNio)}` : formatNio(payment.amountNio)}
+                  {payment.reference && <small className="row-sub">ref. {payment.reference}</small>}
+                </li>
+              ))}
+            </ul>
           </section>
           <section>
             <h3 className="adm-card-title">Datos</h3>

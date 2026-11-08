@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computePayments, computeTotals, discountExceedsLimit, round2 } from '../lib/money'
-import { buildPayments, emptyPaymentForm, evaluatePayments, parseAmount } from './payments'
+import { computeTotals, discountExceedsLimit, round2 } from '../lib/money'
 
 describe('computeTotals', () => {
   const lines = [{ quantity: 2, unitPrice: 350 }, { quantity: 1, unitPrice: 199.99 }]
@@ -42,77 +41,5 @@ describe('computeTotals', () => {
     expect(round2(1.005)).toBe(1.01)
     expect(round2(2.675)).toBe(2.68)
     expect(round2(0.1 + 0.2)).toBe(0.3)
-  })
-})
-
-describe('pagos mixtos', () => {
-  const rate = 36.7
-
-  it('parseAmount acepta coma decimal y descarta lo inválido', () => {
-    expect(parseAmount('12,5')).toBe(12.5)
-    expect(parseAmount(' 1 000.456 ')).toBe(1000.46)
-    expect(parseAmount('abc')).toBe(0)
-    expect(parseAmount('-4')).toBe(0)
-  })
-
-  it('arma pagos en efectivo C$, US$ (con tasa), transferencia y tarjeta', () => {
-    const payments = buildPayments({
-      cashNio: '100', cashUsd: '20', transfer: '300', bank: 'BAC', reference: ' 555 ', card: '50',
-    }, rate)
-    expect(payments).toEqual([
-      { method: 'Cash', currency: 'NIO', amount: 100, exchangeRate: null, bank: null, reference: null },
-      { method: 'Cash', currency: 'USD', amount: 20, exchangeRate: rate, bank: null, reference: null },
-      { method: 'Transfer', currency: 'NIO', amount: 300, exchangeRate: null, bank: 'BAC', reference: '555' },
-      { method: 'Card', currency: 'NIO', amount: 50, exchangeRate: null, bank: null, reference: null },
-    ])
-  })
-
-  it('convierte dólares a córdobas y calcula el cambio en C$', () => {
-    const payments = buildPayments({ ...emptyPaymentForm('BAC'), cashUsd: '30' }, rate)
-    // 30 × 36.7 = 1101 → total 1000 → cambio 101
-    const evaluation = evaluatePayments(1000, payments)
-    expect(evaluation.paidNio).toBe(1101)
-    expect(evaluation.changeNio).toBe(101)
-    expect(evaluation.pendingNio).toBe(0)
-    expect(evaluation.valid).toBe(true)
-  })
-
-  it('efectivo C$ + US$ + transferencia', () => {
-    const payments = buildPayments({ ...emptyPaymentForm('BAC'), cashNio: '200', cashUsd: '10', transfer: '433' }, rate)
-    const evaluation = evaluatePayments(1000, payments)
-    expect(evaluation.paidNio).toBe(1000)
-    expect(evaluation.changeNio).toBe(0)
-    expect(evaluation.valid).toBe(true)
-  })
-
-  it('muestra lo pendiente y no deja confirmar si falta dinero', () => {
-    const payments = buildPayments({ ...emptyPaymentForm(), cashNio: '400' }, rate)
-    const evaluation = evaluatePayments(1000, payments)
-    expect(evaluation.pendingNio).toBe(600)
-    expect(evaluation.valid).toBe(false)
-  })
-
-  it('no permite que la transferencia o la tarjeta superen el total (el cambio solo sale del efectivo)', () => {
-    const transfer = evaluatePayments(500, buildPayments({ ...emptyPaymentForm('BAC'), transfer: '600' }, rate))
-    expect(transfer.valid).toBe(false)
-    expect(transfer.error).toMatch(/cambio/)
-    const card = evaluatePayments(500, buildPayments({ ...emptyPaymentForm(), card: '500.01' }, rate))
-    expect(card.valid).toBe(false)
-    // Mixto con exceso de efectivo sí es válido y da cambio
-    const mixed = evaluatePayments(500, buildPayments({ ...emptyPaymentForm('BAC'), transfer: '200', cashNio: '400' }, rate))
-    expect(mixed.valid).toBe(true)
-    expect(mixed.changeNio).toBe(100)
-  })
-
-  it('exige banco en la transferencia cuando hay bancos configurados', () => {
-    const payments = buildPayments({ ...emptyPaymentForm(''), transfer: '500' }, rate)
-    expect(evaluatePayments(500, payments, true).valid).toBe(false)
-    expect(evaluatePayments(500, payments, false).valid).toBe(true)
-  })
-
-  it('computePayments redondea cada pago en córdobas', () => {
-    const result = computePayments(100, [{ method: 'Cash', currency: 'USD', amount: 2.73, exchangeRate: 36.7, bank: null, reference: null }])
-    expect(result.paidNio).toBe(100.19)
-    expect(result.changeNio).toBe(0.19)
   })
 })

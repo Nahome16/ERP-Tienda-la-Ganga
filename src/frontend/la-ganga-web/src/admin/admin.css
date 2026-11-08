@@ -270,3 +270,28 @@
 .img-add small { color: var(--muted); font-size: .72rem; }
 .img-empty, .img-hint { margin: 8px 0 0; font-size: .76rem; }
 .img-empty { grid-column: 1 / -1; }
+
+/* ---- Conciliación por método y moneda (Caja y cierres, venta) ---- */
+.adm-rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
+.adm-rec-card { min-width: 0; padding: 12px 14px 8px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.6); }
+.adm-rec-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; margin-bottom: 4px; }
+.adm-rec-head h3 { margin: 0; font-size: .92rem; }
+.adm-rec-currency { margin-top: 8px; padding-top: 6px; border-top: 1px solid #efe4d3; }
+.adm-rec-currency h4 { margin: 0 0 2px; color: #5e4b39; font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.adm-rec-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #efe7da; color: #5a554d; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+.adm-rec-pill.ok { color: #0d5a3d; background: #d9efe4; }
+.adm-rec-pill.bad { color: #7c2a1f; background: #fbe0da; }
+.adm-rec-badge { display: inline-block; font-size: .76rem; font-weight: 800; color: #5a554d; }
+.adm-rec-badge.ok { color: #0d5a3d; }
+.adm-rec-badge.bad { color: var(--danger); }
+.adm-rec-line { display: block; white-space: nowrap; }
+.adm-rec-fieldset { min-width: 0; }
+.adm-rec-fieldset > legend { padding: 0 6px; }
+.adm-rec-field > label { color: #5e4b39; font-size: .72rem; font-weight: 800; }
+.adm-rec-field > small { min-height: 1.1em; }
+.adm-pay-list { margin: 0; padding: 0; list-style: none; font-size: .82rem; }
+.adm-pay-list li { padding: 7px 0; border-bottom: 1px dashed #e7dbc8; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.adm-pay-list li:last-child { border-bottom: 0; }
+.cash-slip .slip-sub { margin-top: 3px; font-size: 11px; text-decoration: underline; }
+.cash-slip .slip-row > span:last-child { text-align: right; }
+.adm-table td.nowrap { white-space: nowrap; }

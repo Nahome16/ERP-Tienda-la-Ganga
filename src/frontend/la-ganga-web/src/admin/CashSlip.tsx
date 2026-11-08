@@ -3,16 +3,17 @@ import { useEffect } from 'react'
 import type { CashTotals } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
 import { channelLabels } from './format'
+import { currencyNames, formatMoney, lineCountedText, lineDifferenceText, type RecMethod } from './reconciliation'
 
 export type SlipData = {
   storeName: string
   title: string
   meta: [string, string][]
   totals: CashTotals
-  expectedNio: number
-  expectedUsd: number
-  countedNio: number | null
-  countedUsd: number | null
+  /** Esperado vs verificado por método y moneda. */
+  methods: RecMethod[]
+  /** Hay cajas abiertas: lo verificado todavía no aplica. */
+  open: boolean
   notes?: string | null
   /** Una línea por caja (solo cierre del día). */
   registers?: { name: string; detail: string; totalNio: number }[]
@@ -20,13 +21,6 @@ export type SlipData = {
 
 function Row({ label, value }: { label: string; value: string }) {
   return <div className="slip-row"><span>{label}</span><span>{value}</span></div>
-}
-
-function differenceText(counted: number | null, expected: number, format: (value: number) => string) {
-  if (counted === null) return 'Pendiente'
-  const diff = Math.round((counted - expected) * 100) / 100
-  if (diff === 0) return 'Cuadra'
-  return `${diff > 0 ? 'Sobra' : 'Falta'} ${format(Math.abs(diff))}`
 }
 
 /** Cierre de caja en formato 80 mm. Solo se ve al imprimir (clase printing-cash). */
@@ -58,10 +52,12 @@ export function CashSlip({ data }: { data: SlipData }) {
       <Row label="Descuentos" value={`−${formatNio(totals.discountTotalNio)}`} />
       <div className="slip-row slip-total"><span>TOTAL VENDIDO</span><span>{formatNio(totals.netTotalNio)}</span></div>
       <hr className="slip-rule" />
-      <h2>Por método</h2>
+      <h2>Por método (en C$)</h2>
       <Row label="Efectivo (neto)" value={formatNio(totals.cashTotalNio)} />
       <Row label="Transferencia" value={formatNio(totals.transferTotalNio)} />
-      {totals.transfersByBank.map((bank) => <Row key={bank.bank} label={`  ${bank.bank}`} value={formatNio(bank.totalNio)} />)}
+      {totals.transfersByBank.map((bank) => (
+        <Row key={bank.bank} label={`  ${bank.bank}`} value={bank.totalUsd > 0 ? `${formatNio(bank.totalNio)} (${formatUsd(bank.totalUsd)})` : formatNio(bank.totalNio)} />
+      ))}
       <Row label="POS / Tarjeta" value={formatNio(totals.cardTotalNio)} />
       {totals.byChannel.length > 0 && (
         <>
@@ -70,16 +66,28 @@ export function CashSlip({ data }: { data: SlipData }) {
         </>
       )}
       <hr className="slip-rule" />
-      <h2>Efectivo</h2>
-      <Row label="C$ recibidos" value={formatNio(totals.cashNioTendered)} />
-      <Row label="US$ recibidos" value={formatUsd(totals.cashUsdTendered)} />
+      <h2>Recibido</h2>
+      <Row label="Efectivo C$" value={formatNio(totals.cashNioTendered)} />
+      <Row label="Efectivo US$" value={formatUsd(totals.cashUsdTendered)} />
       <Row label="Cambio entregado" value={formatNio(totals.changeGivenNio)} />
-      <Row label="Esperado C$" value={formatNio(data.expectedNio)} />
-      <Row label="Contado C$" value={data.countedNio === null ? 'Pendiente' : formatNio(data.countedNio)} />
-      <Row label="Diferencia C$" value={differenceText(data.countedNio, data.expectedNio, formatNio)} />
-      <Row label="Esperado US$" value={formatUsd(data.expectedUsd)} />
-      <Row label="Contado US$" value={data.countedUsd === null ? 'Pendiente' : formatUsd(data.countedUsd)} />
-      <Row label="Diferencia US$" value={differenceText(data.countedUsd, data.expectedUsd, formatUsd)} />
+      <Row label="Transfer. C$" value={formatNio(totals.transferNioTendered)} />
+      <Row label="Transfer. US$" value={formatUsd(totals.transferUsdTendered)} />
+      <Row label="Tarjeta C$" value={formatNio(totals.cardNioTendered)} />
+      <Row label="Tarjeta US$" value={formatUsd(totals.cardUsdTendered)} />
+      {data.methods.map((method) => (
+        <div key={method.key} className="slip-method">
+          <hr className="slip-rule" />
+          <h2>{method.title}: esperado vs verificado</h2>
+          {method.lines.map((entry) => (
+            <div key={entry.currency}>
+              <div className="slip-sub">{currencyNames[entry.currency]}</div>
+              <Row label="Esperado" value={formatMoney(entry.currency, entry.expected)} />
+              <Row label={method.key === 'cash' ? 'Contado' : method.key === 'transfer' ? 'Banco' : 'Terminal'} value={lineCountedText(entry, data.open)} />
+              <Row label="Diferencia" value={lineDifferenceText(entry, data.open)} />
+            </div>
+          ))}
+        </div>
+      ))}
       {data.notes && <><hr className="slip-rule" /><div>Notas: {data.notes}</div></>}
       <hr className="slip-rule" />
       <div style={{ marginTop: 28 }} className="slip-center">______________________<br />Firma</div>

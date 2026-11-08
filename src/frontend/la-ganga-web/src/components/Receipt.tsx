@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import { useEffect } from 'react'
 import type { CashSummary, Sale, StoreSettings } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
+import { diffText, reconciliationRows, visibleRows } from '../pos/reconcile'
 import './receipt.css'
 
 type ReceiptProps = { sale: Sale; settings: StoreSettings }
@@ -89,10 +90,15 @@ function formatStamp(iso: string | null) {
     : '—'
 }
 
+const reconCurrency = { NIO: formatNio, USD: formatUsd } as const
+const reconName = { NIO: 'Córdobas', USD: 'Dólares' } as const
+const reconSection = { Cash: 'ARQUEO DE EFECTIVO', Transfer: 'TRANSFERENCIAS (BANCO)', Card: 'TARJETA (LOTE TERMINAL)' } as const
+
 /** Resumen de cierre de caja para papel térmico de 80 mm. */
 export function CashSummarySheet({ summary, storeName }: CashSummaryProps) {
   const { session, totals } = summary
-  const diff = (value: number | null, format: (amount: number) => string) => value === null ? '—' : `${value > 0 ? '+' : ''}${format(value)}`
+  const rows = visibleRows(reconciliationRows(summary))
+  const methods = ['Cash', 'Transfer', 'Card'] as const
   return (
     <div className="receipt-sheet">
       <h1>{storeName}</h1>
@@ -109,20 +115,44 @@ export function CashSummarySheet({ summary, storeName }: CashSummaryProps) {
       <div className="receipt-row"><span>Descuentos</span><span>−{formatNio(totals.discountTotalNio)}</span></div>
       <div className="receipt-row receipt-total"><span>TOTAL VENDIDO</span><span>{formatNio(totals.netTotalNio)}</span></div>
       <hr className="receipt-rule" />
-      <div className="receipt-row"><span>Efectivo (neto)</span><span>{formatNio(totals.cashTotalNio)}</span></div>
-      <div className="receipt-row"><span>Transferencias</span><span>{formatNio(totals.transferTotalNio)}</span></div>
+      <div className="receipt-center"><strong>VENDIDO POR METODO</strong></div>
+      <div className="receipt-row receipt-bold"><span>Efectivo (neto)</span><span>{formatNio(totals.cashTotalNio)}</span></div>
+      <div className="receipt-row receipt-small receipt-ind"><span>Recibido C$</span><span>{formatNio(totals.cashNioTendered)}</span></div>
+      {totals.cashUsdTendered > 0 && <div className="receipt-row receipt-small receipt-ind"><span>Recibido US$</span><span>{formatUsd(totals.cashUsdTendered)}</span></div>}
+      {totals.changeGivenNio > 0 && <div className="receipt-row receipt-small receipt-ind"><span>Cambio dado</span><span>−{formatNio(totals.changeGivenNio)}</span></div>}
+      <div className="receipt-row receipt-bold"><span>Transferencias</span><span>{formatNio(totals.transferTotalNio)}</span></div>
+      {totals.transferNioTendered > 0 && <div className="receipt-row receipt-small receipt-ind"><span>En C$</span><span>{formatNio(totals.transferNioTendered)}</span></div>}
+      {totals.transferUsdTendered > 0 && <div className="receipt-row receipt-small receipt-ind"><span>En US$</span><span>{formatUsd(totals.transferUsdTendered)}</span></div>}
       {totals.transfersByBank.map((item) => (
-        <div className="receipt-row receipt-small" key={item.bank}><span>  {item.bank}</span><span>{formatNio(item.totalNio)}</span></div>
+        <div className="receipt-row receipt-small" key={item.bank}>
+          <span>{item.bank}</span><span>{formatNio(item.totalNio)}{item.totalUsd > 0 ? ` (${formatUsd(item.totalUsd)})` : ''}</span>
+        </div>
       ))}
-      <div className="receipt-row"><span>Tarjeta (POS)</span><span>{formatNio(totals.cardTotalNio)}</span></div>
+      <div className="receipt-row receipt-bold"><span>Tarjeta (POS)</span><span>{formatNio(totals.cardTotalNio)}</span></div>
+      {totals.cardNioTendered > 0 && <div className="receipt-row receipt-small receipt-ind"><span>En C$</span><span>{formatNio(totals.cardNioTendered)}</span></div>}
+      {totals.cardUsdTendered > 0 && <div className="receipt-row receipt-small receipt-ind"><span>En US$</span><span>{formatUsd(totals.cardUsdTendered)}</span></div>}
       <hr className="receipt-rule" />
-      <div className="receipt-center"><strong>ARQUEO</strong></div>
-      <div className="receipt-row"><span>C$ esperado</span><span>{formatNio(summary.expectedCashNio)}</span></div>
-      <div className="receipt-row"><span>C$ contado</span><span>{session.countedCashNio === null ? '—' : formatNio(session.countedCashNio)}</span></div>
-      <div className="receipt-row receipt-bold"><span>Diferencia C$</span><span>{diff(summary.differenceCashNio, formatNio)}</span></div>
-      <div className="receipt-row"><span>US$ esperado</span><span>{formatUsd(summary.expectedCashUsd)}</span></div>
-      <div className="receipt-row"><span>US$ contado</span><span>{session.countedCashUsd === null ? '—' : formatUsd(session.countedCashUsd)}</span></div>
-      <div className="receipt-row receipt-bold"><span>Diferencia US$</span><span>{diff(summary.differenceCashUsd, formatUsd)}</span></div>
+      <div className="receipt-center"><strong>CONCILIACION</strong></div>
+      {methods.map((method) => {
+        const group = rows.filter((row) => row.method === method)
+        return (
+          <div key={method}>
+            <div className="receipt-bold receipt-section">{reconSection[method]}</div>
+            {group.length === 0 && <div className="receipt-small">Sin movimientos</div>}
+            {group.map((row) => {
+              const format = reconCurrency[row.currency]
+              return (
+                <div key={row.currency} className="receipt-recon">
+                  <div>{reconName[row.currency]}</div>
+                  <div className="receipt-row receipt-ind"><span>Esperado</span><span>{format(row.expected)}</span></div>
+                  <div className="receipt-row receipt-ind"><span>Verificado</span><span>{row.counted === null ? 'No verificado' : format(row.counted)}</span></div>
+                  {row.counted !== null && <div className="receipt-row receipt-bold receipt-ind"><span>Diferencia</span><span>{diffText(row.difference, format)}</span></div>}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
       {session.closingNotes && (<><hr className="receipt-rule" /><div>Notas: {session.closingNotes}</div></>)}
       {totals.reviewCount > 0 && <div className="receipt-center receipt-small">{totals.reviewCount} venta(s) con revisión pendiente</div>}
       <hr className="receipt-rule" />
