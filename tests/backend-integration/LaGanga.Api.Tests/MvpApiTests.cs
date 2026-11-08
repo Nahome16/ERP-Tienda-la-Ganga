@@ -90,38 +90,54 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
-    public async Task OversellIsAcceptedFlaggedAndCanBeVoided()
+    public async Task SellingMoreThanTheStockIsRejectedOnlineAndFlaggedOffline()
     {
         var catalogs = await LoadCatalogsAsync();
-        var product = await CreateProductAsync(catalogs, "Camisa venta de más", 500m, [(1, null)]);
-        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var product = await CreateProductAsync(catalogs, "Camisa sin stock", 500m, [(1, null), (0, null)]);
+        var withStock = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var withoutStock = product.GetProperty("variants")[1].GetProperty("id").GetGuid();
         var seller = await CreateSellerAsync();
         var session = await OpenCashAsync(seller, 0m, 0m);
 
-        var result = await PostSaleAsync(seller, session, Guid.NewGuid(), [(variantId, 3, 500m)], null, null, [Pay("Cash", "NIO", 1500m)]);
-        var sale = result.GetProperty("sale");
+        // Con conexión: más de lo que hay → rechazada, y no se toca el inventario.
+        var tooMany = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(withStock, 3, 500m)], null, null, [Pay("Cash", "NIO", 1500m)]);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, tooMany.StatusCode);
+        Assert.Equal("insufficient_stock", await ApiTestHelpers.ReadProblemCodeAsync(tooMany));
+        var empty = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(withoutStock, 1, 500m)], null, null, [Pay("Cash", "NIO", 500m)]);
+        Assert.Equal("insufficient_stock", await ApiTestHelpers.ReadProblemCodeAsync(empty));
+        var intact = await GetAsync(fixture.Admin, $"/api/v1/products/{product.GetProperty("id").GetGuid()}");
+        Assert.Equal(1, intact.GetProperty("variants")[0].GetProperty("stock").GetInt32());
+        Assert.Equal(0, intact.GetProperty("variants")[1].GetProperty("stock").GetInt32());
+
+        // Una venta que sí alcanza se acepta.
+        var enough = await PostSaleAsync(seller, session, Guid.NewGuid(), [(withStock, 1, 500m)], null, null, [Pay("Cash", "NIO", 500m)]);
+        Assert.False(enough.GetProperty("sale").GetProperty("requiresReview").GetBoolean());
+
+        // Sin conexión no se puede rechazar (la prenda ya salió): se acepta y queda para revisión.
+        var offline = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(withStock, 2, 500m)], null, null, [Pay("Cash", "NIO", 1000m)], isOffline: true);
+        Assert.Equal(HttpStatusCode.Created, offline.StatusCode);
+        var sale = (await ReadAsync(offline)).GetProperty("sale");
         Assert.True(sale.GetProperty("requiresReview").GetBoolean());
         Assert.Contains("Stock insuficiente", sale.GetProperty("reviewNote").GetString(), StringComparison.Ordinal);
-
         var negative = await GetAsync(fixture.Admin, "/api/v1/inventory?filter=negative&pageSize=100");
-        Assert.Contains(negative.GetProperty("items").EnumerateArray(), item => item.GetProperty("variantId").GetGuid() == variantId && item.GetProperty("stock").GetInt32() == -2);
+        Assert.Contains(negative.GetProperty("items").EnumerateArray(), item => item.GetProperty("variantId").GetGuid() == withStock && item.GetProperty("stock").GetInt32() == -2);
 
+        // Anular devuelve las unidades.
         var saleId = sale.GetProperty("id").GetGuid();
         var voided = await PostAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/sales/{saleId}/void", new { reason = "Error al cobrar" });
         Assert.Equal("Voided", voided.GetProperty("status").GetString());
         var detail = await GetAsync(fixture.Admin, $"/api/v1/products/{product.GetProperty("id").GetGuid()}");
-        Assert.Equal(1, detail.GetProperty("variants")[0].GetProperty("stock").GetInt32());
+        Assert.Equal(0, detail.GetProperty("variants")[0].GetProperty("stock").GetInt32());
 
         var again = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/sales/{saleId}/void", new { reason = "Otra vez" });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
-
-        var kardex = await GetAsync(fixture.Admin, $"/api/v1/inventory/variants/{variantId}/kardex");
+        var kardex = await GetAsync(fixture.Admin, $"/api/v1/inventory/variants/{withStock}/kardex");
         var types = kardex.GetProperty("items").EnumerateArray().Select(row => row.GetProperty("type").GetString()).ToArray();
         Assert.Contains("SaleVoid", types);
         Assert.Contains("Sale", types);
         Assert.Contains("InitialStock", types);
 
-        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 0m, countedCashUsd = 0m });
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 500m, countedCashUsd = 0m });
     }
 
     [PostgresFact]
@@ -153,8 +169,11 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
 
         var insufficient = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null, [Pay("Cash", "NIO", 900m)]);
         Assert.Equal("payment_insufficient", await ApiTestHelpers.ReadProblemCodeAsync(insufficient));
+        // Los dólares se aceptan por tarjeta, pero un pago de más sin efectivo no tiene cambio posible.
         var usdCard = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null, [Pay("Card", "USD", 30m, 36.7m)]);
-        Assert.Equal(HttpStatusCode.BadRequest, usdCard.StatusCode);
+        Assert.Equal("payment_exceeds_total", await ApiTestHelpers.ReadProblemCodeAsync(usdCard));
+        var usdWithoutRate = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null, [Pay("Transfer", "USD", 27.25m)]);
+        Assert.Equal(HttpStatusCode.BadRequest, usdWithoutRate.StatusCode);
         var changeWithoutCash = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null, [Pay("Transfer", "NIO", 1200m, bank: "BAC")]);
         Assert.Equal("payment_exceeds_total", await ApiTestHelpers.ReadProblemCodeAsync(changeWithoutCash));
 
@@ -162,7 +181,68 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
-    public async Task TwoRegistersSellingTheLastUnitAtTheSameTimeBothSucceedAndOneIsReviewed()
+    public async Task DollarsInEveryMethodAreReconciledByMethodAndCurrencyAtClosing()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        var product = await CreateProductAsync(catalogs, "Pantalón conciliación", 1000m, [(20, null)]);
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller, 0m, 0m);
+
+        // Venta A (C$ 1,000): transferencia US$ 10 (= C$ 367) + tarjeta C$ 400 + efectivo C$ 233.
+        _ = await PostSaleAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null,
+            [Pay("Transfer", "USD", 10m, 36.7m, "BAC"), Pay("Card", "NIO", 400m), Pay("Cash", "NIO", 233m)]);
+        // Venta B (C$ 734): tarjeta en dólares US$ 20.
+        _ = await PostSaleAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 734m)], null, null, [Pay("Card", "USD", 20m, 36.7m)]);
+
+        var summary = await GetAsync(seller.Client, $"/api/v1/cash/sessions/{session}/summary");
+        var totals = summary.GetProperty("totals");
+        Assert.Equal(1734m, totals.GetProperty("netTotalNio").GetDecimal());
+        Assert.Equal(10m, totals.GetProperty("transferUsdTendered").GetDecimal());
+        Assert.Equal(0m, totals.GetProperty("transferNioTendered").GetDecimal());
+        Assert.Equal(367m, totals.GetProperty("transferTotalNio").GetDecimal());
+        Assert.Equal(400m, totals.GetProperty("cardNioTendered").GetDecimal());
+        Assert.Equal(20m, totals.GetProperty("cardUsdTendered").GetDecimal());
+        Assert.Equal(1134m, totals.GetProperty("cardTotalNio").GetDecimal());
+        Assert.Equal(233m, totals.GetProperty("cashTotalNio").GetDecimal());
+        Assert.Equal(
+            totals.GetProperty("netTotalNio").GetDecimal(),
+            totals.GetProperty("cashTotalNio").GetDecimal() + totals.GetProperty("transferTotalNio").GetDecimal() + totals.GetProperty("cardTotalNio").GetDecimal());
+        var bank = totals.GetProperty("transfersByBank")[0];
+        Assert.Equal("BAC", bank.GetProperty("bank").GetString());
+        Assert.Equal(10m, bank.GetProperty("totalUsd").GetDecimal());
+        Assert.Equal(10m, summary.GetProperty("expectedTransferUsd").GetDecimal());
+        Assert.Equal(400m, summary.GetProperty("expectedCardNio").GetDecimal());
+        Assert.Equal(20m, summary.GetProperty("expectedCardUsd").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, summary.GetProperty("differenceCardNio").ValueKind);
+
+        // Cierre: la terminal marca C$ 390 (faltan 10) y US$ 20; el banco muestra US$ 10; las transferencias en C$ no se verifican.
+        var closed = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new
+        {
+            countedCashNio = 233m,
+            countedCashUsd = 0m,
+            countedTransferUsd = 10m,
+            countedCardNio = 390m,
+            countedCardUsd = 20m,
+        });
+        Assert.Equal(0m, closed.GetProperty("differenceCashNio").GetDecimal());
+        Assert.Equal(0m, closed.GetProperty("differenceTransferUsd").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, closed.GetProperty("differenceTransferNio").ValueKind);
+        Assert.Equal(-10m, closed.GetProperty("differenceCardNio").GetDecimal());
+        Assert.Equal(0m, closed.GetProperty("differenceCardUsd").GetDecimal());
+        Assert.Equal(390m, closed.GetProperty("session").GetProperty("countedCardNio").GetDecimal());
+
+        var negative = await PostRawAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 0m, countedCashUsd = 0m, countedCardNio = -5m });
+        Assert.Equal(HttpStatusCode.Conflict, negative.StatusCode); // ya estaba cerrada
+
+        var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-6)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var consolidated = await GetAsync(fixture.Admin, $"/api/v1/cash/consolidated?date={today}");
+        Assert.True(consolidated.GetProperty("expectedCardUsd").GetDecimal() >= 20m);
+        Assert.True(consolidated.GetProperty("expectedTransferUsd").GetDecimal() >= 10m);
+    }
+
+    [PostgresFact]
+    public async Task TwoRegistersSellingTheLastUnitAtTheSameTimeOnlyOneWins()
     {
         var catalogs = await LoadCatalogsAsync();
         var product = await CreateProductAsync(catalogs, "Falda última unidad", 300m, [(1, null)]);
@@ -176,25 +256,19 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         var responses = await Task.WhenAll(
             PostSaleRawAsync(one, sessionOne, Guid.NewGuid(), [(variantId, 1, 300m)], null, null, [Pay("Cash", "NIO", 300m)]),
             PostSaleRawAsync(two, sessionTwo, Guid.NewGuid(), [(variantId, 1, 300m)], null, null, [Pay("Cash", "NIO", 300m)]));
-        Assert.All(responses, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
-        var flagged = 0;
-        foreach (var response in responses)
-        {
-            if ((await ReadAsync(response)).GetProperty("sale").GetProperty("requiresReview").GetBoolean())
-            {
-                flagged++;
-            }
-        }
 
-        Assert.Equal(1, flagged);
+        // Exactamente una caja se lleva la última unidad; la otra recibe «sin existencias» y el saldo nunca es negativo.
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Created);
+        var rejected = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.UnprocessableEntity);
+        Assert.Equal("insufficient_stock", await ApiTestHelpers.ReadProblemCodeAsync(rejected));
         var detail = await GetAsync(fixture.Admin, $"/api/v1/products/{product.GetProperty("id").GetGuid()}");
-        Assert.Equal(-1, detail.GetProperty("variants")[0].GetProperty("stock").GetInt32());
+        Assert.Equal(0, detail.GetProperty("variants")[0].GetProperty("stock").GetInt32());
 
         var busy = await PostRawAsync(one.Client, one.Csrf, "/api/v1/cash/sessions", new { registerId = (await GetAsync(one.Client, "/api/v1/cash/registers"))[0].GetProperty("id").GetGuid(), openingFloatNio = 0, openingFloatUsd = 0 });
         Assert.Equal(HttpStatusCode.Conflict, busy.StatusCode);
 
         _ = await PostAsync(one.Client, one.Csrf, $"/api/v1/cash/sessions/{sessionOne}/close", new { countedCashNio = 300m, countedCashUsd = 0m });
-        _ = await PostAsync(two.Client, two.Csrf, $"/api/v1/cash/sessions/{sessionTwo}/close", new { countedCashNio = 300m, countedCashUsd = 0m });
+        _ = await PostAsync(two.Client, two.Csrf, $"/api/v1/cash/sessions/{sessionTwo}/close", new { countedCashNio = 0m, countedCashUsd = 0m });
     }
 
     [PostgresFact]
@@ -348,14 +422,15 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         (Guid Variant, int Quantity, decimal Price)[] lines,
         object? discount,
         Guid? approvalId,
-        object[] payments) =>
+        object[] payments,
+        bool isOffline = false) =>
         PostRawAsync(seller.Client, seller.Csrf, "/api/v1/pos/sales", new
         {
             clientSaleId,
             cashSessionId = session,
             channel = "Store",
             createdAtUtc = DateTimeOffset.UtcNow,
-            isOffline = false,
+            isOffline,
             lines = lines.Select(line => new { variantId = line.Variant, quantity = line.Quantity, unitPrice = line.Price }).ToArray(),
             discount,
             discountApprovalId = approvalId,

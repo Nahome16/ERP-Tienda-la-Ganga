@@ -72,8 +72,12 @@ public sealed class ReportService(
         summary.KeyValue("   Dólares recibidos US$", totals.CashUsdTendered);
         summary.KeyValue("   Dólares convertidos a C$", totals.CashUsdEquivalentNio);
         summary.KeyValue("   Cambio entregado C$", totals.ChangeGivenNio);
-        summary.KeyValue("Transferencia C$", totals.TransferTotalNio);
-        summary.KeyValue("Tarjeta / POS C$", totals.CardTotalNio);
+        summary.KeyValue("Transferencia (equiv. C$)", totals.TransferTotalNio);
+        summary.KeyValue("   Recibido en córdobas C$", totals.TransferNioTendered);
+        summary.KeyValue("   Recibido en dólares US$", totals.TransferUsdTendered);
+        summary.KeyValue("Tarjeta / POS (equiv. C$)", totals.CardTotalNio);
+        summary.KeyValue("   Cobrado en córdobas C$", totals.CardNioTendered);
+        summary.KeyValue("   Cobrado en dólares US$", totals.CardUsdTendered);
         summary.Blank();
         summary.SectionTitle("Por canal");
         foreach (var channel in totals.ByChannel)
@@ -303,10 +307,13 @@ public sealed class ReportService(
         sessions.Header(
         [
             "Fecha", "Caja", "Cajero/a", "Apertura", "Cierre", "Estado", "Fondo C$", "Fondo US$", "Ventas", "Anuladas",
-            "Bruto C$", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia C$", "Tarjeta / POS C$",
-            "Esperado C$", "Contado C$", "Diferencia C$", "Esperado US$", "Contado US$", "Diferencia US$", "Notas",
+            "Bruto C$", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia (equiv. C$)", "Tarjeta / POS (equiv. C$)",
+            "EFECTIVO esperado C$", "Efectivo contado C$", "Efectivo diferencia C$", "EFECTIVO esperado US$", "Efectivo contado US$", "Efectivo diferencia US$",
+            "TRANSFERENCIA esperada C$", "Transferencia verificada C$", "Transferencia diferencia C$", "TRANSFERENCIA esperada US$", "Transferencia verificada US$", "Transferencia diferencia US$",
+            "TARJETA esperada C$", "Tarjeta terminal C$", "Tarjeta diferencia C$", "TARJETA esperada US$", "Tarjeta terminal US$", "Tarjeta diferencia US$",
+            "Notas",
         ],
-        [11, 9, 20, 17, 17, 10, 11, 11, 8, 9, 13, 13, 17, 15, 15, 15, 13, 13, 13, 12, 12, 12, 32]);
+        [11, 9, 20, 17, 17, 10, 11, 11, 8, 9, 13, 13, 17, 15, 17, 17, 15, 14, 14, 14, 14, 14, 16, 16, 16, 16, 16, 16, 14, 14, 14, 14, 14, 14, 32]);
         var first = sessions.NextRow;
         foreach (var summary in summaries)
         {
@@ -318,19 +325,26 @@ public sealed class ReportService(
                 session.OpeningFloatNio, session.OpeningFloatUsd, totals.SalesCount, totals.VoidedCount,
                 totals.GrossTotalNio, totals.DiscountTotalNio, totals.NetTotalNio, totals.CashTotalNio, totals.TransferTotalNio, totals.CardTotalNio,
                 summary.ExpectedCashNio, session.CountedCashNio, summary.DifferenceCashNio,
-                summary.ExpectedCashUsd, session.CountedCashUsd, summary.DifferenceCashUsd, session.ClosingNotes);
+                summary.ExpectedCashUsd, session.CountedCashUsd, summary.DifferenceCashUsd,
+                summary.ExpectedTransferNio, session.CountedTransferNio, summary.DifferenceTransferNio,
+                summary.ExpectedTransferUsd, session.CountedTransferUsd, summary.DifferenceTransferUsd,
+                summary.ExpectedCardNio, session.CountedCardNio, summary.DifferenceCardNio,
+                summary.ExpectedCardUsd, session.CountedCardUsd, summary.DifferenceCardUsd,
+                session.ClosingNotes);
         }
 
         sessions.FinishTable(first);
 
         var days = new XlsxSheet(workbook, "Consolidado por día");
-        days.Title("Consolidado por día (todas las cajas)");
+        days.Title("Consolidado por día (todas las cajas)", "Esperado = lo que el sistema registró. Contado/verificado = lo que se contó en caja, se verificó en el banco o marcó la terminal al cerrar.");
         days.Header(
         [
-            "Fecha", "Cajas", "Ventas", "Anuladas", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia C$", "Tarjeta / POS C$",
-            "Esperado C$", "Contado C$", "Diferencia C$", "Esperado US$", "Contado US$", "Diferencia US$", "Cajas abiertas",
+            "Fecha", "Cajas", "Ventas", "Anuladas", "Descuentos C$", "TOTAL VENDIDO C$", "Efectivo neto C$", "Transferencia (equiv. C$)", "Tarjeta / POS (equiv. C$)",
+            "EFECTIVO esperado C$", "Efectivo contado C$", "Efectivo diferencia C$", "EFECTIVO esperado US$", "Efectivo contado US$", "Efectivo diferencia US$",
+            "TRANSFERENCIA esperada C$", "Transferencia verificada C$", "TRANSFERENCIA esperada US$", "Transferencia verificada US$",
+            "TARJETA esperada C$", "Tarjeta terminal C$", "TARJETA esperada US$", "Tarjeta terminal US$", "Cajas abiertas",
         ],
-        [11, 8, 8, 9, 13, 17, 15, 15, 15, 13, 13, 13, 12, 12, 12, 13], freeze: false);
+        [11, 8, 8, 9, 13, 17, 15, 17, 17, 15, 14, 14, 14, 14, 14, 16, 16, 16, 16, 14, 14, 14, 14, 13], freeze: false);
         first = days.NextRow;
         foreach (var day in summaries.GroupBy(summary => BusinessTime.ToBusinessDate(summary.Session.OpenedAtUtc)).OrderBy(group => group.Key))
         {
@@ -339,23 +353,30 @@ public sealed class ReportService(
             var expectedUsd = day.Sum(summary => summary.ExpectedCashUsd);
             decimal? countedNio = open > 0 ? null : day.Sum(summary => summary.Session.CountedCashNio ?? 0);
             decimal? countedUsd = open > 0 ? null : day.Sum(summary => summary.Session.CountedCashUsd ?? 0);
+            decimal? Verified(Func<CashSummaryDto, decimal?> selector) =>
+                open > 0 || day.Any(summary => selector(summary) is null) ? null : day.Sum(summary => selector(summary)!.Value);
             days.Row(
                 day.Key, day.Count(), day.Sum(s => s.Totals.SalesCount), day.Sum(s => s.Totals.VoidedCount), day.Sum(s => s.Totals.DiscountTotalNio),
                 day.Sum(s => s.Totals.NetTotalNio), day.Sum(s => s.Totals.CashTotalNio), day.Sum(s => s.Totals.TransferTotalNio), day.Sum(s => s.Totals.CardTotalNio),
-                expectedNio, countedNio, countedNio - expectedNio, expectedUsd, countedUsd, countedUsd - expectedUsd, open);
+                expectedNio, countedNio, countedNio - expectedNio, expectedUsd, countedUsd, countedUsd - expectedUsd,
+                day.Sum(s => s.ExpectedTransferNio), Verified(s => s.Session.CountedTransferNio),
+                day.Sum(s => s.ExpectedTransferUsd), Verified(s => s.Session.CountedTransferUsd),
+                day.Sum(s => s.ExpectedCardNio), Verified(s => s.Session.CountedCardNio),
+                day.Sum(s => s.ExpectedCardUsd), Verified(s => s.Session.CountedCardUsd),
+                open);
         }
 
         days.FinishTable(first);
 
         var banks = new XlsxSheet(workbook, "Transferencias por banco");
         banks.Title("Transferencias por banco", $"Del {Format(fromDate)} al {Format(toDate)}");
-        banks.Header(["Banco", "Total C$"], [28, 16], freeze: false);
+        banks.Header(["Banco", "Total (equiv. C$)", "De ese total, recibido en US$"], [28, 18, 24], freeze: false);
         foreach (var bank in summaries.SelectMany(summary => summary.Totals.TransfersByBank)
                      .GroupBy(bank => bank.Bank, StringComparer.OrdinalIgnoreCase)
-                     .Select(group => new BankTotalDto(group.Key, group.Sum(bank => bank.TotalNio)))
+                     .Select(group => new BankTotalDto(group.Key, group.Sum(bank => bank.TotalNio), group.Sum(bank => bank.TotalUsd)))
                      .OrderByDescending(bank => bank.TotalNio))
         {
-            banks.Row(bank.Bank, bank.TotalNio);
+            banks.Row(bank.Bank, bank.TotalNio, bank.TotalUsd);
         }
 
         return Result.Ok(Save(workbook, $"cierres_de_caja_{Iso(fromDate)}_a_{Iso(toDate)}.xlsx"));

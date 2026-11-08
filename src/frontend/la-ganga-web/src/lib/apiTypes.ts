@@ -58,6 +58,11 @@ export type CashSession = {
   countedCashNio: number | null
   countedCashUsd: number | null
   closingNotes: string | null
+  /** Verificado en el banco / según la terminal; null = no se verificó. */
+  countedTransferNio: number | null
+  countedTransferUsd: number | null
+  countedCardNio: number | null
+  countedCardUsd: number | null
 }
 
 export type CashTotals = {
@@ -75,7 +80,13 @@ export type CashTotals = {
   cashTotalNio: number
   transferTotalNio: number
   cardTotalNio: number
-  transfersByBank: { bank: string; totalNio: number }[]
+  transferNioTendered: number
+  transferUsdTendered: number
+  transferUsdEquivalentNio: number
+  cardNioTendered: number
+  cardUsdTendered: number
+  cardUsdEquivalentNio: number
+  transfersByBank: { bank: string; totalNio: number; totalUsd: number }[]
   byChannel: { channel: SaleChannel; salesCount: number; totalNio: number }[]
 }
 
@@ -86,6 +97,14 @@ export type CashSummary = {
   expectedCashUsd: number
   differenceCashNio: number | null
   differenceCashUsd: number | null
+  expectedTransferNio: number
+  expectedTransferUsd: number
+  differenceTransferNio: number | null
+  differenceTransferUsd: number | null
+  expectedCardNio: number
+  expectedCardUsd: number
+  differenceCardNio: number | null
+  differenceCardUsd: number | null
 }
 
 export type CashConsolidated = {
@@ -97,6 +116,24 @@ export type CashConsolidated = {
   countedCashNio: number | null
   countedCashUsd: number | null
   openSessionsCount: number
+  expectedTransferNio: number
+  expectedTransferUsd: number
+  countedTransferNio: number | null
+  countedTransferUsd: number | null
+  expectedCardNio: number
+  expectedCardUsd: number
+  countedCardNio: number | null
+  countedCardUsd: number | null
+}
+
+export type CloseSessionRequest = {
+  countedCashNio: number
+  countedCashUsd: number
+  notes?: string | null
+  countedTransferNio?: number | null
+  countedTransferUsd?: number | null
+  countedCardNio?: number | null
+  countedCardUsd?: number | null
 }
 
 export type SaleRequestLine = { variantId: string; quantity: number; unitPrice: number }

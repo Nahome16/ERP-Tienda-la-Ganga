@@ -161,6 +161,30 @@ public sealed class SalesService(
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var balances = await LockBalancesAsync(variantIds, cancellationToken);
         var now = timeProvider.GetUtcNow();
+
+        // Regla: no se vende lo que no hay. Una venta hecha CON conexión se rechaza si no alcanza el
+        // stock (con las filas bloqueadas, así dos cajas no pueden llevarse la última unidad).
+        // Una venta hecha SIN conexión no se puede rechazar: la prenda y el dinero ya cambiaron de
+        // manos; se acepta y queda marcada para revisión (el POS ya la validó contra su copia local).
+        if (!request.IsOffline)
+        {
+            foreach (var group in lines.GroupBy(line => line.VariantId))
+            {
+                var wanted = group.Sum(line => line.Quantity);
+                var available = balances.TryGetValue(group.Key, out var current) ? current.Quantity : 0;
+                if (available < wanted)
+                {
+                    var info = variantInfo[group.Key];
+                    return Result.Fail<SaleResultDto>(
+                        ServiceErrorKind.Unprocessable,
+                        "insufficient_stock",
+                        available <= 0
+                            ? $"Sin existencias de {info.ProductName} ({info.SizeName}, {info.ColorName})."
+                            : $"Solo quedan {available} unidad(es) de {info.ProductName} ({info.SizeName}, {info.ColorName}) y se piden {wanted}.");
+                }
+            }
+        }
+
         foreach (var group in lines.GroupBy(line => line.VariantId))
         {
             var quantity = group.Sum(line => line.Quantity);
@@ -442,9 +466,9 @@ public sealed class SalesService(
                 return Bad("Cada pago debe ser mayor que cero.", "payments");
             }
 
-            if (payment.Currency == Currency.USD && (payment.Method != PaymentMethod.Cash || payment.ExchangeRate is null or <= 0))
+            if (payment.Currency == Currency.USD && payment.ExchangeRate is null or <= 0)
             {
-                return Bad("Los dólares solo se reciben en efectivo y con la tasa usada.", "payments");
+                return Bad("Los pagos en dólares necesitan la tasa de cambio usada.", "payments");
             }
 
             if (payment.Currency == Currency.NIO && payment.ExchangeRate is not null && payment.ExchangeRate <= 0)

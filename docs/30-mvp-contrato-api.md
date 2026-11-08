@@ -108,6 +108,8 @@ type CashSession = {
   countedCashNio: number | null
   countedCashUsd: number | null
   closingNotes: string | null
+  countedTransferNio: number | null; countedTransferUsd: number | null   // null = no verificado
+  countedCardNio: number | null;     countedCardUsd: number | null
 }
 ```
 
@@ -127,9 +129,15 @@ type CashTotals = {
   cashUsdEquivalentNio: number     // esos dólares convertidos a C$
   changeGivenNio: number           // cambio entregado (siempre C$)
   cashTotalNio: number             // efectivo neto = cashNioTendered + cashUsdEquivalentNio − changeGivenNio
-  transferTotalNio: number
-  cardTotalNio: number             // «POS»: tarjeta con terminal externa
-  transfersByBank: { bank: string; totalNio: number }[]
+  transferTotalNio: number         // equivalente en C$ (incluye las transferencias en US$)
+  cardTotalNio: number             // «POS»: tarjeta con terminal externa (equivalente en C$)
+  transferNioTendered: number      // transferencias recibidas en córdobas
+  transferUsdTendered: number      // transferencias recibidas en dólares (en US$)
+  transferUsdEquivalentNio: number
+  cardNioTendered: number          // cobros con tarjeta en córdobas
+  cardUsdTendered: number          // cobros con tarjeta en dólares (en US$)
+  cardUsdEquivalentNio: number
+  transfersByBank: { bank: string; totalNio: number; totalUsd: number }[]   // totalUsd: parte recibida en US$
   byChannel: { channel: SaleChannel; salesCount: number; totalNio: number }[]
 }
 // Invariante: cashTotalNio + transferTotalNio + cardTotalNio === netTotalNio
@@ -141,12 +149,32 @@ type CashSummary = {
   expectedCashUsd: number          // openingFloatUsd + cashUsdTendered
   differenceCashNio: number | null // contado − esperado (solo si está cerrada)
   differenceCashUsd: number | null
+  expectedTransferNio: number      // = totals.transferNioTendered
+  expectedTransferUsd: number      // = totals.transferUsdTendered
+  differenceTransferNio: number | null  // verificado − esperado (null si no se verificó)
+  differenceTransferUsd: number | null
+  expectedCardNio: number          // = totals.cardNioTendered
+  expectedCardUsd: number          // = totals.cardUsdTendered
+  differenceCardNio: number | null
+  differenceCardUsd: number | null
 }
 ```
 
 `POST /cash/sessions/{id}/close` — dueño o `cash.report.read`:
-`{ countedCashNio, countedCashUsd, notes }` → `CashSummary` ya con diferencias.
-El arqueo se calcula por **moneda** (C$ y US$ por separado).
+
+```ts
+type CloseRequest = {
+  countedCashNio: number; countedCashUsd: number   // efectivo contado (obligatorios; pueden ser 0)
+  notes?: string | null
+  // Verificación opcional (null/omitido = «no se verificó», sin diferencia):
+  countedTransferNio?: number | null; countedTransferUsd?: number | null   // lo que se ve en el banco
+  countedCardNio?: number | null;     countedCardUsd?: number | null       // lo que marca el cierre de lote de la terminal
+}
+```
+
+→ `CashSummary` ya con diferencias. **Cada método se concilia por moneda** contra su
+propia fuente: el efectivo contra el conteo físico, las transferencias contra el
+banco y la tarjeta contra el cierre de lote de la terminal.
 
 `GET /cash/sessions?from=YYYY-MM-DD&to=YYYY-MM-DD` — `cash.report.read`:
 `CashSummary[]` (por fecha de apertura, hora de Managua).
@@ -163,6 +191,10 @@ type CashConsolidated = {
   countedCashNio: number | null    // null si alguna caja sigue abierta
   countedCashUsd: number | null
   openSessionsCount: number
+  expectedTransferNio: number; expectedTransferUsd: number
+  countedTransferNio: number | null; countedTransferUsd: number | null   // null si hay cajas abiertas o sin verificar
+  expectedCardNio: number; expectedCardUsd: number
+  countedCardNio: number | null; countedCardUsd: number | null
 }
 ```
 
@@ -188,7 +220,7 @@ type SaleRequest = {
   discountApprovalId: string | null
   payments: {
     method: PaymentMethod
-    currency: Currency             // USD solo con Cash
+    currency: Currency             // USD en cualquier método (con su tasa)
     amount: number                 // en la moneda indicada (lo entregado)
     exchangeRate: number | null    // obligatorio con USD (la tasa usada)
     bank: string | null            // Transfer
@@ -205,14 +237,17 @@ Reglas del servidor (no confía en totales del cliente):
 2. Descuento sobre `sellerDiscountLimitPercent` (en % equivalente) sin
    `discountApprovalId` válido y sin `sale.discount.unlimited` → 422
    `discount_not_authorized`.
-3. Pagos < total → 422 `payment_insufficient`. El cambio solo sale del efectivo
-   y se entrega en córdobas; si no hay efectivo y sobra pago → 422
+3. Pagos < total → 422 `payment_insufficient`. Los dólares se aceptan en
+   **efectivo, transferencia y tarjeta** (con `exchangeRate`). El cambio solo sale
+   del efectivo y se entrega en córdobas; si no hay efectivo y sobra pago → 422
    `payment_exceeds_total`.
 4. Variante inexistente → 422 `variant_not_found`. Una variante **inactiva**
    se acepta y la venta queda para revisión.
 5. La venta **siempre se acepta** si es válida (la prenda ya se entregó):
-   - stock insuficiente → se acepta, el saldo puede quedar negativo y la venta
-     queda `requiresReview = true` con nota;
+   - **stock insuficiente: una venta hecha con conexión (`isOffline: false`) se
+     rechaza con 422 `insufficient_stock`** (el saldo nunca queda negativo); solo
+     una venta hecha sin conexión (`isOffline: true`) se acepta con el saldo
+     negativo y `requiresReview = true`, porque la prenda ya se entregó;
    - `unitPrice` distinto del vigente, o tasa USD distinta de la vigente →
      se acepta con la nota correspondiente y `requiresReview = true`;
    - caja ya cerrada al sincronizar → se acepta y se marca para revisión.

@@ -98,6 +98,16 @@ public sealed class CashSession
 
     public decimal? CountedCashUsd { get; private set; }
 
+    /// <summary>Total de transferencias verificado en el banco (null = no se verificó).</summary>
+    public decimal? CountedTransferNio { get; private set; }
+
+    public decimal? CountedTransferUsd { get; private set; }
+
+    /// <summary>Total de tarjeta según el cierre de lote de la terminal (null = no se verificó).</summary>
+    public decimal? CountedCardNio { get; private set; }
+
+    public decimal? CountedCardUsd { get; private set; }
+
     public string? ClosingNotes { get; private set; }
 
     public bool IsOpen => ClosedAtUtc is null;
@@ -107,12 +117,20 @@ public sealed class CashSession
         DateTimeOffset closedAtUtc,
         decimal countedCashNio,
         decimal countedCashUsd,
-        string? notes)
+        string? notes,
+        decimal? countedTransferNio = null,
+        decimal? countedTransferUsd = null,
+        decimal? countedCardNio = null,
+        decimal? countedCardUsd = null)
     {
         ClosedByUserId = closedByUserId;
         ClosedAtUtc = closedAtUtc;
         CountedCashNio = countedCashNio;
         CountedCashUsd = countedCashUsd;
+        CountedTransferNio = countedTransferNio;
+        CountedTransferUsd = countedTransferUsd;
+        CountedCardNio = countedCardNio;
+        CountedCardUsd = countedCardUsd;
         ClosingNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 }

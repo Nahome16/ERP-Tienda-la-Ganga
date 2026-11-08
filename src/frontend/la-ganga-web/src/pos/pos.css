@@ -295,3 +295,4 @@
 }
 @media (prefers-reduced-motion: reduce) { .pv-spinner, .pv-conn-syncing i { animation: none; } }
 @media print { .pv-page, .pv-overlay, .pv-toasts { display: none !important; } }
+.pv-size:disabled { cursor: not-allowed; opacity: .6; }
