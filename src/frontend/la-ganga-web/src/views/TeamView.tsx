@@ -13,6 +13,7 @@ import {
   type UserSummary,
 } from '../lib/usersApi'
 import type { CurrentUser } from '../types'
+import { Plus } from 'lucide-react'
 
 type DataState =
   | { key: number; kind: 'ready'; users: UserSummary[]; roles: Role[] }
@@ -75,7 +76,7 @@ export function TeamView({ currentUser, isPreview }: { currentUser: CurrentUser;
         </div>
         {!isPreview && ready && (
           <div className="page-actions">
-            <button className="primary-button" type="button" onClick={() => setDialog({ kind: 'create' })}>＋ Nueva cuenta</button>
+            <button className="primary-button" type="button" onClick={() => setDialog({ kind: 'create' })}><Plus size={16} strokeWidth={2} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />Nueva cuenta</button>
           </div>
         )}
       </header>

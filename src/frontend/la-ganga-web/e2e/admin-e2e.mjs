@@ -84,7 +84,7 @@ console.log('Creación de producto y etiquetas')
 {
   const { mock, page, context } = await open('productos')
   check(await visible(page.getByText('Camisa Oxford')), 'lista productos')
-  await page.getByRole('button', { name: '＋ Nuevo producto' }).click()
+  await page.getByRole('button', { name: 'Nuevo producto' }).click()
   const dialog = page.getByRole('dialog', { name: 'Nuevo producto' })
   await dialog.getByLabel('Nombre del producto').fill('Polo Básico')
   await dialog.getByLabel('Categoría').selectOption({ label: 'Camisas' })

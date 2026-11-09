@@ -10,6 +10,7 @@ import { ProductDetailDialog } from '../admin/ProductDetailDialog'
 import { CreateProductDialog } from '../admin/ProductDialogs'
 import { LoadError, Notice, Pagination, Spinner, Tag } from '../admin/ui'
 import { categoryOptions, useCatalogs } from '../admin/useCatalogs'
+import { Plus, Search } from 'lucide-react'
 
 const pageSize = 25
 
@@ -47,7 +48,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
         {canCreate && (
           <div className="page-actions">
             <button type="button" className="secondary-button" onClick={() => setImporting(true)} disabled={!catalogs.data}>Importar</button>
-            <button type="button" className="primary-button" onClick={() => setCreating(true)} disabled={!catalogs.data}>＋ Nuevo producto</button>
+            <button type="button" className="primary-button" onClick={() => setCreating(true)} disabled={!catalogs.data}><Plus size={16} strokeWidth={2} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />Nuevo producto</button>
           </div>
         )}
       </header>
@@ -58,7 +59,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
       <section className="panel-card adm-card">
         <div className="adm-toolbar">
           <label className="catalog-search grow">
-            <span aria-hidden="true">⌕</span>
+            <Search size={18} strokeWidth={1.75} aria-hidden="true" />
             <input
               type="search" placeholder="Buscar por nombre, marca o código de barras" aria-label="Buscar productos"
               value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1) }}

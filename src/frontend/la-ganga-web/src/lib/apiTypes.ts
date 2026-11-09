@@ -311,6 +311,8 @@ export type InventoryRow = {
   /** Solo con investment.read: existencias por socio y, con filtro de socio, las unidades de ese socio. */
   partners?: PartnerUnits[]
   partnerStock?: number
+  /** Miniatura de la foto principal del producto. */
+  imageUrl?: string | null
 }
 
 export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid'

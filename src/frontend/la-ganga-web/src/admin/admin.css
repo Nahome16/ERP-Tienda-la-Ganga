@@ -77,7 +77,7 @@
 .adm-dialog { display: flex; flex-direction: column; width: min(560px, 100%); max-height: calc(100vh - 32px); border-radius: 16px; background: var(--paper); box-shadow: 0 24px 70px rgba(4, 30, 34, .35); }
 .adm-dialog.wide { width: min(1060px, 100%); }
 .adm-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 10px; }
-.adm-dialog-head h2 { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 1.3rem; }
+.adm-dialog-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.3rem; }
 .adm-dialog-head p { margin: 3px 0 0; color: var(--muted); font-size: .78rem; }
 .adm-dialog-body { flex: 1; overflow-y: auto; padding: 6px 20px 16px; }
 .adm-dialog-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #efe4d3; }
@@ -355,7 +355,7 @@
 .inv-failures { margin: 6px 0 0; padding-left: 18px; }
 .inv-detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 14px; }
 .inv-detail-head > div { flex: 1 1 260px; min-width: 0; }
-.inv-detail-title { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 1.5rem; overflow-wrap: anywhere; }
+.inv-detail-title { margin: 0; font-family: var(--font-display); font-size: 1.5rem; overflow-wrap: anywhere; }
 .inv-detail-sub { margin: 2px 0 0; overflow-wrap: anywhere; }
 .inv-lots { min-width: 0; }
 .inv-lots .adm-field-inline select, .inv-lots .adm-field-inline input[type="search"] { min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: .82rem; }
@@ -368,3 +368,9 @@
   .inv-lots .adm-toolbar > .primary-button { width: 100%; }
   .inv-detail-head > .secondary-button { width: 100%; }
 }
+
+/* Inventario: foto + nombre del producto */
+.inv-product-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.inv-product-cell > div { display: flex; min-width: 0; flex-direction: column; }
+.inv-product-cell .row-title { font-weight: 650; }
+@media (min-width: 1100px) { .dashboard-page .adm-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
