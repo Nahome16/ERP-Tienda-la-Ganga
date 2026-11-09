@@ -24,6 +24,8 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence("barcode_seq", "inventory");
 
+            modelBuilder.HasSequence("exchange_number_seq", "sales");
+
             modelBuilder.HasSequence("sale_number_seq", "sales");
 
             modelBuilder.Entity("LaGanga.Domain.Catalog.Brand", b =>
@@ -484,10 +486,10 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("NormalizedUsername")
+                    b.HasIndex("NormalizedEmail")
                         .IsUnique();
 
-                    b.HasIndex("NormalizedEmail")
+                    b.HasIndex("NormalizedUsername")
                         .IsUnique();
 
                     b.ToTable("users", "identity");
@@ -1170,6 +1172,127 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LaGanga.Domain.Sales.SaleExchange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CashSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientExchangeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("Number")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValueSql("nextval('sales.exchange_number_seq')");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CashSessionId");
+
+                    b.HasIndex("ClientExchangeId")
+                        .IsUnique();
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("sale_exchanges", "sales");
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Sales.SaleExchangeLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ExchangeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NewBarcode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("NewColorName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("NewSizeName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid>("NewVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReturnedBarcode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReturnedColorName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("ReturnedSizeName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid>("ReturnedVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SaleLineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExchangeId");
+
+                    b.HasIndex("NewVariantId");
+
+                    b.HasIndex("ReturnedVariantId");
+
+                    b.HasIndex("SaleLineId");
+
+                    b.ToTable("sale_exchange_lines", "sales", t =>
+                        {
+                            t.HasCheckConstraint("CK_sale_exchange_lines_quantity", "\"Quantity\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("LaGanga.Domain.Sales.SaleLine", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1323,6 +1446,11 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text[]");
 
+                    b.Property<int>("ExchangeWindowDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(4);
+
                     b.Property<int>("LowStockThreshold")
                         .HasColumnType("integer");
 
@@ -1366,6 +1494,8 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
 
                     b.ToTable("store_settings", "system", t =>
                         {
+                            t.HasCheckConstraint("CK_store_settings_exchange_window", "\"ExchangeWindowDays\" BETWEEN 0 AND 365");
+
                             t.HasCheckConstraint("CK_store_settings_limit", "\"SellerDiscountLimitPercent\" BETWEEN 0 AND 100");
 
                             t.HasCheckConstraint("CK_store_settings_rate", "\"UsdRate\" > 0");
@@ -1378,6 +1508,7 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         {
                             Id = 1,
                             Banks = new string[0],
+                            ExchangeWindowDays = 4,
                             LowStockThreshold = 2,
                             ReceiptFooter = "Recibo interno — no es factura",
                             SellerDiscountLimitPercent = 10m,
@@ -1714,6 +1845,53 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.Navigation("CashSession");
                 });
 
+            modelBuilder.Entity("LaGanga.Domain.Sales.SaleExchange", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Sales.CashSession", null)
+                        .WithMany()
+                        .HasForeignKey("CashSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LaGanga.Domain.Sales.Sale", null)
+                        .WithMany()
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LaGanga.Domain.Identity.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Sales.SaleExchangeLine", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Sales.SaleExchange", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ExchangeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LaGanga.Domain.Inventory.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("NewVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LaGanga.Domain.Inventory.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("ReturnedVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LaGanga.Domain.Sales.SaleLine", null)
+                        .WithMany()
+                        .HasForeignKey("SaleLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("LaGanga.Domain.Sales.SaleLine", b =>
                 {
                     b.HasOne("LaGanga.Domain.Sales.Sale", null)
@@ -1779,6 +1957,11 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.Navigation("Lines");
 
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Sales.SaleExchange", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }
