@@ -10,12 +10,6 @@ export type StoreSettings = {
   storeName: string
   storeAddress: string
   storePhone: string
-  /** Nombre del contribuyente inscrito en la DGI. */
-  ownerName: string
-  /** RUC del contribuyente. */
-  taxId: string
-  /** Leyenda opcional del régimen (p. ej. «Contribuyente Régimen de Cuota Fija»). */
-  receiptLegend: string
   receiptFooter: string
   banks: string[]
   sellerDiscountLimitPercent: number

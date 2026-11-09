@@ -131,37 +131,6 @@ public sealed class SettingsService(
             settings.StorePhone = phone.Trim();
         }
 
-        if (input.OwnerName is { } owner)
-        {
-            if (owner.Trim().Length > 120)
-            {
-                return Invalid("ownerName", "El nombre del contribuyente admite hasta 120 caracteres.");
-            }
-
-            settings.OwnerName = owner.Trim();
-        }
-
-        if (input.TaxId is { } taxId)
-        {
-            var ruc = taxId.Trim().ToUpperInvariant();
-            if (ruc.Length > 30 || !ruc.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'))
-            {
-                return Invalid("taxId", "El RUC solo admite letras, números y guiones (hasta 30 caracteres).");
-            }
-
-            settings.TaxId = ruc;
-        }
-
-        if (input.ReceiptLegend is { } legend)
-        {
-            if (legend.Trim().Length > 120)
-            {
-                return Invalid("receiptLegend", "La leyenda del recibo admite hasta 120 caracteres.");
-            }
-
-            settings.ReceiptLegend = legend.Trim();
-        }
-
         if (input.ReceiptFooter is { } footer)
         {
             if (footer.Trim().Length > 250)
@@ -225,9 +194,6 @@ public sealed class SettingsService(
             settings.StoreName,
             settings.StoreAddress,
             settings.StorePhone,
-            settings.OwnerName,
-            settings.TaxId,
-            settings.ReceiptLegend,
             settings.ReceiptFooter,
             settings.Banks,
             settings.SellerDiscountLimitPercent,

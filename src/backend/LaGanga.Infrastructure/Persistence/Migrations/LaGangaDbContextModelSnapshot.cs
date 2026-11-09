@@ -484,10 +484,10 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("NormalizedEmail")
+                    b.HasIndex("NormalizedUsername")
                         .IsUnique();
 
-                    b.HasIndex("NormalizedUsername")
+                    b.HasIndex("NormalizedEmail")
                         .IsUnique();
 
                     b.ToTable("users", "identity");
@@ -1326,20 +1326,10 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.Property<int>("LowStockThreshold")
                         .HasColumnType("integer");
 
-                    b.Property<string>("OwnerName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
                     b.Property<string>("ReceiptFooter")
                         .IsRequired()
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
-
-                    b.Property<string>("ReceiptLegend")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
 
                     b.Property<decimal>("SellerDiscountLimitPercent")
                         .HasPrecision(5, 2)
@@ -1359,11 +1349,6 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<string>("TaxId")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1394,14 +1379,11 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                             Id = 1,
                             Banks = new string[0],
                             LowStockThreshold = 2,
-                            OwnerName = "",
                             ReceiptFooter = "Recibo interno — no es factura",
-                            ReceiptLegend = "",
                             SellerDiscountLimitPercent = 10m,
                             StoreAddress = "",
                             StoreName = "Tienda La Ganga",
                             StorePhone = "",
-                            TaxId = "",
                             UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             UsdRate = 36.7m
                         });

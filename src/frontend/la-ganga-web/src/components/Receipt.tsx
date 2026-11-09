@@ -21,11 +21,8 @@ export function Receipt({ sale, settings }: ReceiptProps) {
     <div className="receipt-sheet">
       <ReceiptLogo />
       <h1>{settings.storeName}</h1>
-      {settings.ownerName && <div className="receipt-center">{settings.ownerName}</div>}
-      {settings.taxId && <div className="receipt-center">RUC {settings.taxId}</div>}
       {settings.storeAddress && <div className="receipt-center">{settings.storeAddress}</div>}
       {settings.storePhone && <div className="receipt-center">Tel. {settings.storePhone}</div>}
-      {settings.receiptLegend && <div className="receipt-center receipt-small">{settings.receiptLegend}</div>}
       <hr className="receipt-rule" />
       <div className="receipt-center receipt-title">RECIBO DE VENTA</div>
       <div className="receipt-row"><span>N.º</span><strong>{sale.number}</strong></div>

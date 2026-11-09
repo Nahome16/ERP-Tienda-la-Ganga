@@ -10,7 +10,7 @@ import { useFetch } from './hooks'
 import { Dialog, Notice, Row, Tag } from './ui'
 
 const fallbackSettings: StoreSettings = {
-  usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: '', storePhone: '', ownerName: '', taxId: '', receiptLegend: '',
+  usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: '', storePhone: '',
   receiptFooter: 'Recibo interno — no es factura', banks: [], sellerDiscountLimitPercent: 10, lowStockThreshold: 2,
 }
 

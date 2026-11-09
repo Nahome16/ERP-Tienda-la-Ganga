@@ -22,9 +22,6 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
         builder.Property(settings => settings.StoreName).HasMaxLength(120).IsRequired();
         builder.Property(settings => settings.StoreAddress).HasMaxLength(250).IsRequired();
         builder.Property(settings => settings.StorePhone).HasMaxLength(50).IsRequired();
-        builder.Property(settings => settings.OwnerName).HasMaxLength(120).IsRequired();
-        builder.Property(settings => settings.TaxId).HasMaxLength(30).IsRequired();
-        builder.Property(settings => settings.ReceiptLegend).HasMaxLength(120).IsRequired();
         builder.Property(settings => settings.ReceiptFooter).HasMaxLength(250).IsRequired();
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(settings => settings.UpdatedBy).OnDelete(DeleteBehavior.Restrict);
         builder.HasData(new
@@ -34,9 +31,6 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
             StoreName = "Tienda La Ganga",
             StoreAddress = string.Empty,
             StorePhone = string.Empty,
-            OwnerName = string.Empty,
-            TaxId = string.Empty,
-            ReceiptLegend = string.Empty,
             ReceiptFooter = "Recibo interno — no es factura",
             Banks = Array.Empty<string>(),
             SellerDiscountLimitPercent = 10m,
