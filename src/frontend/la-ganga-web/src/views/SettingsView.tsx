@@ -125,7 +125,7 @@ function SettingsForm({ initial, canManage }: { initial: StoreSettings; canManag
           </label>
           <label className="adm-field">
             <span>Pie del recibo</span>
-            <input value={form.receiptFooter} maxLength={200} disabled={!canManage} onChange={(event) => update({ receiptFooter: event.target.value })} />
+            <input value={form.receiptFooter} maxLength={200} disabled={!canManage} placeholder="Ej.: Cambios en 7 días con recibo y etiqueta" onChange={(event) => update({ receiptFooter: event.target.value })} />
           </label>
         </section>
       </div>

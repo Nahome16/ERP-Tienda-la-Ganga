@@ -1,10 +1,12 @@
 .receipt-sheet { font-family: 'Courier New', ui-monospace, monospace; font-size: 12px; line-height: 1.35; color: #000; background: #fff; width: 80mm; max-width: 100%; padding: 4mm; margin: 0 auto; box-sizing: border-box; }
+.receipt-sheet .receipt-logo { display: block; width: 22mm; max-width: 40%; height: auto; margin: 0 auto 1.5mm; }
 .receipt-sheet h1 { font-size: 15px; margin: 0; text-align: center; }
 .receipt-sheet .receipt-center { text-align: center; }
 .receipt-sheet .receipt-row { display: flex; justify-content: space-between; gap: 6px; }
 .receipt-sheet .receipt-rule { border: 0; border-top: 1px dashed #000; margin: 6px 0; }
 .receipt-sheet .receipt-line-name { font-weight: 700; }
 .receipt-sheet .receipt-total { font-size: 14px; font-weight: 700; }
+.receipt-sheet .receipt-title { margin-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: .08em; }
 .receipt-sheet .receipt-bold { font-weight: 700; }
 .receipt-sheet .receipt-small { font-size: 10px; }
 .receipt-sheet .receipt-sign { margin-top: 18px; }
@@ -16,5 +18,6 @@
   body.printing-receipt > *:not(.receipt-print-root) { display: none !important; }
   body.printing-receipt .receipt-print-root { display: block !important; }
   body.printing-receipt .receipt-sheet { width: 80mm; padding: 2mm; margin: 0; }
+  body.printing-receipt .receipt-logo { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 .receipt-print-root { display: none; }
