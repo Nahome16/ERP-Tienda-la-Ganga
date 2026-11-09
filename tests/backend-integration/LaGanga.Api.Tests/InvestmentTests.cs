@@ -227,6 +227,47 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
     private async Task<Guid> CreatePartnerAsync(string name) =>
         (await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/investment/partners", new { name, phone = "8888-0000", notes = (string?)null }, HttpStatusCode.Created)).GetProperty("id").GetGuid();
 
+    [PostgresFact]
+    public async Task ProductEntryKeepsTheReceivedDateAndRejectsFutureDates()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var partner = await CreatePartnerAsync($"Fecha {suffix}");
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-6)).DateTime);
+
+        var future = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products",
+            await ProductBodyAsync($"Camisa futura {suffix}", 500m, 2, 200m, partner, today.AddDays(2)));
+        Assert.Equal(HttpStatusCode.BadRequest, future.StatusCode);
+
+        var received = today.AddDays(-3);
+        _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products",
+            await ProductBodyAsync($"Camisa oxford fecha {suffix}", 500m, 4, 200m, partner, received), HttpStatusCode.Created);
+        var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Camisa oxford fecha {suffix}")}");
+        var lot = Assert.Single(lots.GetProperty("items").EnumerateArray());
+        var entered = lot.GetProperty("enteredAtUtc").GetDateTimeOffset().ToOffset(TimeSpan.FromHours(-6));
+        Assert.Equal(received, DateOnly.FromDateTime(entered.DateTime));
+        Assert.Equal(4, lot.GetProperty("quantityIn").GetInt32());
+    }
+
+    private async Task<object> ProductBodyAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId, DateOnly? receivedOn)
+    {
+        async Task<Guid[]> Ids(string kind)
+        {
+            var page = await GetAsync(fixture.Admin, $"/api/v1/catalog/{kind}?pageSize=100");
+            return page.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        }
+
+        return new
+        {
+            name,
+            categoryId = (await Ids("categories"))[0],
+            brandId = (await Ids("brands"))[0],
+            cutId = (Guid?)null,
+            basePrice = price,
+            receivedOn = receivedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            variants = new[] { new { sizeId = (await Ids("sizes"))[0], colorId = (await Ids("colors"))[0], barcode = (string?)null, priceOverride = (decimal?)null, cost, initialQuantity = quantity, partnerId } },
+        };
+    }
+
     private async Task<JsonElement> CreateProductAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId)
     {
         async Task<Guid[]> Ids(string kind)

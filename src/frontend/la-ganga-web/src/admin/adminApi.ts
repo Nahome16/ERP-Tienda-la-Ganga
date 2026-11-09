@@ -57,7 +57,7 @@ export type VariantInput = {
 }
 export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number }
 
-export const createProduct = (input: ProductInput & { variants: VariantInput[] }) =>
+export const createProduct = (input: ProductInput & { variants: VariantInput[]; receivedOn?: string }) =>
   apiRequest<ProductDetail>(`${v1}/products`, { method: 'POST', body: input })
 export const updateProduct = (product: { id: string; version: number }, input: ProductInput & { isActive: boolean }) =>
   apiRequest<ProductListItem>(`${v1}/products/${product.id}`, { method: 'PUT', body: input, ifMatch: product.version })

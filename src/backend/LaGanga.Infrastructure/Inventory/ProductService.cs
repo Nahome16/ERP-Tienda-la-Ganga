@@ -1,3 +1,4 @@
+using System.Globalization;
 using LaGanga.Application.Common;
 using LaGanga.Application.Inventory;
 using LaGanga.Application.Settings;
@@ -136,12 +137,19 @@ public sealed class ProductService : IProductService
         }
 
         var now = timeProvider.GetUtcNow();
+        var today = BusinessTime.ToBusinessDate(now);
+        if (input.ReceivedOn is { } receivedOn && (receivedOn > today || receivedOn < today.AddDays(-MaxReceivedDaysBack)))
+        {
+            return Invalid("receivedOn", $"La fecha de ingreso no puede ser futura ni de hace más de {MaxReceivedDaysBack} días.");
+        }
+
+        var received = ReceivedMoment(input.ReceivedOn, today, now);
         var product = new Product(
             Guid.NewGuid(), name, input.CategoryId, input.BrandId, input.CutId, input.BasePrice.Value, actor.UserId, now);
         dbContext.Products.Add(product);
         foreach (var variantInput in input.Variants)
         {
-            await AddVariantCoreAsync(product, variantInput, actor, now, cancellationToken);
+            await AddVariantCoreAsync(product, variantInput, actor, now, cancellationToken, received);
         }
 
         audit.Add(actor.UserId, "product.created", "Product", product.Id.ToString(), $"Producto «{product.Name}» con {input.Variants.Count} variante(s).");
@@ -495,7 +503,8 @@ public sealed class ProductService : IProductService
         NewVariantInput input,
         Actor actor,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        (DateTimeOffset EnteredAtUtc, string Note)? received = null)
     {
         var barcode = input.Barcode?.Trim() ?? string.Empty;
         if (barcode.Length == 0)
@@ -510,11 +519,30 @@ public sealed class ProductService : IProductService
         {
             dbContext.Movements.Add(new InventoryMovement(
                 Guid.NewGuid(), variant.Id, MovementType.InitialStock, input.InitialQuantity, input.InitialQuantity,
-                "Existencia inicial", null, actor.UserId, now));
+                received?.Note ?? "Existencia inicial", null, actor.UserId, now));
             lots.AddLot(
                 variant.Id, input.PartnerId, LotSource.InitialStock, input.InitialQuantity, 0,
-                input.Cost, input.PriceOverride ?? product.BasePrice, "Existencia inicial", actor.UserId, now);
+                input.Cost, input.PriceOverride ?? product.BasePrice, received?.Note ?? "Existencia inicial", actor.UserId, received?.EnteredAtUtc ?? now);
         }
+    }
+
+    /// <summary>Días hacia atrás que se acepta como fecha de ingreso de la mercadería.</summary>
+    private const int MaxReceivedDaysBack = 365;
+
+    /// <summary>
+    /// Momento de la entrada (PEPS) para una fecha de ingreso anterior a hoy: el mediodía de ese día en
+    /// Managua. Hoy o sin fecha: el momento actual. El Kardex siempre guarda cuándo se registró.
+    /// </summary>
+    private static (DateTimeOffset EnteredAtUtc, string Note)? ReceivedMoment(DateOnly? receivedOn, DateOnly today, DateTimeOffset now)
+    {
+        if (receivedOn is not { } date || date >= today)
+        {
+            return null;
+        }
+
+        var note = string.Create(CultureInfo.InvariantCulture, $"Existencia inicial (ingresó el {date:dd/MM/yyyy})");
+        var enteredAt = BusinessTime.DayRangeUtc(date).StartUtc.AddHours(12);
+        return (enteredAt < now ? enteredAt : now, note);
     }
 
     private async Task<ProductDetailDto?> LoadDetailAsync(Guid id, bool includeCost, CancellationToken cancellationToken)

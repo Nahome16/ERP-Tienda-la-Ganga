@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogItem } from '../lib/catalogApi'
 import {
-  assignScannedBarcodes, builderToInputs, combosOf, emptyBuilder, resolveVariantPartner, setDraft, totalInitialUnits, type BuilderState,
+  assignScannedBarcodes, builderToInputs, cellUnits, withDefaultCost, combosOf, emptyBuilder, resolveVariantPartner, setDraft, totalInitialUnits, type BuilderState,
 } from './variantBuilderLogic'
 
 const item = (id: string, name: string): CatalogItem => ({ id, name, isActive: true, sortOrder: 1, version: 1, parentId: null, sizeGroupId: null, swatchHex: null, updatedAtUtc: '' })
@@ -79,5 +79,24 @@ describe('assignScannedBarcodes', () => {
     const result = assignScannedBarcodes(state, combosOf(state, sizes, colors), ['999'], new Set(['s|azul']))
     expect(result.state.drafts['m|azul']?.barcode).toBe('999')
     expect(result.state.drafts['s|azul']).toBeUndefined()
+  })
+})
+
+describe('withDefaultCost y cellUnits', () => {
+  it('aplica el costo general solo donde no hay costo propio', () => {
+    let next: BuilderState = { ...emptyBuilder, sizeIds: ['s1', 's2'], colorIds: ['c1'] }
+    next = setDraft(next, 's1|c1', { cost: '90' })
+    const result = withDefaultCost(next, combosOf(next, sizes, colors), '120')
+    expect(result.drafts['s1|c1']?.cost).toBe('90')
+    expect(result.drafts['s2|c1']?.cost).toBe('120')
+    expect(withDefaultCost(next, combosOf(next, sizes, colors), '  ')).toBe(next)
+  })
+
+  it('cuenta solo enteros positivos', () => {
+    let next = setDraft(emptyBuilder, 'a', { qty: '3' })
+    next = setDraft(next, 'b', { qty: '1.5' })
+    expect(cellUnits(next, 'a')).toBe(3)
+    expect(cellUnits(next, 'b')).toBe(0)
+    expect(cellUnits(next, 'zz')).toBe(0)
   })
 })

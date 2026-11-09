@@ -78,7 +78,8 @@ public sealed record CreateProductInput(
     Guid BrandId,
     Guid? CutId,
     decimal? BasePrice,
-    IReadOnlyList<NewVariantInput>? Variants);
+    IReadOnlyList<NewVariantInput>? Variants,
+    DateOnly? ReceivedOn = null);
 
 public sealed record UpdateProductInput(
     string? Name,

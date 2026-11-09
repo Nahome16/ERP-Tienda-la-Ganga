@@ -389,3 +389,16 @@
 .adm-scan-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border: 1px solid var(--line, #e4dccd); border-radius: 999px; background: var(--paper, #fff); font-family: ui-monospace, monospace; font-size: .82rem; }
 .adm-scan-chip button { min-width: 24px; min-height: 24px; border: 0; border-radius: 999px; background: transparent; color: inherit; font-size: 1rem; cursor: pointer; }
 .adm-scan-hint { margin: 0 0 14px; color: var(--muted, #6d6860); font-size: .8rem; }
+
+/* Alta de producto por pasos */
+.adm-step { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; color: var(--ink, #153a45); font-size: .98rem; font-weight: 800; }
+.adm-step:first-child { margin-top: 0; }
+.adm-step > span { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: var(--teal, #1d6b72); color: #fff; font-size: .82rem; }
+.adm-matrix .adm-matrix-total { font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.adm-matrix tfoot th, .adm-matrix tfoot td { border-top: 2px solid var(--line, #e4dccd); }
+.adm-matrix .adm-matrix-grand { color: var(--teal, #1d6b72); font-size: 1.05rem; }
+.adm-entry-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0; }
+.adm-entry-summary > div { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line, #e4dccd); border-radius: 12px; background: var(--paper, #fff); }
+.adm-entry-summary span { color: var(--muted, #6d6860); font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.adm-entry-summary strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.adm-entry-summary small { color: var(--muted, #6d6860); font-size: .76rem; }
