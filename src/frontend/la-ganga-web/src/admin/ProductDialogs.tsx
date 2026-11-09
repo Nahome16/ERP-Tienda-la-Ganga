@@ -1,4 +1,5 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
+import type { CatalogItem } from '../lib/catalogApi'
 import { ScanBarcode } from 'lucide-react'
 import { ApiError } from '../lib/api'
 import type { CurrentUser } from '../types'
@@ -25,6 +26,16 @@ function describeError(error: unknown): string {
     return details.length > 0 ? `${error.message} ${details.join(' ')}` : error.message
   }
   return messageFrom(error)
+}
+
+/** Colores creados desde el diálogo: se suman a los del catálogo hasta que la lista se recargue. */
+function useCatalogsWithNewColors(base: Catalogs) {
+  const [extra, setExtra] = useState<CatalogItem[]>([])
+  const catalogs = useMemo(() => {
+    const known = new Set(base.colors.map((color) => color.id))
+    return { ...base, colors: [...base.colors, ...extra.filter((color) => !known.has(color.id))] }
+  }, [base, extra])
+  return { catalogs, addColor: (color: CatalogItem) => setExtra((current) => [...current, color]) }
 }
 
 type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: string }
@@ -97,7 +108,7 @@ function validateFields(fields: ProductFields): { input: ProductInput | null; er
 }
 
 /** Alta de producto con su matriz de variantes. */
-export function CreateProductDialog({ user, catalogs, onClose, onCreated, initialBarcode, onOpenExisting }: {
+export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onCreated, initialBarcode, onOpenExisting }: {
   user: CurrentUser; catalogs: Catalogs; onClose: () => void
   /** `images` solo viene si se eligieron fotos; `failed` lista las que no se pudieron subir. */
   onCreated: (product: ProductDetail, images?: UploadReport) => void
@@ -107,6 +118,8 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated, initia
   onOpenExisting?: (productId: string) => void
 }) {
   const canImages = hasPermission(user, 'product.images.manage')
+  const canCreateColors = hasPermission(user, 'catalog.manage')
+  const { catalogs, addColor } = useCatalogsWithNewColors(baseCatalogs)
   const [pending, setPending] = useState<File[]>([])
   const [progress, setProgress] = useState<string | null>(null)
   const canCost = hasPermission(user, 'inventory.cost.read')
@@ -266,7 +279,7 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated, initia
         <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice />
 
         <h3 className="adm-step"><span>2</span>Colores, tallas y cantidades</h3>
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={(next) => { changeBuilder(next) }} canCost={canCost} canPartners={canPartners} externalEntry />
+        <VariantBuilder catalogs={catalogs} state={builder} onChange={(next) => { changeBuilder(next) }} canCost={canCost} canPartners={canPartners} externalEntry onColorCreated={canCreateColors ? addColor : undefined} />
 
         <h3 className="adm-step"><span>3</span>Ingreso: socio, costo y precio</h3>
         <div className="adm-grid-2">
@@ -442,12 +455,14 @@ export function EditVariantDialog({ variant, label, canCost, onClose, onSaved, o
 }
 
 /** Agrega variantes nuevas (talla × color) a un producto existente, una por una. */
-export function AddVariantsDialog({ product, catalogs, user, onClose, onDone, onChanged }: {
+export function AddVariantsDialog({ product, catalogs: baseCatalogs, user, onClose, onDone, onChanged }: {
   product: ProductDetail; catalogs: Catalogs; user: CurrentUser; onClose: () => void; onDone: () => void; onChanged: () => void
 }) {
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
   const canPartners = hasPermission(user, 'investment.read')
+  const { catalogs, addColor } = useCatalogsWithNewColors(baseCatalogs)
+  const canCreateColors = hasPermission(user, 'catalog.manage')
   const existing = new Set(product.variants.map((variant) => `${variant.sizeId}|${variant.colorId}`))
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
   const [saving, setSaving] = useState(false)
@@ -493,7 +508,7 @@ export function AddVariantsDialog({ product, catalogs, user, onClose, onDone, on
       )}
     >
       <form id="add-variants-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} />
+        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} onColorCreated={canCreateColors ? addColor : undefined} />
         {error && <Notice tone="error">{error}</Notice>}
       </form>
     </Dialog>

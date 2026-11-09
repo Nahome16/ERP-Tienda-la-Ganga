@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import type { CatalogItem } from '../lib/catalogApi'
+import { NewColorPanel } from './ColorPicker'
 import type { Catalogs } from './useCatalogs'
 import { PartnerSelect, PartnersHint } from './PartnerSelect'
 import { Swatch } from './ui'
@@ -18,10 +20,13 @@ type Props = {
   existing?: Set<string>
   /** El socio y el costo general se piden fuera (sección «Ingreso» del alta). */
   externalEntry?: boolean
+  /** Con permiso de catálogos: crea un color nuevo y lo marca (el padre lo suma a la lista). */
+  onColorCreated?: (color: CatalogItem) => void
 }
 
 /** Elige tallas y colores y arma la matriz talla × color con cantidades iniciales. */
-export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners = false, existing, externalEntry = false }: Props) {
+export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners = false, existing, externalEntry = false, onColorCreated }: Props) {
+  const [creatingColor, setCreatingColor] = useState(false)
   const [groupId, setGroupId] = useState('')
   const [colorFilter, setColorFilter] = useState('')
   const [bulkQty, setBulkQty] = useState('')
@@ -62,13 +67,25 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
         <legend>Colores</legend>
         <div className="adm-toolbar" style={{ marginBottom: 8 }}>
           <input type="search" className="grow" placeholder="Buscar color" aria-label="Buscar color" value={colorFilter} onChange={(event) => setColorFilter(event.target.value)} />
+          {onColorCreated && !creatingColor && <button type="button" className="secondary-button" onClick={() => setCreatingColor(true)}>+ Nuevo color</button>}
         </div>
+        {onColorCreated && creatingColor && (
+          <NewColorPanel
+            existing={catalogs.colors}
+            onCancel={() => setCreatingColor(false)}
+            onCreated={(color) => {
+              onColorCreated(color)
+              onChange({ ...state, colorIds: toggleId(state.colorIds, color.id, true) })
+              setColorFilter('')
+            }}
+          />
+        )}
         {catalogs.colors.length === 0 && <p className="adm-muted">No hay colores activos. Creá colores en Catálogos.</p>}
         <div className="adm-chips">
           {visibleColors.map((color) => (
             <label key={color.id} className={state.colorIds.includes(color.id) ? 'adm-chip on' : 'adm-chip'}>
               <input type="checkbox" checked={state.colorIds.includes(color.id)} onChange={(event) => onChange({ ...state, colorIds: toggleId(state.colorIds, color.id, event.target.checked) })} />
-              {color.swatchHex && <Swatch hex={color.swatchHex} />}
+              <Swatch hex={color.swatchHex} name={color.name} />
               {color.name}
             </label>
           ))}
@@ -147,7 +164,7 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
               <tbody>
                 {chosenColors.map((color) => (
                   <tr key={color.id}>
-                    <th scope="row" className="row-head">{color.swatchHex && <Swatch hex={color.swatchHex} />} {color.name}</th>
+                    <th scope="row" className="row-head"><Swatch hex={color.swatchHex} name={color.name} /> {color.name}</th>
                     {chosenSizes.map((size) => {
                       const key = comboKey(size.id, color.id)
                       const draft = draftOf(state, key)

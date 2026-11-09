@@ -131,7 +131,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
                   {product.variants.map((variant) => (
                     <tr key={variant.id} className={variant.isActive ? (variant.stock < 0 ? 'neg-row' : undefined) : 'inactive-row'}>
                       <td>{variant.sizeName}</td>
-                      <td><Swatch hex={variant.colorHex} /> {variant.colorName}</td>
+                      <td><Swatch hex={variant.colorHex} name={variant.colorName} /> {variant.colorName}</td>
                       <td className="adm-mono">{variant.barcode}</td>
                       <td className="numeric">{formatNio(variant.price)}{variant.priceOverride !== null && <small className="row-sub">precio especial</small>}</td>
                       {canCost && <td className="numeric">{variant.cost === null || variant.cost === undefined ? '—' : formatNio(variant.cost)}</td>}

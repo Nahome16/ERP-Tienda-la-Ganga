@@ -75,13 +75,13 @@ public sealed class CatalogApiTests(CatalogApiFixture fixture) : IClassFixture<C
     [PostgresFact]
     public async Task StaleVersionCannotOverwriteAnotherEdit()
     {
-        var color = await CreateAsync("colors", new { name = "Mostaza", swatchHex = "#c9a227" });
+        var color = await CreateAsync("colors", new { name = "Mostaza ensayo", swatchHex = "#c9a227" });
 
         using var firstRequest = ApiTestHelpers.Build(
             HttpMethod.Put,
             $"/api/v1/catalog/colors/{color.Id}",
             fixture.AdminCsrf,
-            new { name = "Mostaza", swatchHex = "#D4A017", sortOrder = color.SortOrder },
+            new { name = "Mostaza ensayo 2", swatchHex = "#D4A017", sortOrder = color.SortOrder },
             color.Version);
         using var first = await fixture.Admin.SendAsync(firstRequest);
         var updated = await first.Content.ReadFromJsonAsync<CatalogItemResponse>();
@@ -90,7 +90,7 @@ public sealed class CatalogApiTests(CatalogApiFixture fixture) : IClassFixture<C
             HttpMethod.Put,
             $"/api/v1/catalog/colors/{color.Id}",
             fixture.AdminCsrf,
-            new { name = "Mostaza oscuro", sortOrder = color.SortOrder },
+            new { name = "Mostaza ensayo 3", sortOrder = color.SortOrder },
             color.Version);
         using var stale = await fixture.Admin.SendAsync(staleRequest);
 
@@ -118,13 +118,22 @@ public sealed class CatalogApiTests(CatalogApiFixture fixture) : IClassFixture<C
     }
 
     [PostgresFact]
+    public async Task SeededColorsComeWithTheirSwatch()
+    {
+        var all = await ListAsync(fixture.Reader, "colors", "status=all&pageSize=100");
+        var cafe = Assert.Single(all.Items, item => item.Name == "Café");
+        Assert.Equal("#6B4226", cafe.SwatchHex);
+        Assert.True(all.Items.Count(item => item.SwatchHex is not null) >= 41);
+    }
+
+    [PostgresFact]
     public async Task InvalidSwatchIsRejected()
     {
         using var request = ApiTestHelpers.Build(
             HttpMethod.Post,
             "/api/v1/catalog/colors",
             fixture.AdminCsrf,
-            new { name = "Turquesa", swatchHex = "turquesa" });
+            new { name = "Turquesa ensayo", swatchHex = "turquesa" });
         using var response = await fixture.Admin.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

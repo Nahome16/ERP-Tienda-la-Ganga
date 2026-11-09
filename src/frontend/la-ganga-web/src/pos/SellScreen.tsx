@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { swatchFor } from '../lib/colorPalette'
 import { hasPermission } from '../lib/access'
 import type { CashSession, DiscountType, PosVariant, Sale, SaleChannel, SaleRequestPayment } from '../lib/apiTypes'
 import { computeTotals, discountExceedsLimit, formatNio } from '../lib/money'
@@ -56,6 +57,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   const deferredQuery = useDeferredValue(query)
   const [category, setCategory] = useState<string | null>(null)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [zoomPhoto, setZoomPhoto] = useState(false)
   const [feedback, setFeedback] = useState<ScanFeedback>({ tone: 'info', text: 'Escaneá un código o buscá por nombre, talla o color.' })
 
   const [lines, setLines] = useState<CartLine[]>([])
@@ -343,7 +345,6 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
         {activeProduct && (
           <article className="pv-variants" aria-label={`Variantes de ${activeProduct.productName}`}>
             <header>
-              <PosThumb src={activeProduct.imageUrl} name={activeProduct.productName} size="row" />
               <div>
                 <h2>{activeProduct.productName}</h2>
                 <small>{[activeProduct.brandName, activeProduct.categoryName].filter(Boolean).join(' · ')}</small>
@@ -351,12 +352,23 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
               <strong>{activeProduct.minPrice === activeProduct.maxPrice ? formatNio(activeProduct.minPrice) : `${formatNio(activeProduct.minPrice)} – ${formatNio(activeProduct.maxPrice)}`}</strong>
               <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" title="Cerrar variantes" onClick={() => { setSelectedProductId(null); setQuery(''); focusScanner() }}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
             </header>
+            {/* Foto en la esquina: el cajero confirma que la prenda es la misma que tiene en la mano. */}
+            <button
+              type="button" className={`pv-variant-photo${activeProduct.imageUrl ? '' : ' is-empty'}`}
+              onClick={() => { if (activeProduct.imageUrl) setZoomPhoto(true) }}
+              aria-label={activeProduct.imageUrl ? `Ampliar foto de ${activeProduct.productName}` : `${activeProduct.productName} no tiene foto`}
+              title={activeProduct.imageUrl ? 'Ampliar foto' : 'Sin foto: agregala desde Productos en el panel'}
+              tabIndex={activeProduct.imageUrl ? 0 : -1}
+            >
+              <PosThumb src={activeProduct.imageUrl} name={activeProduct.productName} size="hero" />
+              <small>{activeProduct.imageUrl ? 'Toque para ampliar' : 'Sin foto'}</small>
+            </button>
             <div className="pv-variant-rows">
               {[...new Set(activeProduct.variants.map((variant) => variant.colorName))].map((color) => {
                 const colorVariants = activeProduct.variants.filter((variant) => variant.colorName === color)
                 return (
                   <div className="pv-variant-row" key={color}>
-                    <span className="pv-color"><i style={{ background: colorVariants[0]?.colorHex ?? '#d9d2c5' }} />{color}</span>
+                    <span className="pv-color"><i style={{ background: swatchFor(colorVariants[0]?.colorHex, color) }} />{color}</span>
                     <div className="pv-size-cells">
                       {colorVariants.map((variant) => {
                         const left = remaining(variant)
@@ -390,6 +402,13 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
               <span><i className="pv-dot pv-dot-out" />Agotada: no se puede vender</span>
             </p>
           </article>
+        )}
+
+        {zoomPhoto && activeProduct?.imageUrl && (
+          <Modal title={activeProduct.productName} size="sm" onClose={() => { setZoomPhoto(false); focusScanner() }}>
+            <div className="pv-photo-zoom"><PosThumb src={activeProduct.imageUrl} name={activeProduct.productName} size="zoom" /></div>
+            <p className="pv-hint" style={{ textAlign: 'center' }}>{[activeProduct.brandName, activeProduct.categoryName].filter(Boolean).join(' · ')}</p>
+          </Modal>
         )}
 
         <div className="pv-products" role="list">

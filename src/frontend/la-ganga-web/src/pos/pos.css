@@ -518,3 +518,17 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
   .pv-xch-line { grid-template-columns: 88px minmax(0, 1fr); }
   .pv-xch-info { grid-column: 1 / -1; }
 }
+
+/* Foto del producto en la esquina del panel de tallas */
+.pv-variants { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 18px; }
+.pv-variants > header { grid-column: 1 / -1; }
+.pv-variants > .pv-variant-rows, .pv-variants > .pv-legend { grid-column: 1; min-width: 0; }
+.pv-variant-photo { grid-column: 2; grid-row: 2 / span 2; align-self: start; display: grid; gap: 4px; justify-items: center; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.pv-variant-photo.is-empty { cursor: default; }
+.pv-variant-photo small { color: var(--muted, #6d6860); font-size: .72rem; font-weight: 650; }
+.pv-page .pv-thumb-hero { width: 168px; height: 168px; border-radius: 14px; font-size: 2.2rem; border: 1px solid var(--pv-soft-line); box-shadow: var(--shadow-md); }
+.pv-photo-zoom { display: grid; place-items: center; }
+.pv-page .pv-thumb-zoom { width: min(320px, 80vw); aspect-ratio: 1; border-radius: 14px; font-size: 3rem; }
+@media (max-width: 760px) {
+  .pv-page .pv-thumb-hero { width: 96px; height: 96px; font-size: 1.5rem; }
+}

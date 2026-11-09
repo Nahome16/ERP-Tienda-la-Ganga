@@ -182,6 +182,11 @@ export function createMock(options = {}) {
     if (path === '/api/v1/auth/me') return json(route, 200, user)
     if ((r = m(/^\/api\/v1\/catalog\/([a-z-]+)$/))) {
       const map = { categories: s.categories, brands: s.brands, cuts: s.cuts, 'size-groups': s.sizeGroups, sizes: s.sizes, colors: s.colors }
+      if (method === 'POST' && map[r[1]]) {
+        const item = cat(`${r[1]}-${map[r[1]].length + 1}-${Date.now()}`, body.name, { swatchHex: body.swatchHex ?? null, sortOrder: map[r[1]].length + 1 })
+        map[r[1]].push(item)
+        return json(route, 201, item)
+      }
       return json(route, 200, page(map[r[1]] ?? [], Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 25)))
     }
     if (path === '/api/v1/settings') {

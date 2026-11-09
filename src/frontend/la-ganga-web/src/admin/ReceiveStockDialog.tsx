@@ -157,7 +157,7 @@ export function ReceiveStockDialog({ productId, user, catalogs, onClose, onChang
                         {variants.map((variant) => (
                           <tr key={variant.id} className={variant.isActive ? undefined : 'inactive-row'}>
                             <td>{variant.sizeName}</td>
-                            <td><Swatch hex={variant.colorHex} /> {variant.colorName}</td>
+                            <td><Swatch hex={variant.colorHex} name={variant.colorName} /> {variant.colorName}</td>
                             <td className="adm-mono">{variant.barcode}</td>
                             <td className={variant.stock < 0 ? 'numeric adm-neg' : 'numeric'}>{variant.stock}</td>
                             <td className="numeric">

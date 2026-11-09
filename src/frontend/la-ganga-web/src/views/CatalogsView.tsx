@@ -14,6 +14,8 @@ import {
   type CatalogStatus,
 } from '../lib/catalogApi'
 import type { CurrentUser } from '../types'
+import { suggestColorHex, swatchFor } from '../lib/colorPalette'
+import { ColorPicker } from '../admin/ColorPicker'
 import { Plus, Search } from 'lucide-react'
 
 const kinds: CatalogKind[] = ['categories', 'brands', 'cuts', 'size-groups', 'sizes', 'colors']
@@ -303,8 +305,8 @@ export function CatalogsView({ user, isPreview }: { user: CurrentUser; isPreview
                     {kind === 'sizes' && <td>{item.sizeGroupId ? groupNames.get(item.sizeGroupId) ?? '—' : 'Sin grupo'}</td>}
                     {kind === 'colors' && (
                       <td>
-                        {item.swatchHex
-                          ? <span className="swatch-cell"><i style={{ background: item.swatchHex }} />{item.swatchHex}</span>
+                        {item.swatchHex || suggestColorHex(item.name)
+                          ? <span className="swatch-cell"><i style={{ background: swatchFor(item.swatchHex, item.name) }} />{item.swatchHex ?? 'Según el nombre'}</span>
                           : <span className="muted-text">Sin muestra</span>}
                       </td>
                     )}
@@ -375,6 +377,7 @@ function CatalogEditor({ kind, item, categories, categoriesById, sizeGroups, def
   const [parentId, setParentId] = useState(item?.parentId ?? '')
   const [sizeGroupId, setSizeGroupId] = useState(item?.sizeGroupId ?? defaultSizeGroupId)
   const [swatch, setSwatch] = useState(item?.swatchHex ?? '')
+  const [swatchTouched, setSwatchTouched] = useState(Boolean(item?.swatchHex))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -460,7 +463,10 @@ function CatalogEditor({ kind, item, categories, categoriesById, sizeGroups, def
           <input
             value={name}
             maxLength={nameLimits[kind]}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value)
+              if (kind === 'colors' && !swatchTouched) setSwatch(suggestColorHex(event.target.value) ?? '')
+            }}
             required
             autoFocus
             aria-invalid={Boolean(fieldError('name'))}
@@ -493,24 +499,8 @@ function CatalogEditor({ kind, item, categories, categoriesById, sizeGroups, def
         {kind === 'colors' && (
           <div className="catalog-field">
             <span>Muestra visual (opcional)</span>
-            <div className="swatch-input">
-              <input
-                type="color"
-                value={/^#[0-9a-f]{6}$/i.test(swatch) ? swatch : '#000000'}
-                onChange={(event) => setSwatch(event.target.value.toUpperCase())}
-                aria-label="Elegir color de muestra"
-              />
-              <input
-                value={swatch}
-                placeholder="#RRGGBB"
-                maxLength={7}
-                onChange={(event) => setSwatch(event.target.value)}
-                aria-label="Código de color"
-                aria-invalid={Boolean(fieldError('swatchHex'))}
-              />
-              {swatch && <button type="button" className="link-button" onClick={() => setSwatch('')}>Quitar</button>}
-            </div>
-            <small className="field-hint">El nombre sigue siendo el dato principal; la muestra solo ayuda a reconocerlo.</small>
+            <ColorPicker value={swatch} onChange={(hex) => { setSwatchTouched(true); setSwatch(hex) }} />
+            <small className="field-hint">Elegí un tono de la paleta o uno propio. Si lo dejás vacío, se usa el que corresponde al nombre cuando se reconoce.</small>
             {fieldError('swatchHex') && <small className="field-error">{fieldError('swatchHex')}</small>}
           </div>
         )}
