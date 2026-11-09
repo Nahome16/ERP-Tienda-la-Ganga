@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError } from '../lib/api'
 import {
   createUser,
+  changeOwnPassword,
   listRoles,
   listUsers,
   passwordMinLength,
@@ -150,7 +151,7 @@ export function TeamView({ currentUser, isPreview }: { currentUser: CurrentUser;
         <UserDialog roles={ready.roles} user={dialog.user} currentUserId={currentUser.id} onClose={() => setDialog(null)} onSaved={(user) => done(`Se guardaron los cambios de ${user.displayName}.`)} />
       )}
       {dialog?.kind === 'password' && (
-        <PasswordDialog user={dialog.user} onClose={() => setDialog(null)} onSaved={(user) => done(`Se cambió la contraseña de ${user.displayName}. Sus sesiones abiertas se cerraron.`)} />
+        <PasswordDialog user={dialog.user} isSelf={dialog.user.id === currentUser.id} onClose={() => setDialog(null)} onSaved={(user) => done(`Se cambió la contraseña de ${user.displayName}. Sus otras sesiones abiertas se cerraron.`)} />
       )}
     </main>
   )
@@ -298,7 +299,8 @@ function UserDialog({ roles, user, currentUserId, onClose, onSaved }: UserDialog
   )
 }
 
-function PasswordDialog({ user, onClose, onSaved }: { user: UserSummary; onClose: () => void; onSaved: (user: UserSummary) => void }) {
+function PasswordDialog({ user, isSelf, onClose, onSaved }: { user: UserSummary; isSelf: boolean; onClose: () => void; onSaved: (user: UserSummary) => void }) {
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [saving, setSaving] = useState(false)
@@ -317,7 +319,12 @@ function PasswordDialog({ user, onClose, onSaved }: { user: UserSummary; onClose
     }
     setSaving(true)
     try {
-      onSaved(await resetPassword(user.id, password))
+      if (isSelf) {
+        await changeOwnPassword(currentPassword, password)
+        onSaved(user)
+      } else {
+        onSaved(await resetPassword(user.id, password))
+      }
     } catch (caught) {
       setError(errorText(caught))
     } finally {
@@ -327,9 +334,13 @@ function PasswordDialog({ user, onClose, onSaved }: { user: UserSummary; onClose
 
   return (
     <Dialog title={`Nueva contraseña para ${user.displayName}`} onClose={onClose} onSubmit={(event) => { void submit(event) }}>
+      {isSelf && <label className="catalog-field">
+        <span>Contraseña actual</span>
+        <input type="password" value={currentPassword} autoComplete="current-password" onChange={(event) => setCurrentPassword(event.target.value)} required autoFocus />
+      </label>}
       <label className="catalog-field">
         <span>Nueva contraseña</span>
-        <input type="password" value={password} autoComplete="new-password" onChange={(event) => setPassword(event.target.value)} required autoFocus />
+        <input type="password" value={password} autoComplete="new-password" onChange={(event) => setPassword(event.target.value)} required autoFocus={!isSelf} />
       </label>
       <label className="catalog-field">
         <span>Repetila</span>

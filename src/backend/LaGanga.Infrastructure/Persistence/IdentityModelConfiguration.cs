@@ -13,9 +13,13 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
         builder.Property(user => user.Username).HasMaxLength(64).IsRequired();
         builder.Property(user => user.NormalizedUsername).HasMaxLength(64).IsRequired();
         builder.Property(user => user.DisplayName).HasMaxLength(120).IsRequired();
+        builder.Property(user => user.Email).HasMaxLength(254);
+        builder.Property(user => user.NormalizedEmail).HasMaxLength(254);
         builder.Property(user => user.PasswordHash).HasMaxLength(512).IsRequired();
         builder.Property(user => user.SecurityStamp).HasMaxLength(64).IsRequired();
+        builder.Property(user => user.VerificationCodeHash).HasMaxLength(512);
         builder.HasIndex(user => user.NormalizedUsername).IsUnique();
+        builder.HasIndex(user => user.NormalizedEmail).IsUnique();
         builder.HasMany(user => user.Roles)
             .WithOne(userRole => userRole.User)
             .HasForeignKey(userRole => userRole.UserId)

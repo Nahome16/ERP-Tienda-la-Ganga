@@ -39,23 +39,32 @@ La API queda en `http://localhost:5185`. Sus comprobaciones son:
 
 ### Crear la primera cuenta administradora
 
-La migración debe estar aplicada y PostgreSQL en ejecución. Usá una contraseña
-local de al menos 12 caracteres y no la guardés en Git:
+La migración debe estar aplicada y PostgreSQL en ejecución. Configurá primero un
+servidor SMTP de prueba o real mediante variables de entorno. Nunca guardés la
+contraseña SMTP en Git:
 
 ```powershell
+$env:Email__Host = "smtp.example.com"
+$env:Email__Port = "587"
+$env:Email__Username = "correo@dominio.com"
+$env:Email__Password = "CONTRASENA_DE_APLICACION"
+$env:Email__FromAddress = "correo@dominio.com"
+$env:Email__FromName = "Tienda La Ganga"
+$env:Email__EnableSsl = "true"
 $env:LA_GANGA_ADMIN_USERNAME = "administrador"
 $env:LA_GANGA_ADMIN_DISPLAY_NAME = "Administradora La Ganga"
-$env:LA_GANGA_ADMIN_PASSWORD = "UNA_CLAVE_LOCAL_SEGURA"
+$env:LA_GANGA_ADMIN_EMAIL = "correo@dominio.com"
 dotnet run --project src/backend/LaGanga.Api -- --bootstrap-admin
 
 Remove-Item Env:LA_GANGA_ADMIN_USERNAME
 Remove-Item Env:LA_GANGA_ADMIN_DISPLAY_NAME
-Remove-Item Env:LA_GANGA_ADMIN_PASSWORD
+Remove-Item Env:LA_GANGA_ADMIN_EMAIL
 ```
 
 El comando sólo crea la cuenta cuando todavía no existe ningún usuario. Las
-contraseñas se almacenan mediante el hash seguro provisto por ASP.NET Core.
-Al crear la cuenta también carga los catálogos iniciales.
+contraseñas y los códigos se almacenan mediante hash seguro. El código dura diez
+minutos, se usa una sola vez y, después de verificarlo, el sistema obliga a crear
+una contraseña. Al crear la cuenta también carga los catálogos iniciales.
 
 ### Roles y cuentas del equipo
 

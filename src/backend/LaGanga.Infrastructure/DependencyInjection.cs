@@ -35,6 +35,10 @@ public static class DependencyInjection
         services.AddScoped<IIdentityStore, IdentityStore>();
         services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
         services.AddScoped<IPasswordService, PasswordService>();
+        services.AddSingleton(configuration.GetSection(AccessCodeSettings.SectionName).Get<AccessCodeSettings>() ?? new AccessCodeSettings());
+        services.AddSingleton(configuration.GetSection(EmailSettings.SectionName).Get<EmailSettings>() ?? new EmailSettings());
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<IAccountAccessService, AccountAccessService>();
         services.AddScoped<IdentityBootstrapper>();
         services.AddScoped<RoleSynchronizer>();
         services.AddScoped<IUserAdminService, UserAdminService>();

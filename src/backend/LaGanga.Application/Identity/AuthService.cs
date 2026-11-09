@@ -15,17 +15,17 @@ public sealed class AuthService(
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Username) ||
-            command.Username.Length > 64 ||
+            command.Username.Length > 254 ||
             string.IsNullOrWhiteSpace(command.Password) ||
             command.Password.Length > 256)
         {
             return LoginResult.Invalid(LoginFailure.InvalidRequest);
         }
 
-        var normalizedUsername = UserAccount.NormalizeUsername(command.Username);
-        var user = await identityStore.FindUserByNormalizedUsernameAsync(
-            normalizedUsername,
-            cancellationToken);
+        var login = command.Username.Trim();
+        var user = login.Contains('@', StringComparison.Ordinal)
+            ? await identityStore.FindUserByNormalizedEmailAsync(UserAccount.NormalizeEmail(login), cancellationToken)
+            : await identityStore.FindUserByNormalizedUsernameAsync(UserAccount.NormalizeUsername(login), cancellationToken);
 
         if (user is null ||
             !user.IsActive ||
@@ -33,6 +33,15 @@ public sealed class AuthService(
         {
             return LoginResult.Invalid(LoginFailure.InvalidCredentials);
         }
+
+        return await CreateSessionAsync(user, cancellationToken);
+    }
+
+    public async Task<LoginResult> CreateSessionAsync(
+        UserAccount user,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
 
         var now = timeProvider.GetUtcNow();
         var expiresAt = now.Add(settings.MaximumSessionDuration);
@@ -49,6 +58,15 @@ public sealed class AuthService(
         identityStore.AddSession(session);
         await identityStore.SaveChangesAsync(cancellationToken);
 
+        return LoginResult.Success(
+            session.Id,
+            csrfToken,
+            expiresAt,
+            ToCurrentUser(user));
+    }
+
+    public static CurrentUser ToCurrentUser(UserAccount user)
+    {
         var roles = user.Roles
             .Select(userRole => userRole.Role.Name)
             .Distinct(StringComparer.Ordinal)
@@ -60,11 +78,7 @@ public sealed class AuthService(
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        return LoginResult.Success(
-            session.Id,
-            csrfToken,
-            expiresAt,
-            new CurrentUser(user.Id, user.Username, user.DisplayName, roles, permissions));
+        return new CurrentUser(user.Id, user.Username, user.DisplayName, roles, permissions, user.MustChangePassword);
     }
 
     public async Task<CurrentUser?> ValidateSessionAsync(
@@ -102,7 +116,8 @@ public sealed class AuthService(
             session.User.Username,
             session.User.DisplayName,
             roles,
-            permissions);
+            permissions,
+            session.User.MustChangePassword);
     }
 
     public async Task<bool> LogoutAsync(

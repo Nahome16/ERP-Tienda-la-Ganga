@@ -5,4 +5,5 @@ public sealed record CurrentUser(
     string Username,
     string DisplayName,
     IReadOnlyCollection<string> Roles,
-    IReadOnlyCollection<string> Permissions);
+    IReadOnlyCollection<string> Permissions,
+    bool MustChangePassword);

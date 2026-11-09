@@ -13,7 +13,8 @@ Convenciones generales (iguales a `/api/v1/catalog`):
   `code` (estable, para el código) y `errors` (campo → mensajes).
 - Ediciones de producto/variante: `If-Match: "<version>"`; conflicto → 409
   `version_conflict`.
-- Moneda base: córdoba (`NIO`). Se acepta `USD` solo en efectivo.
+- Moneda base: córdoba (`NIO`). Se acepta `USD` en efectivo, transferencia y
+  tarjeta, conservando moneda, importe y tasa usados.
 - Zona horaria de negocio: America/Managua (UTC−6 fijo, sin horario de verano).
 - Paginación: `page` (desde 1) y `pageSize` (máx. 100) →
   `{ items, page, pageSize, totalCount, totalPages }`.
@@ -248,11 +249,16 @@ Reglas del servidor (no confía en totales del cliente):
      rechaza con 422 `insufficient_stock`** (el saldo nunca queda negativo); solo
      una venta hecha sin conexión (`isOffline: true`) se acepta con el saldo
      negativo y `requiresReview = true`, porque la prenda ya se entregó;
-   - `unitPrice` distinto del vigente, o tasa USD distinta de la vigente →
-     se acepta con la nota correspondiente y `requiresReview = true`;
-   - caja ya cerrada al sincronizar → se acepta y se marca para revisión.
+   - con conexión, `unitPrice` distinto del vigente → 409 `price_changed`, y tasa
+     USD distinta → 409 `exchange_rate_changed`; sin conexión se conserva el
+     valor realmente cobrado y queda `requiresReview = true`;
+   - caja ya cerrada al sincronizar una venta offline → se acepta y se marca para
+     revisión, pero no modifica los totales ni la diferencia del cierre emitido.
 6. Todo en una transacción: venta, líneas, pagos, movimientos de inventario,
    auditoría.
+7. Un cierre es inmutable: una venta no puede anularse después de cerrar su caja
+   (`cash_session_closed`). Una devolución posterior será un movimiento nuevo en
+   el turno vigente, no una reescritura del cierre histórico.
 
 ```ts
 type SaleResult = {

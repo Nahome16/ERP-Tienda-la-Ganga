@@ -39,8 +39,8 @@ public sealed class CashService(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(actor);
 
-        var floatNio = request.OpeningFloatNio ?? 0;
-        var floatUsd = request.OpeningFloatUsd ?? 0;
+        var floatNio = Money.Round(request.OpeningFloatNio ?? 0);
+        var floatUsd = Money.Round(request.OpeningFloatUsd ?? 0);
         if (floatNio is < 0 or > 100_000_000 || floatUsd is < 0 or > 100_000_000)
         {
             return Result.Fail<CashSessionDto>(ServiceErrorKind.Validation, "validation_failed", "El fondo inicial no puede ser negativo.", "openingFloatNio");
@@ -119,8 +119,11 @@ public sealed class CashService(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(actor);
 
-        var session = await dbContext.CashSessions.Include(candidate => candidate.Register)
-            .SingleOrDefaultAsync(candidate => candidate.Id == sessionId, cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var session = await dbContext.CashSessions
+            .FromSqlInterpolated($"SELECT * FROM sales.cash_sessions WHERE \"Id\" = {sessionId} FOR UPDATE")
+            .Include(candidate => candidate.Register)
+            .SingleOrDefaultAsync(cancellationToken);
         if (session is null)
         {
             return Result.Fail<CashSummaryDto>(ServiceErrorKind.NotFound, "not_found", "No encontramos esa caja.");
@@ -136,7 +139,8 @@ public sealed class CashService(
             return Result.Fail<CashSummaryDto>(ServiceErrorKind.Conflict, "already_closed", "Esta caja ya fue cerrada.");
         }
 
-        if (request.CountedCashNio is null or < 0 || request.CountedCashUsd is null or < 0)
+        if (request.CountedCashNio is null or < 0 or > 100_000_000 ||
+            request.CountedCashUsd is null or < 0 or > 100_000_000)
         {
             return Result.Fail<CashSummaryDto>(ServiceErrorKind.Validation, "validation_failed", "Indicá el efectivo contado en córdobas y en dólares (puede ser cero).", "countedCashNio");
         }
@@ -147,30 +151,37 @@ public sealed class CashService(
         }
 
         var verified = new[] { request.CountedTransferNio, request.CountedTransferUsd, request.CountedCardNio, request.CountedCardUsd };
-        if (verified.Any(amount => amount is < 0))
+        if (verified.Any(amount => amount is < 0 or > 100_000_000))
         {
             return Result.Fail<CashSummaryDto>(ServiceErrorKind.Validation, "validation_failed", "Los montos verificados no pueden ser negativos.", "countedTransferNio");
         }
 
+        var countedCashNio = Money.Round(request.CountedCashNio.Value);
+        var countedCashUsd = Money.Round(request.CountedCashUsd.Value);
+        decimal? countedTransferNio = request.CountedTransferNio is { } transferNio ? Money.Round(transferNio) : null;
+        decimal? countedTransferUsd = request.CountedTransferUsd is { } transferUsd ? Money.Round(transferUsd) : null;
+        decimal? countedCardNio = request.CountedCardNio is { } cardNio ? Money.Round(cardNio) : null;
+        decimal? countedCardUsd = request.CountedCardUsd is { } cardUsd ? Money.Round(cardUsd) : null;
         session.Close(
             actor.UserId,
             timeProvider.GetUtcNow(),
-            request.CountedCashNio.Value,
-            request.CountedCashUsd.Value,
+            countedCashNio,
+            countedCashUsd,
             request.Notes,
-            request.CountedTransferNio,
-            request.CountedTransferUsd,
-            request.CountedCardNio,
-            request.CountedCardUsd);
+            countedTransferNio,
+            countedTransferUsd,
+            countedCardNio,
+            countedCardUsd);
         audit.Add(
             actor.UserId,
             "cash.closed",
             "CashSession",
             session.Id.ToString(),
-            $"{session.Register.Name} cerrada: efectivo contado C$ {request.CountedCashNio} y US$ {request.CountedCashUsd}"
-            + $"{(request.CountedTransferNio is null && request.CountedTransferUsd is null ? string.Empty : $", transferencias verificadas C$ {request.CountedTransferNio ?? 0} y US$ {request.CountedTransferUsd ?? 0}")}"
-            + $"{(request.CountedCardNio is null && request.CountedCardUsd is null ? string.Empty : $", tarjeta según terminal C$ {request.CountedCardNio ?? 0} y US$ {request.CountedCardUsd ?? 0}")}.");
+            $"{session.Register.Name} cerrada: efectivo contado C$ {countedCashNio} y US$ {countedCashUsd}"
+            + $"{(countedTransferNio is null && countedTransferUsd is null ? string.Empty : $", transferencias verificadas C$ {countedTransferNio ?? 0} y US$ {countedTransferUsd ?? 0}")}"
+            + $"{(countedCardNio is null && countedCardUsd is null ? string.Empty : $", tarjeta según terminal C$ {countedCardNio ?? 0} y US$ {countedCardUsd ?? 0}")}.");
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return Result.Ok((await SummarizeAsync([session], cancellationToken))[0]);
     }
 
@@ -195,7 +206,10 @@ public sealed class CashService(
             .OrderBy(session => session.Register.Name).ThenBy(session => session.OpenedAtUtc).ToListAsync(cancellationToken);
         var summaries = await SummarizeAsync(sessions, cancellationToken);
 
-        var sales = await LoadSalesAsync(sessions.Select(session => session.Id).ToArray(), cancellationToken);
+        var sessionById = sessions.ToDictionary(session => session.Id);
+        var sales = (await LoadSalesAsync(sessions.Select(session => session.Id).ToArray(), cancellationToken))
+            .Where(sale => IncludedAtClose(sale, sessionById[sale.CashSessionId]))
+            .ToArray();
         var open = summaries.Count(summary => summary.Session.ClosedAtUtc is null);
         return new CashConsolidatedDto(
             businessDate,
@@ -292,7 +306,9 @@ public sealed class CashService(
         var bySession = sales.ToLookup(sale => sale.CashSessionId);
         return sessions.Select((session, index) =>
         {
-            var totals = ComputeTotals(bySession[session.Id].ToArray());
+            // Un cierre es una fotografía inmutable. Una venta offline recibida
+            // después del cierre queda para revisión, pero no reescribe el arqueo.
+            var totals = ComputeTotals(bySession[session.Id].Where(sale => IncludedAtClose(sale, session)).ToArray());
             var expectedNio = session.OpeningFloatNio + totals.CashNioTendered - totals.ChangeGivenNio;
             var expectedUsd = session.OpeningFloatUsd + totals.CashUsdTendered;
             return new CashSummaryDto(
@@ -312,6 +328,9 @@ public sealed class CashService(
                 session.CountedCardUsd is { } cardUsd ? cardUsd - totals.CardUsdTendered : null);
         }).ToArray();
     }
+
+    private static bool IncludedAtClose(Sale sale, CashSession session) =>
+        session.ClosedAtUtc is null || sale.ReceivedAtUtc <= session.ClosedAtUtc.Value;
 
     private async Task<IReadOnlyList<CashSessionDto>> MapSessionsAsync(
         IReadOnlyList<CashSession> sessions,

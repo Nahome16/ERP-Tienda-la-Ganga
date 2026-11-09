@@ -28,6 +28,7 @@ public sealed class SalesService : ISalesService
 
     private const int MaxLines = 200;
     private const int MaxQuantity = 1000;
+    private const int MaxPayments = 20;
 
     public async Task<ServiceResult<SaleResultDto>> RegisterAsync(
         SaleRequest request,
@@ -49,7 +50,7 @@ public sealed class SalesService : ISalesService
             return Result.Ok(new SaleResultDto(true, existing));
         }
 
-        var session = await dbContext.CashSessions.Include(candidate => candidate.Register)
+        var session = await dbContext.CashSessions.AsNoTracking().Include(candidate => candidate.Register)
             .SingleOrDefaultAsync(candidate => candidate.Id == request.CashSessionId, cancellationToken);
         if (session is null)
         {
@@ -85,14 +86,15 @@ public sealed class SalesService : ISalesService
         }
 
         var reviewNotes = new List<string>();
+        var receivedAtUtc = timeProvider.GetUtcNow();
         var sale = new Sale(
             Guid.NewGuid(),
             request.ClientSaleId,
             session.Id,
             actor.UserId,
             request.Channel,
-            request.CreatedAtUtc.ToUniversalTime(),
-            timeProvider.GetUtcNow(),
+            request.IsOffline ? request.CreatedAtUtc.ToUniversalTime() : receivedAtUtc,
+            receivedAtUtc,
             request.IsOffline,
             request.Note);
 
@@ -100,13 +102,22 @@ public sealed class SalesService : ISalesService
         foreach (var line in lines)
         {
             var info = variantInfo[line.VariantId];
-            var lineTotal = Money.Round(line.Quantity * line.UnitPrice);
+            var unitPrice = Money.Round(line.UnitPrice);
+            if (!request.IsOffline && unitPrice != info.CurrentPrice)
+            {
+                return Result.Fail<SaleResultDto>(
+                    ServiceErrorKind.Conflict,
+                    "price_changed",
+                    $"El precio de {info.ProductName} cambió a C$ {info.CurrentPrice:0.00}. Actualizá el punto de venta antes de cobrar.");
+            }
+
+            var lineTotal = Money.Round(line.Quantity * unitPrice);
             sale.AddLine(new SaleLine(
                 Guid.NewGuid(), sale.Id, info.Id, info.ProductName, info.SizeName, info.ColorName, info.Barcode,
-                line.Quantity, line.UnitPrice, lineTotal));
-            if (line.UnitPrice != info.CurrentPrice)
+                line.Quantity, unitPrice, lineTotal));
+            if (request.IsOffline && unitPrice != info.CurrentPrice)
             {
-                reviewNotes.Add($"Precio distinto del vigente en {info.ProductName} ({info.Barcode}): se cobró {line.UnitPrice:0.00} y el sistema indica {info.CurrentPrice:0.00}.");
+                reviewNotes.Add($"Precio distinto del vigente en {info.ProductName} ({info.Barcode}): se cobró {unitPrice:0.00} y el sistema indica {info.CurrentPrice:0.00}.");
             }
 
             if (!info.IsActive)
@@ -128,12 +139,12 @@ public sealed class SalesService : ISalesService
         if (discountPercent > settings.SellerDiscountLimitPercent && !actor.Has(PermissionNames.SaleDiscountUnlimited))
         {
             approval = request.DiscountApprovalId is { } approvalId
-                ? await dbContext.DiscountApprovals.SingleOrDefaultAsync(candidate => candidate.Id == approvalId, cancellationToken)
+                ? await dbContext.DiscountApprovals.AsNoTracking().SingleOrDefaultAsync(candidate => candidate.Id == approvalId, cancellationToken)
                 : null;
             if (approval is null ||
                 approval.RequestedByUserId != actor.UserId ||
-                (approval.UsedBySaleId is not null && approval.UsedBySaleId != sale.Id) ||
-                request.CreatedAtUtc > approval.ExpiresAtUtc)
+                approval.UsedBySaleId is not null ||
+                timeProvider.GetUtcNow() > approval.ExpiresAtUtc)
             {
                 return Result.Fail<SaleResultDto>(
                     ServiceErrorKind.Unprocessable,
@@ -157,18 +168,47 @@ public sealed class SalesService : ISalesService
         sale.SetTotals(
             subtotal,
             request.Discount?.Type,
-            request.Discount?.Value,
+            request.Discount is null ? null : Money.Round(request.Discount.Value),
             discountNio,
             total,
             change,
             approval?.Id);
 
-        if (!session.IsOpen)
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        session = await LockCashSessionAsync(session.Id, cancellationToken);
+        if (session is null)
         {
-            reviewNotes.Add("La caja ya estaba cerrada cuando llegó esta venta.");
+            return Result.Fail<SaleResultDto>(ServiceErrorKind.Unprocessable, "session_not_found", "La caja de esta venta no existe.");
         }
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (!session.IsOpen)
+        {
+            if (!request.IsOffline)
+            {
+                return Result.Fail<SaleResultDto>(
+                    ServiceErrorKind.Conflict,
+                    "session_closed",
+                    "La caja ya fue cerrada. Abrí un nuevo turno antes de registrar otra venta.");
+            }
+
+            reviewNotes.Add("La venta se hizo sin conexión y llegó después del cierre de caja; debe conciliarse.");
+        }
+
+        if (approval is not null)
+        {
+            approval = await LockDiscountApprovalAsync(approval.Id, cancellationToken);
+            if (approval is null ||
+                approval.RequestedByUserId != actor.UserId ||
+                approval.UsedBySaleId is not null ||
+                timeProvider.GetUtcNow() > approval.ExpiresAtUtc)
+            {
+                return Result.Fail<SaleResultDto>(
+                    ServiceErrorKind.Unprocessable,
+                    "discount_not_authorized",
+                    "La autorización de descuento ya fue usada o venció. Solicitá una nueva.");
+            }
+        }
+
         var balances = await LockBalancesAsync(variantIds, cancellationToken);
         var now = timeProvider.GetUtcNow();
 
@@ -382,7 +422,7 @@ public sealed class SalesService : ISalesService
         }
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var sale = await LoadAsync(id, cancellationToken, track: true);
+        var sale = await LoadForUpdateAsync(id, cancellationToken);
         if (sale is null)
         {
             return NotFound();
@@ -391,6 +431,20 @@ public sealed class SalesService : ISalesService
         if (sale.Status == SaleStatus.Voided)
         {
             return Result.Fail<SaleDto>(ServiceErrorKind.Conflict, "already_voided", "Esta venta ya fue anulada.");
+        }
+
+        var cashSession = await LockCashSessionAsync(sale.CashSessionId, cancellationToken);
+        if (cashSession is null)
+        {
+            return Result.Fail<SaleDto>(ServiceErrorKind.Conflict, "session_not_found", "La caja de esta venta ya no existe.");
+        }
+
+        if (!cashSession.IsOpen)
+        {
+            return Result.Fail<SaleDto>(
+                ServiceErrorKind.Conflict,
+                "cash_session_closed",
+                "La caja de esta venta ya fue cerrada. Registrá una devolución o ajuste en el turno actual; el cierre histórico no puede modificarse.");
         }
 
         var now = timeProvider.GetUtcNow();
@@ -481,19 +535,20 @@ public sealed class SalesService : ISalesService
             return Bad("Falta la fecha de la venta.", "createdAtUtc");
         }
 
-        if (request.Payments is null)
+        if (request.Payments is null || request.Payments.Count > MaxPayments)
         {
-            return Bad("Faltan los pagos.", "payments");
+            return Bad($"La venta admite como máximo {MaxPayments} pagos.", "payments");
         }
 
         foreach (var payment in request.Payments)
         {
-            if (payment.Amount <= 0 || payment.Amount > 100_000_000)
+            if (Money.Round(payment.Amount) <= 0 || payment.Amount > 100_000_000)
             {
                 return Bad("Cada pago debe ser mayor que cero.", "payments");
             }
 
-            if (payment.Currency == Currency.USD && payment.ExchangeRate is null or <= 0)
+            if (payment.Currency == Currency.USD &&
+                (payment.ExchangeRate is null || Money.RoundRate(payment.ExchangeRate.Value) <= 0 || payment.ExchangeRate > 1_000_000))
             {
                 return Bad("Los pagos en dólares necesitan la tasa de cambio usada.", "payments");
             }
@@ -515,7 +570,7 @@ public sealed class SalesService : ISalesService
     private static ServiceError? ComputeDiscount(DiscountRequest? discount, decimal subtotal, out decimal discountNio)
     {
         discountNio = 0;
-        if (discount is null || discount.Value == 0)
+        if (discount is null)
         {
             return null;
         }
@@ -525,23 +580,29 @@ public sealed class SalesService : ISalesService
             return new ServiceError(ServiceErrorKind.Unprocessable, "discount_invalid", "El descuento no puede ser negativo.", "discount");
         }
 
+        var value = Money.Round(discount.Value);
+        if (value == 0)
+        {
+            return null;
+        }
+
         switch (discount.Type)
         {
             case DiscountType.Percent:
-                if (discount.Value > 100)
+                if (value > 100)
                 {
                     return new ServiceError(ServiceErrorKind.Unprocessable, "discount_invalid", "Un descuento porcentual no puede pasar de 100%.", "discount");
                 }
 
-                discountNio = Money.Round(subtotal * discount.Value / 100);
+                discountNio = Money.Round(subtotal * value / 100);
                 break;
             default:
-                if (Money.Round(discount.Value) > subtotal)
+                if (value > subtotal)
                 {
                     return new ServiceError(ServiceErrorKind.Unprocessable, "discount_invalid", "El descuento no puede superar el subtotal.", "discount");
                 }
 
-                discountNio = Money.Round(discount.Value);
+                discountNio = value;
                 break;
         }
 
@@ -561,12 +622,25 @@ public sealed class SalesService : ISalesService
         cashNio = 0;
         foreach (var payment in request.Payments!)
         {
+            var amount = Money.Round(payment.Amount);
+            var exchangeRate = payment.Currency == Currency.USD
+                ? Money.RoundRate(payment.ExchangeRate!.Value)
+                : (decimal?)null;
             var amountNio = payment.Currency == Currency.USD
-                ? Money.Round(payment.Amount * payment.ExchangeRate!.Value)
-                : Money.Round(payment.Amount);
-            if (payment.Currency == Currency.USD && payment.ExchangeRate != currentRate)
+                ? Money.Round(amount * exchangeRate!.Value)
+                : amount;
+            if (payment.Currency == Currency.USD && exchangeRate != currentRate)
             {
-                reviewNotes.Add($"Tasa del dólar usada {payment.ExchangeRate:0.####}; la vigente es {currentRate:0.####}.");
+                if (!request.IsOffline)
+                {
+                    return new ServiceError(
+                        ServiceErrorKind.Conflict,
+                        "exchange_rate_changed",
+                        $"La tasa vigente es C$ {currentRate:0.####} por dólar. Actualizá el punto de venta antes de cobrar.",
+                        "payments");
+                }
+
+                reviewNotes.Add($"Tasa del dólar usada {exchangeRate:0.####}; la vigente es {currentRate:0.####}.");
             }
 
             paidNio += amountNio;
@@ -580,8 +654,8 @@ public sealed class SalesService : ISalesService
                 sale.Id,
                 payment.Method,
                 payment.Currency,
-                Money.Round(payment.Amount),
-                payment.Currency == Currency.USD ? payment.ExchangeRate : null,
+                amount,
+                exchangeRate,
                 amountNio,
                 string.IsNullOrWhiteSpace(payment.Bank) ? null : payment.Bank.Trim(),
                 string.IsNullOrWhiteSpace(payment.Reference) ? null : payment.Reference.Trim()));
@@ -611,6 +685,26 @@ public sealed class SalesService : ISalesService
             .ToListAsync(cancellationToken);
         return balances.ToDictionary(balance => balance.VariantId);
     }
+
+    private Task<CashSession?> LockCashSessionAsync(Guid id, CancellationToken cancellationToken) =>
+        dbContext.CashSessions
+            .FromSqlInterpolated($"SELECT * FROM sales.cash_sessions WHERE \"Id\" = {id} FOR UPDATE")
+            .Include(candidate => candidate.Register)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    private Task<DiscountApproval?> LockDiscountApprovalAsync(Guid id, CancellationToken cancellationToken) =>
+        dbContext.DiscountApprovals
+            .FromSqlInterpolated($"SELECT * FROM sales.discount_approvals WHERE \"Id\" = {id} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+    private Task<Sale?> LoadForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
+        dbContext.Sales
+            .FromSqlInterpolated($"SELECT * FROM sales.sales WHERE \"Id\" = {id} FOR UPDATE")
+            .Include(sale => sale.Lines)
+            .Include(sale => sale.Payments)
+            .Include(sale => sale.CashSession)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(cancellationToken);
 
     private async Task<Sale?> LoadAsync(Guid id, CancellationToken cancellationToken, bool track = false)
     {
@@ -691,4 +785,6 @@ internal static class Money
 {
     /// <summary>Redondeo a 2 decimales, mitad hacia arriba (igual que el frontend).</summary>
     public static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    public static decimal RoundRate(decimal value) => Math.Round(value, 4, MidpointRounding.AwayFromZero);
 }

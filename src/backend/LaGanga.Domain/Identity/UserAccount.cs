@@ -28,11 +28,27 @@ public sealed class UserAccount
 
     public string DisplayName { get; private set; } = string.Empty;
 
+    public string? Email { get; private set; }
+
+    public string? NormalizedEmail { get; private set; }
+
     public string PasswordHash { get; private set; } = string.Empty;
 
     public string SecurityStamp { get; private set; } = string.Empty;
 
     public bool IsActive { get; private set; }
+
+    public bool MustChangePassword { get; private set; }
+
+    public string? VerificationCodeHash { get; private set; }
+
+    public DateTimeOffset? VerificationCodeIssuedAtUtc { get; private set; }
+
+    public DateTimeOffset? VerificationCodeExpiresAtUtc { get; private set; }
+
+    public int VerificationCodeFailedAttempts { get; private set; }
+
+    public DateTimeOffset? VerificationCodeConsumedAtUtc { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
@@ -43,10 +59,49 @@ public sealed class UserAccount
     public static string NormalizeUsername(string username) =>
         username.Trim().ToUpperInvariant();
 
+    public static string NormalizeEmail(string email) =>
+        email.Trim().ToUpperInvariant();
+
     public void SetPasswordHash(string passwordHash)
     {
         PasswordHash = passwordHash;
         SecurityStamp = Guid.NewGuid().ToString("N");
+    }
+
+    public void SetEmail(string email)
+    {
+        Email = email.Trim();
+        NormalizedEmail = NormalizeEmail(email);
+    }
+
+    public void RequirePasswordChange() => MustChangePassword = true;
+
+    public void CompletePasswordChange() => MustChangePassword = false;
+
+    public bool CanIssueVerificationCode(DateTimeOffset now, TimeSpan cooldown) =>
+        VerificationCodeIssuedAtUtc is null || VerificationCodeIssuedAtUtc.Value.Add(cooldown) <= now;
+
+    public void BeginVerification(string codeHash, DateTimeOffset issuedAtUtc, DateTimeOffset expiresAtUtc)
+    {
+        VerificationCodeHash = codeHash;
+        VerificationCodeIssuedAtUtc = issuedAtUtc;
+        VerificationCodeExpiresAtUtc = expiresAtUtc;
+        VerificationCodeFailedAttempts = 0;
+        VerificationCodeConsumedAtUtc = null;
+    }
+
+    public bool CanVerifyCode(DateTimeOffset now, int maximumAttempts) =>
+        VerificationCodeHash is not null &&
+        VerificationCodeConsumedAtUtc is null &&
+        VerificationCodeExpiresAtUtc > now &&
+        VerificationCodeFailedAttempts < maximumAttempts;
+
+    public void RegisterFailedVerificationAttempt() => VerificationCodeFailedAttempts++;
+
+    public void ConsumeVerificationCode(DateTimeOffset consumedAtUtc)
+    {
+        VerificationCodeConsumedAtUtc = consumedAtUtc;
+        VerificationCodeHash = null;
     }
 
     public void MarkLogin(DateTimeOffset loggedInAtUtc) => LastLoginAtUtc = loggedInAtUtc;

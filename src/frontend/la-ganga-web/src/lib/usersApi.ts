@@ -59,3 +59,10 @@ export function updateUser(id: string, input: { displayName: string; roleIds: st
 export function resetPassword(id: string, password: string) {
   return apiRequest<UserSummary>(`/api/v1/users/${id}/password`, { method: 'POST', body: { password } })
 }
+
+export function changeOwnPassword(currentPassword: string | null, newPassword: string) {
+  return apiRequest<import('../types').CurrentUser>('/api/v1/auth/password', {
+    method: 'POST',
+    body: { currentPassword, newPassword },
+  })
+}

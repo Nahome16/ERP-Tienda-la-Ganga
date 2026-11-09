@@ -13,7 +13,7 @@ import { Dialog, Notice } from './ui'
 import type { Catalogs } from './useCatalogs'
 import { categoryOptions } from './useCatalogs'
 import { VariantBuilder } from './VariantBuilder'
-import { builderToInputs, emptyBuilder, type BuilderState } from './variantBuilder'
+import { builderToInputs, emptyBuilder, type BuilderState } from './variantBuilderLogic'
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError) {

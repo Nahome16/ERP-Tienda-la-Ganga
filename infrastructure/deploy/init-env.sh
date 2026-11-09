@@ -3,7 +3,7 @@
 #
 # Uso:
 #   ./init-env.sh               pregunta los datos y crea .env (con clave de base de datos generada)
-#   ./init-env.sh --quitar-admin   borra la contraseña del administrador inicial del .env
+#   ./init-env.sh --quitar-admin   borra los datos de creación del administrador inicial
 #                                  (hágalo apenas termine de crear el administrador)
 set -Eeuo pipefail
 umask 077
@@ -14,7 +14,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 if [[ "${1:-}" == "--quitar-admin" ]]; then
   [[ -f "$ENV_FILE" ]] || fail "No existe $ENV_FILE"
   sed -i 's/^LA_GANGA_ADMIN_PASSWORD=.*/LA_GANGA_ADMIN_PASSWORD=/' "$ENV_FILE"
-  ok "Se borró LA_GANGA_ADMIN_PASSWORD de $ENV_FILE"
+  sed -i 's/^LA_GANGA_ADMIN_EMAIL=.*/LA_GANGA_ADMIN_EMAIL=/' "$ENV_FILE"
+  ok "Se borraron los datos de creación del administrador inicial de $ENV_FILE"
   exit 0
 fi
 
@@ -66,17 +67,28 @@ while true; do
 done
 
 while true; do
-  printf 'Contraseña del administrador (mínimo 12 caracteres; no se ve al escribir): '
-  IFS= read -r -s ADMIN_PASS || fail "Se cerró la entrada antes de terminar. Vuelva a ejecutar ./init-env.sh"
-  echo
-  printf 'Repita la contraseña: '
-  IFS= read -r -s ADMIN_PASS2 || fail "Se cerró la entrada antes de terminar. Vuelva a ejecutar ./init-env.sh"
-  echo
-  if [[ "$ADMIN_PASS" != "$ADMIN_PASS2" ]]; then warn "Las contraseñas no coinciden."; continue; fi
-  if (( ${#ADMIN_PASS} < 12 )); then warn "Debe tener al menos 12 caracteres."; continue; fi
-  if [[ "$ADMIN_PASS" == *"'"* ]]; then warn "No use el apóstrofo (') en la contraseña."; continue; fi
-  break
+  ask "Correo de acceso del administrador inicial" "$ACME_EMAIL"
+  ADMIN_EMAIL="$REPLY"
+  [[ "$ADMIN_EMAIL" =~ ^[^[:space:]@\'\"]+@[^[:space:]@\'\"]+\.[^[:space:]@\'\"]+$ ]] && break
+  warn "Ese correo no parece válido."
 done
+
+ask "Servidor SMTP (ej. smtp.gmail.com)"
+EMAIL_HOST="$REPLY"
+[[ -n "$EMAIL_HOST" && "$EMAIL_HOST" != *"'"* ]] || fail "El servidor SMTP no puede quedar vacío ni contener apóstrofos."
+ask "Puerto SMTP" "587"
+EMAIL_PORT="$REPLY"
+[[ "$EMAIL_PORT" =~ ^[0-9]+$ ]] && (( EMAIL_PORT >= 1 && EMAIL_PORT <= 65535 )) || fail "Puerto SMTP inválido."
+ask "Usuario SMTP (normalmente el correo remitente)" "$ADMIN_EMAIL"
+EMAIL_USERNAME="$REPLY"
+[[ "$EMAIL_USERNAME" != *"'"* ]] || fail "El usuario SMTP no puede contener apóstrofos."
+printf 'Contraseña SMTP o contraseña de aplicación (no se ve al escribir): '
+IFS= read -r -s EMAIL_PASSWORD || fail "Se cerró la entrada antes de terminar. Vuelva a ejecutar ./init-env.sh"
+echo
+[[ -n "$EMAIL_PASSWORD" && "$EMAIL_PASSWORD" != *"'"* ]] || fail "La contraseña SMTP no puede quedar vacía ni contener apóstrofos."
+ask "Correo remitente" "$EMAIL_USERNAME"
+EMAIL_FROM_ADDRESS="$REPLY"
+[[ "$EMAIL_FROM_ADDRESS" != *"'"* ]] || fail "El remitente no puede contener apóstrofos."
 
 command -v openssl >/dev/null 2>&1 || fail "Falta openssl (sudo apt-get install -y openssl)."
 DB_PASS="$(openssl rand -hex 24)"
@@ -93,10 +105,19 @@ TEMPLATE="$DEPLOY_DIR/.env.example"
   echo "POSTGRES_USER=la_ganga"
   printf 'POSTGRES_PASSWORD=%s\n' "$DB_PASS"
   echo
-  echo "# Administrador inicial: BORRE la contraseña después de crearlo (./init-env.sh --quitar-admin)."
+  printf "EMAIL_HOST='%s'\n" "$EMAIL_HOST"
+  printf 'EMAIL_PORT=%s\n' "$EMAIL_PORT"
+  printf "EMAIL_USERNAME='%s'\n" "$EMAIL_USERNAME"
+  printf "EMAIL_PASSWORD='%s'\n" "$EMAIL_PASSWORD"
+  printf "EMAIL_FROM_ADDRESS='%s'\n" "$EMAIL_FROM_ADDRESS"
+  echo "EMAIL_FROM_NAME='Tienda La Ganga'"
+  echo "EMAIL_ENABLE_SSL=true"
+  echo
+  echo "# Administrador inicial: BORRE estos datos después de crearlo (./init-env.sh --quitar-admin)."
   printf "LA_GANGA_ADMIN_USERNAME='%s'\n" "$ADMIN_USER"
   printf "LA_GANGA_ADMIN_DISPLAY_NAME='%s'\n" "$ADMIN_NAME"
-  printf "LA_GANGA_ADMIN_PASSWORD='%s'\n" "$ADMIN_PASS"
+  printf "LA_GANGA_ADMIN_EMAIL='%s'\n" "$ADMIN_EMAIL"
+  echo "LA_GANGA_ADMIN_PASSWORD="
   echo
   echo "TZ=America/Managua"
   echo
@@ -107,4 +128,4 @@ chmod 600 "$ENV_FILE"
 ok "Se creó $ENV_FILE (permisos 600)."
 echo
 echo "Siguiente paso:  docker compose -f compose.prod.yml up -d --build"
-echo "Guarde la contraseña del administrador en un lugar seguro (gestor de contraseñas o papel bajo llave)."
+echo "El administrador recibirá un código por correo al ejecutar --bootstrap-admin."

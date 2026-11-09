@@ -96,6 +96,13 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 identity.AddClaims(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
                 identity.AddClaims(user.Permissions.Select(
                     permission => new Claim(AuthConstants.PermissionClaim, permission)));
+                foreach (var claim in identity.FindAll(AuthenticationEndpoints.MustChangePasswordClaim).ToArray())
+                {
+                    identity.RemoveClaim(claim);
+                }
+                identity.AddClaim(new Claim(
+                    AuthenticationEndpoints.MustChangePasswordClaim,
+                    user.MustChangePassword.ToString()));
             },
             OnRedirectToLogin = context =>
             {
@@ -158,6 +165,29 @@ app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    var mustChangePassword = context.User.Identity?.IsAuthenticated == true &&
+        string.Equals(
+            context.User.FindFirstValue(AuthenticationEndpoints.MustChangePasswordClaim),
+            bool.TrueString,
+            StringComparison.OrdinalIgnoreCase);
+    var allowedDuringPasswordChange = context.Request.Path.StartsWithSegments("/api/v1/auth/me") ||
+        context.Request.Path.StartsWithSegments("/api/v1/auth/password") ||
+        context.Request.Path.StartsWithSegments("/api/v1/auth/logout");
+    if (mustChangePassword && context.Request.Path.StartsWithSegments("/api/v1") && !allowedDuringPasswordChange)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await Results.Problem(
+            statusCode: StatusCodes.Status403Forbidden,
+            title: "Debés crear una contraseña nueva antes de continuar.",
+            extensions: new Dictionary<string, object?> { ["code"] = "password_change_required" })
+            .ExecuteAsync(context);
+        return;
+    }
+
+    await next();
+});
 app.UseAuthorization();
 
 app.MapGet("/api/health", () =>
@@ -179,29 +209,44 @@ static async Task BootstrapAdministratorAsync(IServiceProvider services)
 {
     var username = Environment.GetEnvironmentVariable("LA_GANGA_ADMIN_USERNAME");
     var displayName = Environment.GetEnvironmentVariable("LA_GANGA_ADMIN_DISPLAY_NAME");
+    var email = Environment.GetEnvironmentVariable("LA_GANGA_ADMIN_EMAIL");
     var password = Environment.GetEnvironmentVariable("LA_GANGA_ADMIN_PASSWORD");
 
     if (string.IsNullOrWhiteSpace(username) ||
         string.IsNullOrWhiteSpace(displayName) ||
-        string.IsNullOrWhiteSpace(password) ||
-        password.Length < 12)
+        (string.IsNullOrWhiteSpace(email) && (string.IsNullOrWhiteSpace(password) || password.Length < 12)))
     {
         throw new InvalidOperationException(
-            "Set LA_GANGA_ADMIN_USERNAME, LA_GANGA_ADMIN_DISPLAY_NAME and a password of at least 12 characters before bootstrapping.");
+            "Set LA_GANGA_ADMIN_USERNAME, LA_GANGA_ADMIN_DISPLAY_NAME and LA_GANGA_ADMIN_EMAIL for verified access, " +
+            "or LA_GANGA_ADMIN_PASSWORD (12+ characters) for the legacy bootstrap.");
     }
 
     await using var scope = services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<LaGangaDbContext>();
     await dbContext.Database.MigrateAsync();
     var bootstrapper = scope.ServiceProvider.GetRequiredService<IdentityBootstrapper>();
-    var created = await bootstrapper.CreateInitialAdministratorAsync(
-        username,
-        displayName,
-        password,
-        CancellationToken.None);
+    var created = string.IsNullOrWhiteSpace(email)
+        ? await bootstrapper.CreateInitialAdministratorAsync(
+            username,
+            displayName,
+            password!,
+            CancellationToken.None)
+        : await bootstrapper.CreateInitialAdministratorInvitationAsync(
+            username,
+            displayName,
+            email,
+            CancellationToken.None);
+
+    if (created && !string.IsNullOrWhiteSpace(email))
+    {
+        await scope.ServiceProvider.GetRequiredService<IAccountAccessService>()
+            .RequestCodeAsync(email, CancellationToken.None);
+    }
 
     Console.WriteLine(created
-        ? "Initial administrator created. Remove the bootstrap environment variables now."
+        ? string.IsNullOrWhiteSpace(email)
+            ? "Initial administrator created. Remove the bootstrap environment variables now."
+            : "Initial administrator created and verification code requested by email. Remove the bootstrap environment variables now."
         : "Bootstrap skipped because at least one user already exists.");
 
     if (created)

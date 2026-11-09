@@ -8,6 +8,7 @@ import { DashboardView } from './views/DashboardView'
 import { InventoryView } from './views/InventoryView'
 import { InvestmentView } from './views/InvestmentView'
 import { LoginView } from './views/LoginView'
+import { PasswordChangeView } from './views/PasswordChangeView'
 import { PosView } from './views/PosView'
 import { TeamView } from './views/TeamView'
 import { AuditView } from './views/AuditView'
@@ -34,6 +35,7 @@ function isCurrentUser(value: unknown): value is CurrentUser {
     && typeof candidate.displayName === 'string'
     && isStringArray(candidate.roles)
     && isStringArray(candidate.permissions)
+    && typeof candidate.mustChangePassword === 'boolean'
 }
 
 function isHealthStatus(value: unknown): value is HealthStatus {
@@ -194,6 +196,48 @@ function App() {
     }
   }
 
+  async function requestCode(email: string): Promise<boolean> {
+    setIsSubmitting(true)
+    setLoginError(null)
+    try {
+      const response = await fetch('/api/v1/auth/code/request', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }),
+      })
+      if (!response.ok) throw new Error('No fue posible solicitar el código.')
+      return true
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'No fue posible solicitar el código.')
+      return false
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function verifyCode(email: string, code: string) {
+    setIsSubmitting(true)
+    setLoginError(null)
+    try {
+      const response = await fetch('/api/v1/auth/code/verify', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code }),
+      })
+      const payload: unknown = await response.json()
+      if (!response.ok) {
+        const title = typeof payload === 'object' && payload !== null && typeof (payload as Record<string, unknown>).title === 'string'
+          ? String((payload as Record<string, unknown>).title) : 'No fue posible verificar el código.'
+        throw new Error(title)
+      }
+      const user = loginResponseUser(payload)
+      if (!user) throw new Error('La respuesta del servidor no contiene una sesión válida.')
+      setOfflineStart(false)
+      setAuth({ kind: 'authenticated', user })
+      void saveCachedUser(user).catch(() => undefined)
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'No fue posible verificar el código.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   async function logout() {
     if (auth.kind !== 'authenticated') return
     const csrfToken = readCookie('la_ganga_csrf')
@@ -246,12 +290,23 @@ function App() {
         isSubmitting={isSubmitting}
         previewEnabled={false}
         onLogin={login}
+        onRequestCode={requestCode}
+        onVerifyCode={verifyCode}
         onPreview={() => undefined}
       />
     )
   }
 
   const user = auth.user
+
+  if (user.mustChangePassword) {
+    return <PasswordChangeView user={user} onChanged={(changed) => {
+      setAuth({ kind: 'authenticated', user: changed })
+      void saveCachedUser(changed).catch(() => undefined)
+      navigate(landingView(changed) ?? 'panel', changed)
+    }} onLogout={() => { void logout() }} />
+  }
+
   const allowed = allowedViews(user)
   const panelViews = shellViews(user)
 

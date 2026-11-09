@@ -5,6 +5,7 @@ using LaGanga.Infrastructure.Identity;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -36,6 +37,7 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
     public const string AdminUsername = "admin.pruebas";
     public const string ReaderUsername = "lector.pruebas";
     public const string DefaultPassword = "Contrasena-de-prueba-2026";
+    public const string ReaderEmail = "lector.pruebas@laganga.test";
 
     private string? _serverConnection;
     private string? _databaseName;
@@ -52,6 +54,8 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
     public string ReaderCsrf { get; private set; } = string.Empty;
 
     public HttpClient Anonymous { get; private set; } = null!;
+
+    public TestEmailSender EmailSender { get; } = new();
 
     /// <summary>Cliente nuevo con su propia cookie de sesión.</summary>
     public HttpClient CreateClient() =>
@@ -79,6 +83,7 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:DefaultConnection", testConnection);
             builder.UseSetting("Authentication:LoginAttemptsPerMinute", "100");
+            builder.ConfigureTestServices(services => services.AddSingleton<IEmailSender>(EmailSender));
         });
 
         await PrepareDatabaseAsync(_factory.Services);
@@ -134,6 +139,7 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
         var readerRole = new Role(Guid.NewGuid(), "Lector de catálogos");
         readerRole.AddPermission(catalogRead);
         var reader = new UserAccount(Guid.NewGuid(), ReaderUsername, "Lector de pruebas", DateTimeOffset.UtcNow);
+        reader.SetEmail(ReaderEmail);
         reader.SetPasswordHash(provider.GetRequiredService<IPasswordService>().HashPassword(reader, DefaultPassword));
         reader.AddRole(readerRole);
         dbContext.Roles.Add(readerRole);
@@ -151,5 +157,32 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
         await using var command = new NpgsqlCommand(commandText, connection);
 #pragma warning restore CA2100
         await command.ExecuteNonQueryAsync();
+    }
+}
+
+public sealed class TestEmailSender : IEmailSender
+{
+    private readonly Dictionary<string, string> codes = new(StringComparer.OrdinalIgnoreCase);
+
+    public string? CodeFor(string email)
+    {
+        lock (codes)
+        {
+            return codes.GetValueOrDefault(email);
+        }
+    }
+
+    public Task SendAccessCodeAsync(
+        string email,
+        string displayName,
+        string code,
+        DateTimeOffset expiresAtUtc,
+        CancellationToken cancellationToken)
+    {
+        lock (codes)
+        {
+            codes[email] = code;
+        }
+        return Task.CompletedTask;
     }
 }

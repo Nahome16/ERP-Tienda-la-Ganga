@@ -15,6 +15,7 @@ export async function saveCachedUser(user: CurrentUser): Promise<void> {
     displayName: user.displayName,
     roles: [...user.roles],
     permissions: [...user.permissions],
+    mustChangePassword: user.mustChangePassword,
     savedAtUtc: new Date().toISOString(),
   }
   await setMeta<StoredUser>(USER_KEY, stored)
@@ -29,6 +30,7 @@ export async function loadCachedUser(): Promise<CurrentUser | null> {
     displayName: stored.displayName,
     roles: stored.roles,
     permissions: stored.permissions,
+    mustChangePassword: stored.mustChangePassword ?? false,
   }
 }
 
@@ -44,7 +46,7 @@ export async function clearCachedUser(): Promise<void> {
 export async function restoreOfflineUser(): Promise<CurrentUser | null> {
   try {
     const user = await loadCachedUser()
-    if (!user || !user.permissions.includes('sale.create')) return null
+    if (!user || user.mustChangePassword || !user.permissions.includes('sale.create')) return null
     const cash = await loadAnyCashSession()
     if (!cash || cash.userId !== user.id || cash.session.closedAtUtc) return null
     return user

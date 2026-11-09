@@ -30,6 +30,7 @@ export type CurrentUser = {
   displayName: string
   roles: string[]
   permissions: string[]
+  mustChangePassword: boolean
 }
 
 export type AuthState =

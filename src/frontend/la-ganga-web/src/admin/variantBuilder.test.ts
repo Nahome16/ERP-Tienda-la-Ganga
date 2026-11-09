@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CatalogItem } from '../lib/catalogApi'
 import {
   builderToInputs, combosOf, emptyBuilder, resolveVariantPartner, setDraft, totalInitialUnits, type BuilderState,
-} from './variantBuilder'
+} from './variantBuilderLogic'
 
 const item = (id: string, name: string): CatalogItem => ({ id, name, isActive: true, sortOrder: 1, version: 1, parentId: null, sizeGroupId: null, swatchHex: null, updatedAtUtc: '' })
 const sizes = [item('s1', 'S'), item('s2', 'M')]

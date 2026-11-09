@@ -75,6 +75,13 @@ services:
       # Jornada larga: la sesión dura hasta 12 horas y se cierra tras 60 minutos sin actividad.
       Authentication__MaximumSessionDuration: "12:00:00"
       Authentication__IdleTimeout: "01:00:00"
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__Username: ${EMAIL_USERNAME:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__FromAddress: ${EMAIL_FROM_ADDRESS:-}
+      Email__FromName: ${EMAIL_FROM_NAME:-Tienda La Ganga}
+      Email__EnableSsl: ${EMAIL_ENABLE_SSL:-true}
       # "localhost" lo usa la comprobación de salud interna del contenedor.
       AllowedHosts: "${DOMINIO:?Falta DOMINIO en el archivo .env};localhost"
       TZ: ${TZ:-America/Managua}
@@ -145,7 +152,15 @@ services:
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-la_ganga};Username=${POSTGRES_USER:-la_ganga};Password=${POSTGRES_PASSWORD}"
       LA_GANGA_ADMIN_USERNAME: ${LA_GANGA_ADMIN_USERNAME:-}
       LA_GANGA_ADMIN_DISPLAY_NAME: ${LA_GANGA_ADMIN_DISPLAY_NAME:-}
+      LA_GANGA_ADMIN_EMAIL: ${LA_GANGA_ADMIN_EMAIL:-}
       LA_GANGA_ADMIN_PASSWORD: ${LA_GANGA_ADMIN_PASSWORD:-}
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__Username: ${EMAIL_USERNAME:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__FromAddress: ${EMAIL_FROM_ADDRESS:-}
+      Email__FromName: ${EMAIL_FROM_NAME:-Tienda La Ganga}
+      Email__EnableSsl: ${EMAIL_ENABLE_SSL:-true}
     mem_limit: 512m
     logging: *default-logging
     networks: [interna]

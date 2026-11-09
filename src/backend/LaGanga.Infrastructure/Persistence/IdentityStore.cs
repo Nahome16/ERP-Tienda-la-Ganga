@@ -18,6 +18,18 @@ public sealed class IdentityStore(LaGangaDbContext dbContext) : IIdentityStore
                 user => user.NormalizedUsername == normalizedUsername,
                 cancellationToken);
 
+    public Task<UserAccount?> FindUserByNormalizedEmailAsync(
+        string normalizedEmail,
+        CancellationToken cancellationToken) =>
+        dbContext.Users
+            .Include(user => user.Roles)
+                .ThenInclude(userRole => userRole.Role)
+                    .ThenInclude(role => role.Permissions)
+                        .ThenInclude(rolePermission => rolePermission.Permission)
+            .SingleOrDefaultAsync(
+                user => user.NormalizedEmail == normalizedEmail,
+                cancellationToken);
+
     public Task<UserSession?> FindSessionAsync(Guid sessionId, CancellationToken cancellationToken) =>
         dbContext.Sessions
             .Include(session => session.User)

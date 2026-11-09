@@ -8,6 +8,8 @@ type LoginViewProps = {
   isSubmitting: boolean
   previewEnabled: boolean
   onLogin: (username: string, password: string) => Promise<void>
+  onRequestCode: (email: string) => Promise<boolean>
+  onVerifyCode: (email: string, code: string) => Promise<void>
   onPreview: (role: 'Administrador' | 'Vendedor') => void
 }
 
@@ -17,14 +19,29 @@ export function LoginView({
   isSubmitting,
   previewEnabled,
   onLogin,
+  onRequestCode,
+  onVerifyCode,
   onPreview,
 }: LoginViewProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [mode, setMode] = useState<'password' | 'code'>('password')
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     void onLogin(username, password)
+  }
+
+  async function submitCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!codeSent) {
+      setCodeSent(await onRequestCode(email))
+      return
+    }
+    await onVerifyCode(email, code)
   }
 
   return (
@@ -55,20 +72,20 @@ export function LoginView({
           </div>
           <header>
             <p>Bienvenido</p>
-            <h2>Iniciar sesión</h2>
-            <span>Usá el usuario y contraseña asignados por el administrador.</span>
+            <h2>{mode === 'password' ? 'Iniciar sesión' : 'Acceso con código'}</h2>
+            <span>{mode === 'password' ? 'Usá tu correo o usuario y contraseña.' : 'Te enviaremos un código de 6 dígitos a tu correo.'}</span>
           </header>
 
-          <form className="login-form" onSubmit={submit}>
+          {mode === 'password' ? <form className="login-form" onSubmit={submit}>
             <label>
-              <span>Usuario</span>
+              <span>Correo o usuario</span>
               <input
                 autoComplete="username"
                 autoFocus
                 maxLength={64}
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-                placeholder="Tu nombre de usuario"
+                placeholder="correo@ejemplo.com o usuario"
               />
             </label>
             <label>
@@ -86,7 +103,24 @@ export function LoginView({
             <button className="login-button" disabled={isSubmitting || api.kind === 'offline'} type="submit">
               {isSubmitting ? 'Validando…' : 'Entrar al sistema'}
             </button>
-          </form>
+            <button className="secondary-button" type="button" onClick={() => setMode('code')}>Entrar con código de correo</button>
+          </form> : <form className="login-form" onSubmit={(event) => { void submitCode(event) }}>
+            <label>
+              <span>Correo electrónico</span>
+              <input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="tu@correo.com" autoFocus disabled={codeSent} />
+            </label>
+            {codeSent && <label>
+              <span>Código de verificación</span>
+              <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" autoFocus />
+            </label>}
+            {codeSent && <p className="field-hint">Revisá también la carpeta de correo no deseado. El código vence en 10 minutos.</p>}
+            {error && <div className="login-error" role="alert">{error}</div>}
+            <button className="login-button" disabled={isSubmitting || api.kind === 'offline' || (codeSent && code.length !== 6)} type="submit">
+              {isSubmitting ? 'Validando…' : codeSent ? 'Verificar código' : 'Enviar código'}
+            </button>
+            {codeSent && <button className="secondary-button" type="button" onClick={() => { setCodeSent(false); setCode('') }}>Usar otro correo</button>}
+            <button className="secondary-button" type="button" onClick={() => setMode('password')}>Entrar con contraseña</button>
+          </form>}
 
           {previewEnabled && (
             <div className="preview-access">

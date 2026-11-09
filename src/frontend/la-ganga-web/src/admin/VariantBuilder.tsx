@@ -5,7 +5,7 @@ import { Swatch } from './ui'
 import { usePartners } from './usePartners'
 import {
   combosOf, comboKey, draftNoPartner, draftOf, draftSamePartner, setDraft, toggleId, totalInitialUnits, type BuilderState,
-} from './variantBuilder'
+} from './variantBuilderLogic'
 
 type Props = {
   catalogs: Catalogs

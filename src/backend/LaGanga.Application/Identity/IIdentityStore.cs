@@ -8,6 +8,10 @@ public interface IIdentityStore
         string normalizedUsername,
         CancellationToken cancellationToken);
 
+    Task<UserAccount?> FindUserByNormalizedEmailAsync(
+        string normalizedEmail,
+        CancellationToken cancellationToken);
+
     Task<UserSession?> FindSessionAsync(Guid sessionId, CancellationToken cancellationToken);
 
     void AddSession(UserSession session);

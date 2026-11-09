@@ -79,9 +79,28 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         Assert.Equal(-6m, closed.GetProperty("differenceCashNio").GetDecimal());
         Assert.Equal(0m, closed.GetProperty("differenceCashUsd").GetDecimal());
 
-        var late = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variant1, 1, 1000m)], null, null, [Pay("Card", "NIO", 1000m)]);
-        Assert.Equal(HttpStatusCode.Created, late.StatusCode); // la venta ya ocurrió: se acepta y se revisa
-        Assert.True((await ReadAsync(late)).GetProperty("sale").GetProperty("requiresReview").GetBoolean());
+        // Un cierre emitido es histórico: una anulación posterior no puede reescribirlo.
+        var voidAfterClose = await PostRawAsync(
+            fixture.Admin,
+            fixture.AdminCsrf,
+            $"/api/v1/sales/{s1.GetProperty("id").GetGuid()}/void",
+            new { reason = "Solicitud posterior al cierre" });
+        Assert.Equal(HttpStatusCode.Conflict, voidAfterClose.StatusCode);
+        Assert.Equal("cash_session_closed", await ApiTestHelpers.ReadProblemCodeAsync(voidAfterClose));
+
+        var lateOnline = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variant1, 1, 1000m)], null, null, [Pay("Card", "NIO", 1000m)]);
+        Assert.Equal(HttpStatusCode.Conflict, lateOnline.StatusCode);
+        Assert.Equal("session_closed", await ApiTestHelpers.ReadProblemCodeAsync(lateOnline));
+
+        var lateOffline = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variant1, 1, 1000m)], null, null,
+            [Pay("Card", "NIO", 1000m)], isOffline: true);
+        Assert.Equal(HttpStatusCode.Created, lateOffline.StatusCode); // ocurrió sin red: se conserva y queda para conciliación
+        Assert.True((await ReadAsync(lateOffline)).GetProperty("sale").GetProperty("requiresReview").GetBoolean());
+
+        var immutableClose = await GetAsync(seller.Client, $"/api/v1/cash/sessions/{session}/summary");
+        Assert.Equal(2, immutableClose.GetProperty("totals").GetProperty("salesCount").GetInt32());
+        Assert.Equal(2800m, immutableClose.GetProperty("totals").GetProperty("netTotalNio").GetDecimal());
+        Assert.Equal(-6m, immutableClose.GetProperty("differenceCashNio").GetDecimal());
 
         var consolidated = await GetAsync(fixture.Admin, "/api/v1/cash/consolidated");
         Assert.True(consolidated.GetProperty("totals").GetProperty("netTotalNio").GetDecimal() >= 2800m);
@@ -167,6 +186,16 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         var reused = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], discount, approvalId, [Pay("Cash", "NIO", 750m)]);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, reused.StatusCode);
 
+        // La autorización es realmente de un solo uso incluso si dos cobros llegan juntos.
+        var concurrentApproval = await PostAsync(seller.Client, seller.Csrf, "/api/v1/pos/discount-approvals", new { username = CatalogApiFixture.AdminUsername, password = CatalogApiFixture.DefaultPassword });
+        var concurrentApprovalId = concurrentApproval.GetProperty("approvalId").GetGuid();
+        var concurrent = await Task.WhenAll(
+            PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], discount, concurrentApprovalId, [Pay("Cash", "NIO", 750m)]),
+            PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], discount, concurrentApprovalId, [Pay("Cash", "NIO", 750m)]));
+        Assert.Single(concurrent, response => response.StatusCode == HttpStatusCode.Created);
+        var rejectedConcurrentDiscount = Assert.Single(concurrent, response => response.StatusCode == HttpStatusCode.UnprocessableEntity);
+        Assert.Equal("discount_not_authorized", await ApiTestHelpers.ReadProblemCodeAsync(rejectedConcurrentDiscount));
+
         var insufficient = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null, [Pay("Cash", "NIO", 900m)]);
         Assert.Equal("payment_insufficient", await ApiTestHelpers.ReadProblemCodeAsync(insufficient));
         // Los dólares se aceptan por tarjeta, pero un pago de más sin efectivo no tiene cambio posible.
@@ -177,7 +206,31 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         var changeWithoutCash = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null, [Pay("Transfer", "NIO", 1200m, bank: "BAC")]);
         Assert.Equal("payment_exceeds_total", await ApiTestHelpers.ReadProblemCodeAsync(changeWithoutCash));
 
-        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 750m, countedCashUsd = 0m });
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 1500m, countedCashUsd = 0m });
+    }
+
+    [PostgresFact]
+    public async Task OnlineSaleRejectsAClientPriceDifferentFromTheOfficialPrice()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        var product = await CreateProductAsync(catalogs, "Precio protegido", 1000m, [(3, null)]);
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller, 0m, 0m);
+
+        var manipulated = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1m)], null, null,
+            [Pay("Cash", "NIO", 1m)]);
+        Assert.Equal(HttpStatusCode.Conflict, manipulated.StatusCode);
+        Assert.Equal("price_changed", await ApiTestHelpers.ReadProblemCodeAsync(manipulated));
+
+        var staleRate = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null,
+            [Pay("Cash", "USD", 1000m, 1m)]);
+        Assert.Equal(HttpStatusCode.Conflict, staleRate.StatusCode);
+        Assert.Equal("exchange_rate_changed", await ApiTestHelpers.ReadProblemCodeAsync(staleRate));
+
+        var detail = await GetAsync(fixture.Admin, $"/api/v1/products/{product.GetProperty("id").GetGuid()}");
+        Assert.Equal(3, detail.GetProperty("variants")[0].GetProperty("stock").GetInt32());
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 0m, countedCashUsd = 0m });
     }
 
     [PostgresFact]

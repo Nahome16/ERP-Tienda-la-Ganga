@@ -98,7 +98,7 @@ public sealed class SettingsService(
                 return Invalid("usdRate", "La tasa del dólar debe ser mayor que cero.");
             }
 
-            settings.UsdRate = Math.Round(rate, 4);
+            settings.UsdRate = Math.Round(rate, 4, MidpointRounding.AwayFromZero);
         }
 
         if (input.StoreName is { } name)

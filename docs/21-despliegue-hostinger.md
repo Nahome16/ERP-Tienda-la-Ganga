@@ -246,7 +246,9 @@ Le hará estas preguntas:
 | Correo | Un correo real que usted lea |
 | Usuario del administrador | Enter para dejar `administrador`, o el que prefiera |
 | Nombre completo | Cómo se mostrará (ej. "Administradora La Ganga") |
-| Contraseña del administrador | **12 caracteres o más.** Use una frase larga que pueda recordar. No use apóstrofos (`'`) |
+| Correo de acceso | El correo donde recibirá el código inicial |
+| Servidor, puerto y usuario SMTP | Los datos proporcionados por su proveedor de correo |
+| Contraseña SMTP | Use una contraseña de aplicación cuando el proveedor la exija; no use apóstrofos (`'`) |
 
 El script genera solo una contraseña larga para la base de datos y guarda todo
 en el archivo `.env` (solo su usuario puede leerlo). **Nunca comparta ni suba el
@@ -296,10 +298,11 @@ docker compose -f compose.prod.yml run --rm cli --bootstrap-admin
 Debe decir que el administrador inicial fue creado (también carga los catálogos
 iniciales: marcas, cortes, tallas, colores y categorías). Esto usa las variables
 `LA_GANGA_ADMIN_USERNAME`, `LA_GANGA_ADMIN_DISPLAY_NAME` y
-`LA_GANGA_ADMIN_PASSWORD` del `.env`. Si dice que se omitió porque *ya existe al
+`LA_GANGA_ADMIN_EMAIL` del `.env`. También usa la configuración `EMAIL_*` para
+enviar un código de seis dígitos. Si dice que se omitió porque *ya existe al
 menos un usuario*, el administrador ya estaba creado.
 
-**Inmediatamente después, borre la contraseña del archivo `.env`:**
+**Inmediatamente después, borre los datos de creación inicial del archivo `.env`:**
 
 ```
 ./init-env.sh --quitar-admin
@@ -312,8 +315,9 @@ para `--sync-roles` y `--seed-catalogs` si algún día se lo piden.)
 
 ## 8. Primer ingreso y creación de vendedores
 
-1. En el navegador abra `https://SU_DOMINIO` e ingrese con el usuario y la
-   contraseña del administrador.
+1. En el navegador abra `https://SU_DOMINIO`, elija **Código por correo**, escriba
+   el correo del administrador y el código recibido. El sistema exigirá crear una
+   contraseña antes de permitir el acceso al panel.
 2. Vaya a **Equipo** en el menú.
 3. Cree **una cuenta por persona**: cada vendedor/a con su propio usuario y
    contraseña, con el rol **Vendedor** (solo punto de venta). Para quien
@@ -604,11 +608,11 @@ desde el panel de Hostinger). Al volver, las cajas sincronizan solas.
 ## 14. Seguridad
 
 - **Cambie las contraseñas** que usó durante la instalación si las compartió o
-  las escribió en algún chat. La contraseña del administrador debe ser larga (12
-  caracteres o más) y única.
+  las escribió en algún chat. La contraseña creada por el administrador después
+  de verificar su correo debe ser larga (12 caracteres o más) y única.
 - **No comparta cuentas.** Una persona, una cuenta. Cuando alguien deja la
   tienda, **desactive su cuenta** desde **Equipo** el mismo día.
-- **Borre la contraseña del administrador del `.env`** después de crearlo
+- **Borre los datos de creación del administrador del `.env`** después de crearlo
   (`./init-env.sh --quitar-admin`). El archivo `.env` nunca se sube a Git ni se
   comparte.
 - **Guarde en un gestor de contraseñas** (o en papel bajo llave): la contraseña
@@ -649,8 +653,8 @@ Marque cada punto **antes de abrir al público (10 de noviembre de 2026)**.
 - [ ] Se reinició el servidor (`sudo reboot`) y el sistema volvió a funcionar solo.
 
 **Cuentas y contraseñas**
-- [ ] Administrador creado y su contraseña guardada en un lugar seguro.
-- [ ] Contraseña del administrador **borrada del `.env`** (`./init-env.sh --quitar-admin`).
+- [ ] Administrador creado, correo verificado y contraseña nueva guardada en un lugar seguro.
+- [ ] Datos de creación del administrador **borrados del `.env`** (`./init-env.sh --quitar-admin`).
 - [ ] Una cuenta **por persona** creada en **Equipo** (rol Vendedor / Encargado de inventario).
 - [ ] Ninguna cuenta compartida.
 
@@ -696,9 +700,8 @@ todo en un servidor nuevo:
    ```
 
 5. Entre al sistema con el administrador que existía en el respaldo. (No hace
-   falta `--bootstrap-admin`: los usuarios vienen en el respaldo.) Borre del
-   `.env` la contraseña del administrador que pidió `init-env.sh`:
-   `./init-env.sh --quitar-admin`.
+   falta `--bootstrap-admin`: los usuarios vienen en el respaldo.) Si el `.env`
+   conserva datos de creación inicial, bórrelos con `./init-env.sh --quitar-admin`.
 
 ---
 
@@ -719,7 +722,7 @@ Todos desde `~/la-ganga/infrastructure/deploy`, como usuario `ganga`.
 | Estado del respaldo automático | `./install-cron.sh --estado` |
 | Actualizar | `./update.sh` |
 | Volver a la versión anterior | `./update.sh --revertir` |
-| Borrar clave del admin del `.env` | `./init-env.sh --quitar-admin` |
+| Borrar datos de creación del admin del `.env` | `./init-env.sh --quitar-admin` |
 | Sincronizar roles (si lo piden) | `docker compose -f compose.prod.yml run --rm cli --sync-roles` |
 
 **Archivos de este kit** (`infrastructure/deploy/`):
