@@ -24,6 +24,7 @@ Convenciones generales (iguales a `/api/v1/catalog`):
 | Permiso | Para qué |
 |---|---|
 | `sale.create` | Usar el POS y registrar ventas |
+| `sale.exchange` | Registrar cambios de talla o color con el recibo |
 | `sale.read` | Historial de ventas de toda la tienda |
 | `sale.void` | Anular ventas y resolver ventas «Requiere revisión» |
 | `sale.discount.unlimited` | Autorizar descuentos sobre el límite del vendedor |
@@ -32,7 +33,7 @@ Convenciones generales (iguales a `/api/v1/catalog`):
 | `settings.manage` | Tasa USD, bancos, datos del recibo |
 | `audit.read` | Consultar auditoría |
 
-Vendedor: `catalog.read, product.read, inventory.read, sale.create, cash.operate`.
+Vendedor: `catalog.read, product.read, inventory.read, sale.create, sale.exchange, cash.operate`.
 Encargado de inventario: lo que ya tenía. Administrador: todos.
 
 ## 1. Configuración
@@ -528,3 +529,30 @@ type Lot = {
 - `GET /inventory?partnerId=<id>|none`: filtra variantes con existencias de ese socio. Con
   `investment.read`, cada fila trae `partners: { partnerId: string|null; name: string; units: number }[]`
   y, si hay filtro, `partnerStock` (unidades de ese socio). Sin `investment.read` esos campos no se envían.
+
+
+## Cambios de talla o color
+
+Permiso `sale.exchange`. Solo con conexión. El cliente cambia una prenda por otra
+talla o color **del mismo producto**; no se mueve dinero y la venta no cambia
+(se conserva el precio pagado). El plazo se configura en `exchangeWindowDays`
+(por defecto 4 días, contados en días calendario de Managua).
+
+`GET /exchanges/lookup?number=V-000123` — venta, plazo (`daysSinceSale`,
+`windowDays`, `canExchange`, `blockedReason`), prendas con unidades disponibles
+para cambio y tallas/colores del mismo producto con existencia, y cambios previos.
+
+`POST /exchanges` — **idempotente** por `clientExchangeId`:
+
+```json
+{ "clientExchangeId": "guid", "saleId": "guid", "cashSessionId": "guid|null",
+  "items": [{ "saleLineId": "guid", "quantity": 1, "newVariantId": "guid" }],
+  "note": "Le quedó pequeña" }
+```
+
+Responde `201` con el comprobante `CT-000001` (o `200` con `alreadyProcessed: true`).
+Efectos: Kardex `ExchangeIn` (prenda que regresa) y `ExchangeOut` (prenda que sale),
+entradas PEPS de socios ajustadas y auditoría `sale.exchanged`.
+Errores `409/422`: `sale_voided`, `exchange_window_expired`, `exceeds_sold_quantity`,
+`different_product`, `same_variant`, `variant_inactive`, `insufficient_stock`.
+Una venta con cambios no se puede anular (`sale_has_exchanges`).
