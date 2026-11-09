@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Plus, ScanBarcode, Search } from 'lucide-react'
 import { ApiError } from '../lib/api'
 import { hasPermission } from '../lib/access'
 import { formatNio } from '../lib/money'
@@ -10,6 +11,10 @@ import { noPartnerFilter, partnerFilterParam, partnerUnitsLabel } from '../admin
 import { ExcelShortcut } from '../admin/reportsUi'
 import { LoadError, Kpi, Notice, Pagination, Spinner, Tag } from '../admin/ui'
 import { usePartners } from '../admin/usePartners'
+import { Thumb } from '../admin/ImageManager'
+import { ProductDetailDialog } from '../admin/ProductDetailDialog'
+import { CreateProductDialog } from '../admin/ProductDialogs'
+import { useCatalogs } from '../admin/useCatalogs'
 import { VariantPanel, type PanelVariant } from '../admin/VariantPanel'
 
 const pageSize = 25
@@ -24,6 +29,11 @@ type FilterValue = typeof filters[number]['value']
 export function InventoryView({ user }: { user: CurrentUser }) {
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canPartners = hasPermission(user, 'investment.read')
+  const canCreate = hasPermission(user, 'product.create')
+  const catalogs = useCatalogs()
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const search = useDebounced(searchInput)
   const [filter, setFilter] = useState<FilterValue>('all')
@@ -61,7 +71,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
     try {
       const variant = await getVariantByBarcode(code)
       setSelected({
-        variantId: variant.id, productName: variant.productName, sizeName: variant.sizeName, colorName: variant.colorName,
+        variantId: variant.id, productId: variant.productId, productName: variant.productName, sizeName: variant.sizeName, colorName: variant.colorName,
         barcode: variant.barcode, price: variant.price, stock: variant.stock, cost: variant.cost,
       })
       setScan('')
@@ -87,8 +97,16 @@ export function InventoryView({ user }: { user: CurrentUser }) {
           <h1>Inventario</h1>
           <p className="page-summary">Existencias por variante. Escaneá un código para abrir su ficha, ver el Kardex o registrar un movimiento.</p>
         </div>
-        {hasPermission(user, 'inventory.read') && <div className="page-actions"><ExcelShortcut kind="inventory" /></div>}
+        <div className="page-actions">
+          {hasPermission(user, 'inventory.read') && <ExcelShortcut kind="inventory" />}
+          {canCreate && (
+            <button type="button" className="primary-button" onClick={() => setCreating(true)} disabled={!catalogs.data}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />Nuevo producto
+            </button>
+          )}
+        </div>
       </header>
+      {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
 
       {summary.error && <LoadError message={summary.error} onRetry={summary.reload} />}
       <div className="adm-kpis">
@@ -101,7 +119,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
       <section className="panel-card adm-card">
         <div className="adm-toolbar">
           <form className="adm-scanner" onSubmit={(event) => { void submitScan(event) }} role="search">
-            <span aria-hidden="true">▥</span>
+            <ScanBarcode size={20} strokeWidth={1.75} aria-hidden="true" />
             <input
               value={scan} onChange={(event) => setScan(event.target.value)} autoFocus inputMode="numeric"
               placeholder="Escaneá o escribí el código de barras y presioná Enter" aria-label="Escáner de código de barras"
@@ -109,7 +127,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
             <button type="submit" className="secondary-button" disabled={scanning || !scan.trim()}>{scanning ? 'Buscando…' : 'Buscar'}</button>
           </form>
           <label className="catalog-search grow">
-            <span aria-hidden="true">⌕</span>
+            <Search size={18} strokeWidth={1.75} aria-hidden="true" />
             <input
               type="search" placeholder="Buscar por nombre, marca, talla, color o código" aria-label="Buscar en inventario"
               value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1) }}
@@ -166,7 +184,20 @@ export function InventoryView({ user }: { user: CurrentUser }) {
                   onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected({ ...row }) } }}
                   aria-label={`${row.productName} talla ${row.sizeName} ${row.colorName}, existencia ${row.stock}`}
                 >
-                  <td><span className="row-title">{row.productName}</span><small className="row-sub">{row.categoryName}</small></td>
+                  <td>
+                    <div className="inv-product-cell">
+                      <Thumb src={row.imageUrl} name={row.productName} size={40} />
+                      <div>
+                        <button
+                          type="button" className="link-button row-title" style={{ padding: 0, textAlign: 'left' }}
+                          title="Ver producto: fotos, tallas y colores"
+                          onClick={(event) => { event.stopPropagation(); setDetailId(row.productId) }}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >{row.productName}</button>
+                        <small className="row-sub">{row.categoryName}</small>
+                      </div>
+                    </div>
+                  </td>
                   <td>{row.sizeName}</td>
                   <td>{row.colorName}</td>
                   <td className="adm-mono">{row.barcode}</td>
@@ -200,6 +231,27 @@ export function InventoryView({ user }: { user: CurrentUser }) {
         <VariantPanel
           key={selected.variantId} user={user} variant={selected} lowThreshold={lowThreshold}
           onClose={() => setSelected(null)} onChanged={refreshAll}
+          onOpenProduct={selected.productId ? () => { setDetailId(selected.productId ?? null); setSelected(null) } : undefined}
+        />
+      )}
+      {detailId && catalogs.data && (
+        <ProductDetailDialog
+          key={detailId} productId={detailId} user={user} catalogs={catalogs.data} openLabels={false}
+          onClose={() => setDetailId(null)} onChanged={refreshAll}
+        />
+      )}
+      {creating && catalogs.data && (
+        <CreateProductDialog
+          user={user} catalogs={catalogs.data} onClose={() => setCreating(false)}
+          onCreated={(product, images) => {
+            setCreating(false)
+            const base = `Producto «${product.name}» creado con ${product.variants.length} variante${product.variants.length === 1 ? '' : 's'}.`
+            setNotice(images && images.failed.length > 0
+              ? { tone: 'warn', text: `${base} No se pudo subir: ${images.failed.map((item) => `«${item.name}»`).join(', ')}. Reintentá desde la ficha del producto.` }
+              : { tone: 'ok', text: images ? `${base} Se subieron ${images.total} ${images.total === 1 ? 'foto' : 'fotos'}.` : base })
+            refreshAll()
+            setDetailId(product.id)
+          }}
         />
       )}
     </main>

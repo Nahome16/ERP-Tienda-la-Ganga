@@ -59,6 +59,9 @@ public sealed class ImagesAndReportsTests(CatalogApiFixture fixture) : IClassFix
         Assert.Equal(order[0].GetProperty("thumbUrl").GetString(), detail.GetProperty("primaryImageUrl").GetString());
         var list = await GetAsync(fixture.Admin, $"/api/v1/products?search={Uri.EscapeDataString("Blusa con fotos")}");
         Assert.Equal(order[0].GetProperty("thumbUrl").GetString(), list.GetProperty("items")[0].GetProperty("primaryImageUrl").GetString());
+        var inventory = await GetAsync(fixture.Admin, $"/api/v1/inventory?search={Uri.EscapeDataString("Blusa con fotos")}&pageSize=100");
+        Assert.Contains(inventory.GetProperty("items").EnumerateArray(), item =>
+            item.GetProperty("productId").GetGuid() == productId && item.GetProperty("imageUrl").GetString() == order[0].GetProperty("thumbUrl").GetString());
         var snapshot = await GetAsync(fixture.Admin, "/api/v1/pos/snapshot");
         Assert.Contains(snapshot.GetProperty("variants").EnumerateArray(), variant =>
             variant.GetProperty("productId").GetGuid() == productId && variant.GetProperty("imageUrl").GetString() == order[0].GetProperty("thumbUrl").GetString());

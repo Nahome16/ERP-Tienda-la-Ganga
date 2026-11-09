@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import type { SaleRequestPayment, StoreSettings } from '../lib/apiTypes'
 import { formatNio, formatUsd, paymentNio } from '../lib/money'
 import { Modal } from './Modal'
+import { X } from 'lucide-react'
 import {
   amountForPending, checkDraft, currencyLabel, currencyShort, describePayment, emptyDraft, evaluatePayments, methodLabel,
   parseAmount, payCurrencies, payMethods, quickBills, usdToNio, type PayCurrency, type PayMethod, type PaymentDraft,
@@ -241,7 +242,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
                           type="button" className="pv-icon-button" aria-label={`Quitar pago: ${label}`}
                           onClick={() => setPayments((current) => current.filter((_, position) => position !== index))}
                         >
-                          ✕
+                          <X size={16} strokeWidth={1.75} aria-hidden="true" />
                         </button>
                       </li>
                     )

@@ -13,6 +13,7 @@ import { usePartners } from './usePartners'
 
 export type PanelVariant = {
   variantId: string
+  productId?: string
   productName: string
   sizeName: string
   colorName: string
@@ -32,8 +33,10 @@ const kindLabels: Record<Kind, string> = {
 const kardexPageSize = 10
 
 /** Ficha de una variante: existencia, Kardex paginado y formulario de movimiento. */
-export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged }: {
+export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged, onOpenProduct }: {
   user: CurrentUser; variant: PanelVariant; lowThreshold: number; onClose: () => void; onChanged: () => void
+  /** Abre la ficha completa del producto (fotos, tallas y colores). */
+  onOpenProduct?: () => void
 }) {
   const canKardex = hasPermission(user, 'inventory.kardex.read')
   const canAdjust = hasPermission(user, 'inventory.adjust')
@@ -112,6 +115,7 @@ export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged }
         {statusTag}
         <span>Precio <strong>{formatNio(variant.price)}</strong></span>
         {canCost && variant.cost != null && <span>Costo <strong>{formatNio(variant.cost)}</strong></span>}
+        {onOpenProduct && <button type="button" className="secondary-button" style={{ marginLeft: 'auto' }} onClick={onOpenProduct}>Ver producto completo (fotos, tallas y colores)</button>}
       </div>
       {stock < 0 && <Notice tone="warn">El saldo es negativo: se vendió más de lo que había registrado. Revisá el Kardex y corregí con una entrada o un ajuste.</Notice>}
 

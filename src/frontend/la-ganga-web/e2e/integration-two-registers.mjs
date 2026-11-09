@@ -128,7 +128,7 @@ try {
 
   const admin = await newUser('admin')
   await login(admin.page, ADMIN)
-  await admin.page.getByRole('navigation').waitFor({ timeout: 15000 })
+  await admin.page.getByRole('navigation', { name: 'Módulos' }).waitFor({ timeout: 15000 })
   const consolidated = await admin.page.evaluate(async () => (await (await fetch('/api/v1/cash/consolidated')).json()))
   check('Consolidado incluye las dos cajas', consolidated.sessions.length >= 2 && consolidated.openSessionsCount >= 2, `${consolidated.sessions.length} cajas`)
   const t = consolidated.totals

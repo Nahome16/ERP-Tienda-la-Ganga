@@ -14,6 +14,7 @@ import {
   type CatalogStatus,
 } from '../lib/catalogApi'
 import type { CurrentUser } from '../types'
+import { Plus, Search } from 'lucide-react'
 
 const kinds: CatalogKind[] = ['categories', 'brands', 'cuts', 'size-groups', 'sizes', 'colors']
 const pageSize = 25
@@ -205,7 +206,7 @@ export function CatalogsView({ user, isPreview }: { user: CurrentUser; isPreview
         {canManage && !isPreview && (
           <div className="page-actions">
             <button className="primary-button" type="button" onClick={() => setEditor({ mode: 'create' })}>
-              ＋ {labels.create}
+              <Plus size={16} strokeWidth={2} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />{labels.create}
             </button>
           </div>
         )}
@@ -234,7 +235,7 @@ export function CatalogsView({ user, isPreview }: { user: CurrentUser; isPreview
         <section className="panel-card catalog-card">
           <div className="catalog-toolbar">
             <label className="catalog-search">
-              <span aria-hidden="true">⌕</span>
+              <Search size={18} strokeWidth={1.75} aria-hidden="true" />
               <input
                 type="search"
                 placeholder={`Buscar ${labels.plural.toLocaleLowerCase('es')}`}

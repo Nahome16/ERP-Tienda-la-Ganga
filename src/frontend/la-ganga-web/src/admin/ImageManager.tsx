@@ -6,6 +6,7 @@ import { deleteImage, processImageFile, reorderImages, uploadErrorMessage, type 
 import { ACCEPT_ATTRIBUTE, MAX_IMAGES, makeFirst, moveItem, remainingSlots, selectFiles, withOrder } from './imageUtils'
 import { messageFrom } from './format'
 import { Notice } from './ui'
+import { Plus } from 'lucide-react'
 
 /** Marcador neutro cuando no hay imagen (o no cargó). */
 export function ImagePlaceholder({ label = 'Sin imagen' }: { label?: string }) {
@@ -269,7 +270,7 @@ export function ImageManager({ productId, images: initial, canManage, onChanged 
 
         {canManage && !full && (
           <button type="button" className="img-add" disabled={busy} onClick={() => pickRef.current?.click()}>
-            <span aria-hidden="true">＋</span>
+            <Plus size={18} strokeWidth={1.75} aria-hidden="true" />
             <b>Agregar fotos</b>
             <small>o arrastralas acá · quedan {slots}</small>
           </button>
@@ -337,7 +338,7 @@ export function PendingImages({ onChange }: { onChange: (files: File[]) => void 
         ))}
         {items.length < MAX_IMAGES && (
           <button type="button" className="img-add" onClick={() => pickRef.current?.click()}>
-            <span aria-hidden="true">＋</span><b>Agregar fotos</b><small>o arrastralas acá</small>
+            <Plus size={18} strokeWidth={1.75} aria-hidden="true" /><b>Agregar fotos</b><small>o arrastralas acá</small>
           </button>
         )}
       </div>

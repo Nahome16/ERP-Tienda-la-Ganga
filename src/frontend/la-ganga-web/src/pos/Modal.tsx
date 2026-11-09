@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { X } from 'lucide-react'
 
 type ModalProps = {
   title: string
@@ -61,7 +62,7 @@ export function Modal({ title, onClose, children, footer, size = 'md', locked = 
       <div className={`pv-modal pv-modal-${size}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef}>
         <header className="pv-modal-head">
           <h2 id={titleId}>{title}</h2>
-          <button type="button" className="pv-icon-button" onClick={onClose} disabled={locked} aria-label="Cerrar">✕</button>
+          <button type="button" className="pv-icon-button" onClick={onClose} disabled={locked} aria-label="Cerrar"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
         <div className="pv-modal-body">{children}</div>
         {footer && <footer className="pv-modal-foot">{footer}</footer>}

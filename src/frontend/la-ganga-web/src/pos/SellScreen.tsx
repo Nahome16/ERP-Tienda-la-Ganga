@@ -18,6 +18,7 @@ import { buildIndex, findByBarcode, groupByProduct, searchVariants } from './sea
 import { availableStock, pendingUnits } from './stock'
 import { clearCartDraft, loadCartDraft, saveCartDraft } from './storage'
 import type { CartLine, DiscountApproval } from './types'
+import { Check, Plus, ScanBarcode, X } from 'lucide-react'
 
 type SellScreenProps = {
   user: CurrentUser
@@ -307,7 +308,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       <section className="pv-catalog" aria-label="Catálogo">
         <form className="pv-scanner" onSubmit={submitScan}>
           <label htmlFor="pv-scan-input" className="pv-sr-only">Escanear código de barras o buscar producto</label>
-          <span className="pv-scanner-icon" aria-hidden="true">▥</span>
+          <ScanBarcode className="pv-scanner-icon" size={22} strokeWidth={1.75} aria-hidden="true" />
           <input
             id="pv-scan-input" ref={scannerRef} value={query} autoComplete="off" autoCapitalize="none" spellCheck={false}
             placeholder="Escaneá el código o buscá (nombre, marca, talla, color)  ·  F2"
@@ -336,7 +337,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 <small>{[activeProduct.brandName, activeProduct.categoryName].filter(Boolean).join(' · ')}</small>
               </div>
               <strong>{activeProduct.minPrice === activeProduct.maxPrice ? formatNio(activeProduct.minPrice) : `${formatNio(activeProduct.minPrice)} – ${formatNio(activeProduct.maxPrice)}`}</strong>
-              <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" onClick={() => { setSelectedProductId(null); setQuery(''); focusScanner() }}>✕</button>
+              <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" onClick={() => { setSelectedProductId(null); setQuery(''); focusScanner() }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
             </header>
             <div className="pv-variant-rows">
               {[...new Set(activeProduct.variants.map((variant) => variant.colorName))].map((color) => {
@@ -431,10 +432,10 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                     }}
                     onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); focusScanner() } }}
                   />
-                  <button type="button" aria-label={`Sumar una unidad de ${variantLabel(line)}`} onClick={() => { requestQuantity(line.variantId, line.quantity + 1, variantLabel(line)); focusScanner() }}>＋</button>
+                  <button type="button" aria-label={`Sumar una unidad de ${variantLabel(line)}`} onClick={() => { requestQuantity(line.variantId, line.quantity + 1, variantLabel(line)); focusScanner() }}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>
                 </div>
                 <b className="pv-line-total">{formatNio(Math.round(line.quantity * line.unitPrice * 100) / 100)}</b>
-                <button type="button" className="pv-icon-button" aria-label={`Quitar ${variantLabel(line)} del carrito`} onClick={() => { setLines((current) => removeLine(current, line.variantId)); focusScanner() }}>✕</button>
+                <button type="button" className="pv-icon-button" aria-label={`Quitar ${variantLabel(line)} del carrito`} onClick={() => { setLines((current) => removeLine(current, line.variantId)); focusScanner() }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
               </article>
             )
           })}
@@ -530,7 +531,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
         >
           {doneEntry && (
             <div className="pv-done" data-testid="sale-done">
-              <div className="pv-done-check" aria-hidden="true">✓</div>
+              <div className="pv-done-check" aria-hidden="true"><Check size={34} strokeWidth={2.5} /></div>
               <p className="pv-done-ref">{doneEntry.serverSale ? doneEntry.serverSale.number : doneEntry.localSale.number}</p>
               <p className="pv-done-total">{formatNio(doneEntry.localSale.totalNio)}</p>
               {doneEntry.localSale.changeNio > 0 && <p className="pv-done-change">Cambio a entregar: <strong>{formatNio(doneEntry.localSale.changeNio)}</strong></p>}

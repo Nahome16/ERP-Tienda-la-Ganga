@@ -177,7 +177,8 @@ public sealed record InventoryRowDto(
     decimal? Cost,
     decimal? StockValue,
     int? PartnerStock = null,
-    IReadOnlyList<PartnerUnitsDto>? Partners = null);
+    IReadOnlyList<PartnerUnitsDto>? Partners = null,
+    string? ImageUrl = null);
 
 public sealed record PartnerUnitsDto(Guid? PartnerId, string Name, int Units);
 

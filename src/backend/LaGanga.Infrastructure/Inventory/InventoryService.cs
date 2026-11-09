@@ -69,6 +69,8 @@ public sealed class InventoryService : IInventoryService
                 Price = variant.PriceOverride ?? product.BasePrice,
                 Stock = balance == null ? 0 : balance.Quantity,
                 variant.Cost,
+                ImageUrl = dbContext.ProductImages.Where(image => image.ProductId == product.Id)
+                    .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault(),
             };
 
         var canSeePartners = actor.Has(PermissionNames.InvestmentRead);
@@ -160,7 +162,8 @@ public sealed class InventoryService : IInventoryService
             canSeePartners && (partnerFilter is not null || withoutPartner)
                 ? partnerUnits.GetValueOrDefault(row.VariantId)?.Where(unit => unit.PartnerId == partnerFilter).Sum(unit => unit.Units) ?? 0
                 : null,
-            canSeePartners ? partnerUnits.GetValueOrDefault(row.VariantId) ?? [] : null)).ToArray();
+            canSeePartners ? partnerUnits.GetValueOrDefault(row.VariantId) ?? [] : null,
+            row.ImageUrl)).ToArray();
         return Paging.Create(items, query.Page, query.PageSize, total);
     }
 

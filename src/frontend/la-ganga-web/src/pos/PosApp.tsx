@@ -16,6 +16,7 @@ import { SalesPanel } from './SalesPanel'
 import { SellScreen } from './SellScreen'
 import { clearCartDraft, clearCashSession, loadCashSession, saveCashSession } from './storage'
 import './pos.css'
+import { Bell, BellOff } from 'lucide-react'
 
 export type PosAppProps = {
   api: ApiState
@@ -227,7 +228,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
         </div>
 
         <nav className="pv-actions" aria-label="Acciones de la caja">
-          <button type="button" className="pv-btn pv-btn-small pv-on-dark-btn" onClick={toggleSound} aria-pressed={soundEnabled} title="Sonido y vibración del escáner">{soundEnabled ? '🔔 Sonido' : '🔕 Sin sonido'}</button>
+          <button type="button" className="pv-btn pv-btn-small pv-on-dark-btn" onClick={toggleSound} aria-pressed={soundEnabled} title="Sonido y vibración del escáner">{soundEnabled ? <Bell size={16} strokeWidth={1.75} aria-hidden="true" /> : <BellOff size={16} strokeWidth={1.75} aria-hidden="true" />}<span>{soundEnabled ? 'Sonido' : 'Sin sonido'}</span></button>
           {session && <button type="button" className="pv-btn pv-btn-small pv-on-dark-btn" onClick={() => setPanel('sales')}>Ventas de esta caja</button>}
           {session && <button type="button" className="pv-btn pv-btn-small pv-on-dark-btn" onClick={() => setPanel('close')}>Cerrar caja</button>}
           <button type="button" className="pv-btn pv-btn-small pv-btn-outline-dark" onClick={requestLogout}>Cerrar sesión</button>

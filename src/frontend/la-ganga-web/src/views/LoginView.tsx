@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { ApiState } from '../types'
+import { ShieldCheck } from 'lucide-react'
 
 type LoginViewProps = {
   api: ApiState
@@ -39,7 +40,7 @@ export function LoginView({
           <p>Ingresá con tu cuenta personal. La experiencia se adapta automáticamente a tu rol.</p>
         </div>
         <div className="login-security-note">
-          <span aria-hidden="true">✓</span>
+          <ShieldCheck size={18} strokeWidth={1.75} aria-hidden="true" />
           <p><strong>Acceso protegido</strong><small>Las contraseñas no se guardan en el navegador.</small></p>
         </div>
       </section>
