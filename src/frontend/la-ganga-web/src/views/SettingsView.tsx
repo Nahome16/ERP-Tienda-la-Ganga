@@ -11,6 +11,7 @@ import { LoadError, Notice, Spinner } from '../admin/ui'
 type Form = {
   usdRate: string; storeName: string; storeAddress: string; storePhone: string; receiptFooter: string
   banks: string[]; sellerDiscountLimitPercent: string; lowStockThreshold: string
+  exchangeWindowDays: string
 }
 
 function toForm(settings: StoreSettings): Form {
@@ -18,6 +19,7 @@ function toForm(settings: StoreSettings): Form {
     usdRate: String(settings.usdRate), storeName: settings.storeName, storeAddress: settings.storeAddress,
     storePhone: settings.storePhone, receiptFooter: settings.receiptFooter, banks: [...settings.banks],
     sellerDiscountLimitPercent: String(settings.sellerDiscountLimitPercent), lowStockThreshold: String(settings.lowStockThreshold),
+    exchangeWindowDays: String(settings.exchangeWindowDays ?? 4),
   }
 }
 
@@ -30,6 +32,8 @@ function validate(form: Form): { value: StoreSettings | null; errors: Record<str
   if (discount === null || discount < 0 || discount > 100) errors.sellerDiscountLimitPercent = 'Debe estar entre 0 y 100.'
   const low = parseDecimal(form.lowStockThreshold)
   if (low === null || !Number.isInteger(low) || low < 0) errors.lowStockThreshold = 'Debe ser un número entero, cero o mayor.'
+  const exchangeDays = parseDecimal(form.exchangeWindowDays)
+  if (exchangeDays === null || !Number.isInteger(exchangeDays) || exchangeDays < 0 || exchangeDays > 365) errors.exchangeWindowDays = 'Debe ser un número entero entre 0 y 365.'
   if (Object.keys(errors).length > 0) return { value: null, errors }
   return {
     errors,
@@ -37,6 +41,7 @@ function validate(form: Form): { value: StoreSettings | null; errors: Record<str
       usdRate: usdRate as number, storeName: form.storeName.trim(), storeAddress: form.storeAddress.trim(), storePhone: form.storePhone.trim(),
       receiptFooter: form.receiptFooter.trim(), banks: form.banks,
       sellerDiscountLimitPercent: discount as number, lowStockThreshold: low as number,
+      exchangeWindowDays: exchangeDays as number,
     },
   }
 }
@@ -105,6 +110,11 @@ function SettingsForm({ initial, canManage }: { initial: StoreSettings; canManag
             <span>Umbral de stock bajo (unidades)</span>
             <input type="number" step={1} min={0} value={form.lowStockThreshold} disabled={!canManage} onChange={(event) => update({ lowStockThreshold: event.target.value })} aria-invalid={Boolean(errors.lowStockThreshold)} />
             {errors.lowStockThreshold ? <small className="err">{errors.lowStockThreshold}</small> : <small>Una variante con esta cantidad o menos se marca como bajo stock.</small>}
+          </label>
+          <label className="adm-field">
+            <span>Plazo para cambios de talla (días)</span>
+            <input type="number" step={1} min={0} max={365} value={form.exchangeWindowDays} disabled={!canManage} onChange={(event) => update({ exchangeWindowDays: event.target.value })} aria-invalid={Boolean(errors.exchangeWindowDays)} />
+            {errors.exchangeWindowDays ? <small className="err">{errors.exchangeWindowDays}</small> : <small>Días desde la compra en que la caja acepta cambios con recibo. 0 = solo el mismo día.</small>}
           </label>
         </section>
 

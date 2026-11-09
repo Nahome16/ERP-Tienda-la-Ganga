@@ -493,3 +493,28 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
   .pv-page button:active:not(:disabled) { transform: none; }
 }
 @media print { .pv-page, .pv-overlay, .pv-toasts { display: none !important; } }
+
+/* --- Cambio de talla --- */
+.pv-xch-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.pv-xch-search .pv-field { flex: 1 1 220px; margin-top: 0; }
+.pv-xch-search input { min-height: 48px; font-size: 1.05rem; font-weight: 700; letter-spacing: .02em; }
+.pv-xch-search .pv-btn { min-height: 48px; }
+.pv-xch { display: grid; gap: 12px; margin-top: 16px; }
+.pv-xch-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border: 1px solid var(--pv-soft-line); border-radius: 12px; background: var(--pv-seg-bg); }
+.pv-xch-head .pv-hint { margin-top: 2px; }
+.pv-xch-lines { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.pv-xch-line { display: grid; grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1.1fr); align-items: end; gap: 10px 14px; padding: 12px 14px; border: 1px solid var(--pv-soft-line); border-radius: 12px; background: var(--paper, #fffdf9); }
+.pv-xch-line.is-selected { border-color: var(--pv-ok); box-shadow: 0 0 0 1px var(--pv-ok) inset; }
+.pv-xch-info { display: grid; gap: 2px; min-width: 0; }
+.pv-xch-info span { font-size: .9rem; font-weight: 600; }
+.pv-xch-info small { color: var(--muted, #6d6860); font-size: .78rem; font-weight: 600; }
+.pv-xch-qty, .pv-xch-new { display: grid; gap: 4px; min-width: 0; font-size: .78rem; font-weight: 650; color: var(--muted, #6d6860); }
+.pv-xch-qty select, .pv-xch-new select { width: 100%; min-height: 44px; }
+.pv-xch-err { grid-column: 1 / -1; margin: 0; }
+.pv-xch-done { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.pv-xch-done li { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--pv-ok-bg); }
+.pv-xch-done span { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .9rem; font-weight: 600; }
+@media (max-width: 640px) {
+  .pv-xch-line { grid-template-columns: 88px minmax(0, 1fr); }
+  .pv-xch-info { grid-column: 1 / -1; }
+}

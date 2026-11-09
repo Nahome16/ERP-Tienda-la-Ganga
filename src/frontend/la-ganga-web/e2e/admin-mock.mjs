@@ -19,7 +19,7 @@ export function createMock(options = {}) {
   const user = options.user ?? adminUser
   const log = [] // { method, path, body }
   const s = {
-    settings: { usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000', receiptFooter: 'Recibo interno — no es factura', banks: ['BAC', 'Lafise'], sellerDiscountLimitPercent: 10, lowStockThreshold: 2 },
+    settings: { usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000', receiptFooter: 'Recibo interno — no es factura', banks: ['BAC', 'Lafise'], sellerDiscountLimitPercent: 10, lowStockThreshold: 2, exchangeWindowDays: 4 },
     categories: [cat('c1', 'Camisas'), cat('c2', 'Pantalones')],
     brands: [cat('b1', 'Bossini'), cat('b2', 'Levis')],
     cuts: [cat('k1', 'Regular'), cat('k2', 'Slim')],

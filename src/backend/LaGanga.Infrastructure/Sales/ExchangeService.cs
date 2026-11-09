@@ -422,7 +422,7 @@ public sealed class ExchangeService : IExchangeService
         return await MapAsync(exchanges, cancellationToken);
     }
 
-    private async Task<IReadOnlyList<ExchangeDto>> MapAsync(IReadOnlyList<SaleExchange> exchanges, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ExchangeDto>> MapAsync(List<SaleExchange> exchanges, CancellationToken cancellationToken)
     {
         if (exchanges.Count == 0)
         {

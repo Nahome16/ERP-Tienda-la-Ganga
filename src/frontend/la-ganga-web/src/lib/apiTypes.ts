@@ -14,6 +14,8 @@ export type StoreSettings = {
   banks: string[]
   sellerDiscountLimitPercent: number
   lowStockThreshold: number
+  /** Días desde la venta en que se aceptan cambios de talla o color. */
+  exchangeWindowDays: number
 }
 
 export type PosVariant = {
@@ -315,7 +317,7 @@ export type InventoryRow = {
   imageUrl?: string | null
 }
 
-export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid'
+export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid' | 'ExchangeIn' | 'ExchangeOut'
 
 export type KardexRow = {
   type: KardexType
@@ -415,3 +417,81 @@ export type Lot = {
 }
 
 export type PartnerUnits = { partnerId: string | null; name: string; units: number }
+
+// --- Cambios de talla o color ---
+
+export type ExchangeOption = {
+  variantId: string
+  sizeName: string
+  colorName: string
+  colorHex: string | null
+  barcode: string
+  stock: number
+  price: number
+  isActive: boolean
+}
+
+export type ExchangeableLine = {
+  saleLineId: string
+  variantId: string
+  productId: string
+  productName: string
+  sizeName: string
+  colorName: string
+  barcode: string
+  quantity: number
+  alreadyExchanged: number
+  available: number
+  unitPrice: number
+  options: ExchangeOption[]
+}
+
+export type ExchangeLine = {
+  productName: string
+  quantity: number
+  unitPrice: number
+  returnedSizeName: string
+  returnedColorName: string
+  returnedBarcode: string
+  newSizeName: string
+  newColorName: string
+  newBarcode: string
+}
+
+export type Exchange = {
+  id: string
+  number: string
+  saleId: string
+  saleNumber: string
+  createdAtUtc: string
+  userName: string
+  registerName: string | null
+  note: string | null
+  lines: ExchangeLine[]
+}
+
+export type ExchangeLookup = {
+  saleId: string
+  saleNumber: string
+  saleCreatedAtUtc: string
+  status: 'Confirmed' | 'Voided'
+  totalNio: number
+  daysSinceSale: number
+  windowDays: number
+  canExchange: boolean
+  blockedReason: string | null
+  lines: ExchangeableLine[]
+  exchanges: Exchange[]
+}
+
+export type ExchangeItemRequest = { saleLineId: string; quantity: number; newVariantId: string }
+
+export type ExchangeRequest = {
+  clientExchangeId: string
+  saleId: string
+  cashSessionId: string | null
+  items: ExchangeItemRequest[]
+  note: string | null
+}
+
+export type ExchangeResult = { alreadyProcessed: boolean; exchange: Exchange }
