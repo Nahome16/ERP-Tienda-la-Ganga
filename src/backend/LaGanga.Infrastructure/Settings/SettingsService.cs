@@ -176,6 +176,16 @@ public sealed class SettingsService(
             settings.LowStockThreshold = threshold;
         }
 
+        if (input.ExchangeWindowDays is { } window)
+        {
+            if (window is < 0 or > LaGanga.Domain.Sales.ExchangePolicy.MaxWindowDays)
+            {
+                return Invalid("exchangeWindowDays", "El plazo para cambios debe estar entre 0 y 365 días.");
+            }
+
+            settings.ExchangeWindowDays = window;
+        }
+
         settings.UpdatedAtUtc = timeProvider.GetUtcNow();
         settings.UpdatedBy = userId;
         audit.Add(
@@ -197,7 +207,8 @@ public sealed class SettingsService(
             settings.ReceiptFooter,
             settings.Banks,
             settings.SellerDiscountLimitPercent,
-            settings.LowStockThreshold);
+            settings.LowStockThreshold,
+            settings.ExchangeWindowDays);
 
     private static ServiceResult<StoreSettingsDto> Invalid(string field, string message) =>
         Result.Fail<StoreSettingsDto>(ServiceErrorKind.Validation, "validation_failed", message, field);

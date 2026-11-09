@@ -86,6 +86,46 @@ internal sealed class LotService(LaGangaDbContext dbContext)
         }
     }
 
+    /// <summary>
+    /// Devuelve a su entrada original unidades de una línea de venta (cambio de talla).
+    /// Se descuenta primero de las asignaciones más recientes de esa línea.
+    /// </summary>
+    public async Task ReturnFromSaleLineAsync(Guid saleLineId, Guid variantId, int quantity, CancellationToken cancellationToken)
+    {
+        var allocations = await dbContext.LotAllocations
+            .Where(allocation => allocation.SaleLineId == saleLineId && allocation.VariantId == variantId && allocation.Kind == AllocationKind.Sale)
+            .OrderByDescending(allocation => allocation.CreatedAtUtc).ThenByDescending(allocation => allocation.Id)
+            .ToListAsync(cancellationToken);
+        var lotIds = allocations.Where(allocation => allocation.LotId != null).Select(allocation => allocation.LotId!.Value).Distinct().ToArray();
+        var lots = await dbContext.StockLots.Where(lot => lotIds.Contains(lot.Id)).ToDictionaryAsync(lot => lot.Id, cancellationToken);
+        var pending = quantity;
+        foreach (var allocation in allocations)
+        {
+            if (pending == 0)
+            {
+                break;
+            }
+
+            var taken = Math.Min(pending, allocation.Quantity);
+            if (allocation.LotId is { } lotId)
+            {
+                var lot = lots[lotId];
+                lot.QuantityRemaining = Math.Min(lot.QuantityIn, lot.QuantityRemaining + taken);
+            }
+
+            if (taken == allocation.Quantity)
+            {
+                dbContext.LotAllocations.Remove(allocation);
+            }
+            else
+            {
+                allocation.Reduce(taken);
+            }
+
+            pending -= taken;
+        }
+    }
+
     /// <summary>Cuadra las entradas con la existencia real de la variante (ver la invariante de la clase).</summary>
     public async Task ReconcileAsync(Guid variantId, int balance, DateTimeOffset now, CancellationToken cancellationToken)
     {

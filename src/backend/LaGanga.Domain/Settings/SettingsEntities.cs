@@ -27,6 +27,9 @@ public sealed class StoreSettings
 
     public int LowStockThreshold { get; set; }
 
+    /// <summary>Días para aceptar cambios de talla después de la venta (0 = solo el mismo día).</summary>
+    public int ExchangeWindowDays { get; set; } = 4;
+
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
     public Guid? UpdatedBy { get; set; }

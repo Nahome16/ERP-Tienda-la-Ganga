@@ -10,7 +10,8 @@ public sealed record StoreSettingsDto(
     string ReceiptFooter,
     IReadOnlyList<string> Banks,
     decimal SellerDiscountLimitPercent,
-    int LowStockThreshold);
+    int LowStockThreshold,
+    int ExchangeWindowDays);
 
 public sealed record UpdateSettingsInput(
     decimal? UsdRate,
@@ -20,7 +21,8 @@ public sealed record UpdateSettingsInput(
     string? ReceiptFooter,
     IReadOnlyList<string>? Banks,
     decimal? SellerDiscountLimitPercent,
-    int? LowStockThreshold);
+    int? LowStockThreshold,
+    int? ExchangeWindowDays = null);
 
 public interface ISettingsService
 {

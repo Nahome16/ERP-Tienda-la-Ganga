@@ -62,6 +62,10 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
 
     public DbSet<DiscountApproval> DiscountApprovals => Set<DiscountApproval>();
 
+    public DbSet<SaleExchange> SaleExchanges => Set<SaleExchange>();
+
+    public DbSet<SaleExchangeLine> SaleExchangeLines => Set<SaleExchangeLine>();
+
     public DbSet<StoreSettings> Settings => Set<StoreSettings>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -83,6 +87,7 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasSequence<long>(SalesSchema.SaleNumberSequence, SalesSchema.Name).StartsAt(1);
+        modelBuilder.HasSequence<long>(SalesSchema.ExchangeNumberSequence, SalesSchema.Name).StartsAt(1);
         modelBuilder.HasSequence<long>("barcode_seq", "inventory").StartsAt(1);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LaGangaDbContext).Assembly);
     }

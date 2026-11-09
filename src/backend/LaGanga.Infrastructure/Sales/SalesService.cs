@@ -433,6 +433,14 @@ public sealed class SalesService : ISalesService
             return Result.Fail<SaleDto>(ServiceErrorKind.Conflict, "already_voided", "Esta venta ya fue anulada.");
         }
 
+        if (await dbContext.SaleExchanges.AnyAsync(exchange => exchange.SaleId == sale.Id, cancellationToken))
+        {
+            return Result.Fail<SaleDto>(
+                ServiceErrorKind.Conflict,
+                "sale_has_exchanges",
+                "Esta venta tiene cambios de talla registrados y ya no se puede anular. Registrá un ajuste de inventario si hace falta.");
+        }
+
         var cashSession = await LockCashSessionAsync(sale.CashSessionId, cancellationToken);
         if (cashSession is null)
         {

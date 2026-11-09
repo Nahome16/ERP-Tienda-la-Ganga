@@ -17,6 +17,7 @@ public static class SystemRoles
         PermissionNames.ProductRead,
         PermissionNames.InventoryRead,
         PermissionNames.SaleCreate,
+        PermissionNames.SaleExchange,
         PermissionNames.CashOperate,
     ];
 

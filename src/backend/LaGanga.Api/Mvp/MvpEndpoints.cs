@@ -26,6 +26,7 @@ public static class MvpEndpoints
         MapPos(endpoints);
         MapCash(endpoints);
         MapSales(endpoints);
+        MapExchanges(endpoints);
         MapProducts(endpoints);
         MapImages(endpoints);
         MapReports(endpoints);
@@ -188,6 +189,29 @@ public static class MvpEndpoints
                 return actor is null ? ApiHelpers.Unauthorized401() : (await service.ResolveReviewAsync(id, request, actor, ct)).ToHttp();
             })
             .RequireAuthorization(PermissionNames.SaleVoid)
+            .RequireCsrf();
+    }
+
+    private static void MapExchanges(IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/exchanges").WithTags("Exchanges").RequireAuthorization(PermissionNames.SaleExchange);
+
+        group.MapGet("/lookup", async ([FromQuery] string? number, IExchangeService service, CancellationToken ct) =>
+            (await service.LookupAsync(number, ct)).ToHttp());
+
+        group.MapPost("/", async (ExchangeRequest request, IExchangeService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                if (actor is null)
+                {
+                    return ApiHelpers.Unauthorized401();
+                }
+
+                var result = await service.RegisterAsync(request, actor, ct);
+                return result.ToHttp(value => value.AlreadyProcessed
+                    ? Results.Ok(value)
+                    : Results.Created($"/api/v1/exchanges/{value.Exchange.Id}", value));
+            })
             .RequireCsrf();
     }
 

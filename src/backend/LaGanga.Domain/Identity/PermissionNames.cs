@@ -20,6 +20,7 @@ public static class PermissionNames
     public const string SaleCreate = "sale.create";
     public const string SaleRead = "sale.read";
     public const string SaleVoid = "sale.void";
+    public const string SaleExchange = "sale.exchange";
     public const string SaleDiscountUnlimited = "sale.discount.unlimited";
     public const string CashOperate = "cash.operate";
     public const string CashReportRead = "cash.report.read";
@@ -48,6 +49,7 @@ public static class PermissionNames
         SaleCreate,
         SaleRead,
         SaleVoid,
+        SaleExchange,
         SaleDiscountUnlimited,
         CashOperate,
         CashReportRead,

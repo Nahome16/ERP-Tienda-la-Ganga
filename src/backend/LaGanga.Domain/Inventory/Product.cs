@@ -182,6 +182,12 @@ public enum MovementType
     Loss,
     Sale,
     SaleVoid,
+
+    /// <summary>Entra la prenda que el cliente devuelve en un cambio de talla.</summary>
+    ExchangeIn,
+
+    /// <summary>Sale la prenda que el cliente se lleva en un cambio de talla.</summary>
+    ExchangeOut,
 }
 
 /// <summary>Movimiento inmutable del Kardex. Las correcciones se hacen con otro movimiento.</summary>
