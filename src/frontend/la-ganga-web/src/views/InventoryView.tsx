@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Plus, ScanBarcode, Search } from 'lucide-react'
+import { PackagePlus, Plus, ScanBarcode, Search } from 'lucide-react'
 import { ApiError } from '../lib/api'
 import { hasPermission } from '../lib/access'
 import { formatNio } from '../lib/money'
@@ -13,7 +13,9 @@ import { LoadError, Kpi, Notice, Pagination, Spinner, Tag } from '../admin/ui'
 import { usePartners } from '../admin/usePartners'
 import { Thumb } from '../admin/ImageManager'
 import { ProductDetailDialog } from '../admin/ProductDetailDialog'
+import { ProductPickerDialog } from '../admin/ProductPickerDialog'
 import { CreateProductDialog } from '../admin/ProductDialogs'
+import { ReceiveStockDialog } from '../admin/ReceiveStockDialog'
 import { useCatalogs } from '../admin/useCatalogs'
 import { VariantPanel, type PanelVariant } from '../admin/VariantPanel'
 
@@ -30,9 +32,12 @@ export function InventoryView({ user }: { user: CurrentUser }) {
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canPartners = hasPermission(user, 'investment.read')
   const canCreate = hasPermission(user, 'product.create')
+  const canReceive = hasPermission(user, 'inventory.adjust')
   const catalogs = useCatalogs()
   const [detailId, setDetailId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [receiveId, setReceiveId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const search = useDebounced(searchInput)
@@ -99,8 +104,13 @@ export function InventoryView({ user }: { user: CurrentUser }) {
         </div>
         <div className="page-actions">
           {hasPermission(user, 'inventory.read') && <ExcelShortcut kind="inventory" />}
+          {canReceive && (
+            <button type="button" className="primary-button" onClick={() => setPicking(true)} disabled={!catalogs.data}>
+              <PackagePlus size={16} strokeWidth={2} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />Ingresar mercadería
+            </button>
+          )}
           {canCreate && (
-            <button type="button" className="primary-button" onClick={() => setCreating(true)} disabled={!catalogs.data}>
+            <button type="button" className="secondary-button" onClick={() => setCreating(true)} disabled={!catalogs.data}>
               <Plus size={16} strokeWidth={2} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />Nuevo producto
             </button>
           )}
@@ -232,6 +242,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
           key={selected.variantId} user={user} variant={selected} lowThreshold={lowThreshold}
           onClose={() => setSelected(null)} onChanged={refreshAll}
           onOpenProduct={selected.productId ? () => { setDetailId(selected.productId ?? null); setSelected(null) } : undefined}
+          onReceive={selected.productId ? () => { setReceiveId(selected.productId ?? null); setSelected(null) } : undefined}
         />
       )}
       {detailId && catalogs.data && (
@@ -239,6 +250,16 @@ export function InventoryView({ user }: { user: CurrentUser }) {
           key={detailId} productId={detailId} user={user} catalogs={catalogs.data} openLabels={false}
           onClose={() => setDetailId(null)} onChanged={refreshAll}
         />
+      )}
+      {picking && (
+        <ProductPickerDialog
+          onClose={() => setPicking(false)}
+          onPick={(id) => { setPicking(false); setReceiveId(id) }}
+          onCreate={canCreate ? () => { setPicking(false); setCreating(true) } : undefined}
+        />
+      )}
+      {receiveId && catalogs.data && (
+        <ReceiveStockDialog key={receiveId} productId={receiveId} user={user} catalogs={catalogs.data} onClose={() => setReceiveId(null)} onChanged={refreshAll} />
       )}
       {creating && catalogs.data && (
         <CreateProductDialog

@@ -10,6 +10,7 @@ import { ImageManager } from './ImageManager'
 import { useFetch } from './hooks'
 import { LabelsDialog, type LabelVariant } from './LabelsDialog'
 import { AddVariantsDialog, EditProductDialog, EditVariantDialog } from './ProductDialogs'
+import { ReceiveStockDialog } from './ReceiveStockDialog'
 import { Dialog, LoadError, Notice, Spinner, Swatch, Tag } from './ui'
 import type { Catalogs } from './useCatalogs'
 
@@ -27,12 +28,14 @@ type Nested =
   | { kind: 'edit-variant'; variant: Variant }
   | { kind: 'add-variants' }
   | { kind: 'labels' }
+  | { kind: 'receive' }
   | null
 
 export function ProductDetailDialog({ productId, user, catalogs, openLabels, onClose, onChanged }: Props) {
   const canEdit = hasPermission(user, 'product.edit')
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canImages = hasPermission(user, 'product.images.manage')
+  const canReceive = hasPermission(user, 'inventory.adjust')
   const { data: product, error, loading, reload } = useFetch<ProductDetail>(`product|${productId}`, (signal) => getProduct(productId, signal))
   const [nested, setNested] = useState<Nested>(openLabels ? { kind: 'labels' } : null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
@@ -93,6 +96,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
         onClose={onClose}
         footer={product && (
           <>
+            {canReceive && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'receive' })}>Ingresar mercadería</button>}
             {canEdit && <button type="button" className="secondary-button" disabled={busy} onClick={() => toggleProduct(product)}>{product.isActive ? 'Inactivar producto' : 'Activar producto'}</button>}
             {canEdit && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'add-variants' })}>Agregar variantes</button>}
             {canEdit && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'edit-product' })}>Editar producto</button>}
@@ -169,6 +173,9 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
           onClose={() => setNested(null)} onChanged={() => changed()}
           onDone={() => { setNested(null); changed('Se agregaron las variantes.') }}
         />
+      )}
+      {product && nested?.kind === 'receive' && (
+        <ReceiveStockDialog productId={product.id} user={user} catalogs={catalogs} onClose={() => { setNested(null); reload() }} onChanged={() => { reload(); onChanged() }} />
       )}
       {product && nested?.kind === 'labels' && (
         <LabelsDialog title={product.name} variants={labelVariants} onClose={() => setNested(null)} />
