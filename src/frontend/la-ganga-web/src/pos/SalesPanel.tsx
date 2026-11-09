@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Ban, CircleAlert, CircleCheck, Clock, Printer, ReceiptText, RefreshCw, TriangleAlert, WifiOff, type LucideIcon } from 'lucide-react'
 import type { CashSession, Sale } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
 import { channelLabel, formatTime, mergeSales, type SaleRow } from './format'
@@ -57,15 +58,20 @@ export function SalesPanel({ session, entries, online, syncing, onPrint, onRetry
       footer={(
         <>
           <span className="pv-confirm-text">{rows.length} {rows.length === 1 ? 'venta' : 'ventas'} · {formatNio(total)}</span>
-          {online && <button type="button" className="pv-btn pv-btn-ghost" onClick={() => { void load() }} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar'}</button>}
-          {needsAttention && online && <button type="button" className="pv-btn pv-btn-ghost" onClick={onRetryAll} disabled={syncing}>Reintentar envío</button>}
+          {online && <button type="button" className="pv-btn pv-btn-secondary" onClick={() => { void load() }} disabled={loading}><RefreshCw size={18} strokeWidth={1.75} className={loading ? 'pv-spin' : undefined} aria-hidden="true" />{loading ? 'Actualizando…' : 'Actualizar'}</button>}
+          {needsAttention && online && <button type="button" className="pv-btn pv-btn-secondary" onClick={onRetryAll} disabled={syncing}>Reintentar envío</button>}
           <button type="button" className="pv-btn pv-btn-primary" onClick={onClose}>Cerrar</button>
         </>
       )}
     >
-      {!online && <p className="pv-banner pv-banner-warn">Sin conexión: se muestran las ventas guardadas en este equipo.</p>}
-      {error && <p className="pv-banner pv-banner-error" role="alert">{error}</p>}
-      {rows.length === 0 && <p className="pv-empty">Todavía no hay ventas en esta caja.</p>}
+      {!online && <p className="pv-banner pv-banner-warn"><WifiOff size={18} strokeWidth={1.75} aria-hidden="true" /><span>Sin conexión: se muestran las ventas guardadas en este equipo.</span></p>}
+      {error && <p className="pv-banner pv-banner-error" role="alert"><CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" /><span>{error}</span></p>}
+      {rows.length === 0 && (
+        <div className="pv-empty">
+          <span className="pv-badge-icon" aria-hidden="true"><ReceiptText size={26} strokeWidth={1.75} /></span>
+          <p>Todavía no hay ventas en esta caja.</p>
+        </div>
+      )}
       {rows.length > 0 && (
         <ul className="pv-sales-list">
           {rows.map((row) => <SaleItem key={row.clientSaleId} row={row} onPrint={onPrint} onRetry={onRetry} onDetail={() => setDetailId(detailId === row.clientSaleId ? null : row.clientSaleId)} />)}
@@ -87,6 +93,10 @@ export function SalesPanel({ session, entries, online, syncing, onPrint, onRetry
   )
 }
 
+const statusIcons: Record<SaleRow['status'], LucideIcon> = {
+  pending: Clock, sent: CircleCheck, review: TriangleAlert, voided: Ban, attention: CircleAlert,
+}
+
 function SaleItem({ row, onPrint, onRetry, onDetail }: {
   row: SaleRow
   onPrint: (sale: Sale) => void
@@ -94,6 +104,7 @@ function SaleItem({ row, onPrint, onRetry, onDetail }: {
   onDetail: () => void
 }) {
   const { sale } = row
+  const StatusIcon = statusIcons[row.status]
   return (
     <li className={`pv-sale-item is-${row.status}`}>
       <div className="pv-sale-main">
@@ -101,15 +112,15 @@ function SaleItem({ row, onPrint, onRetry, onDetail }: {
         <span>{formatTime(sale.createdAtUtc)} · {channelLabel[sale.channel]}{sale.isOffline ? ' · sin conexión' : ''}</span>
       </div>
       <b className="pv-sale-total">{formatNio(sale.totalNio)}</b>
-      <span className={`pv-pill pv-pill-${row.status}`}>{row.label}</span>
+      <span className={`pv-pill pv-pill-${row.status}`}><StatusIcon size={13} strokeWidth={2} aria-hidden="true" />{row.label}</span>
       <div className="pv-sale-actions">
-        <button type="button" className="pv-btn pv-btn-small" onClick={() => onPrint(sale)}>Recibo</button>
-        <button type="button" className="pv-btn pv-btn-small pv-btn-ghost" onClick={onDetail}>Detalle</button>
+        <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={() => onPrint(sale)}><Printer size={16} strokeWidth={1.75} aria-hidden="true" />Recibo</button>
+        <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={onDetail}>Detalle</button>
         {row.entry && (row.status === 'attention' || (row.status === 'pending' && row.entry.attempts > 0)) && (
-          <button type="button" className="pv-btn pv-btn-small pv-btn-ghost" onClick={() => onRetry(row.clientSaleId)}>Reintentar</button>
+          <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={() => onRetry(row.clientSaleId)}>Reintentar</button>
         )}
       </div>
-      {row.status === 'attention' && row.detail && <p className="pv-sale-msg">{row.detail}</p>}
+      {row.status === 'attention' && row.detail && <p className="pv-sale-msg"><CircleAlert size={14} strokeWidth={1.75} aria-hidden="true" />{row.detail}</p>}
     </li>
   )
 }

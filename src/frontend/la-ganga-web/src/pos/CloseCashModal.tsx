@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { CircleAlert, CircleCheck, Printer, TriangleAlert } from 'lucide-react'
 import type { CashSession, CashSummary } from '../lib/apiTypes'
 import { formatNio, formatUsd, round2 } from '../lib/money'
 import { channelLabel, formatDateTime } from './format'
@@ -30,7 +31,13 @@ const money: Record<ReconCurrency, (value: number) => string> = { NIO: formatNio
 const currencyName: Record<ReconCurrency, string> = { NIO: 'Córdobas', USD: 'Dólares' }
 
 function Diff({ value, format }: { value: number | null; format: (amount: number) => string }) {
-  return <span className={`pv-diff pv-diff-${diffTone(value)}`}>{diffText(value, format)}</span>
+  const tone = diffTone(value)
+  return (
+    <span className={`pv-diff pv-diff-${tone}`}>
+      {tone === 'ok' ? <CircleCheck size={14} strokeWidth={1.75} aria-hidden="true" /> : tone === 'none' ? null : <TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" />}
+      {diffText(value, format)}
+    </span>
+  )
 }
 
 function Row({ label, children, strong = false }: { label: string; children: ReactNode; strong?: boolean }) {
@@ -217,7 +224,7 @@ export function CloseCashModal({
         onClose={onFinish}
         footer={(
           <>
-            <button type="button" className="pv-btn pv-btn-ghost" onClick={() => onPrintSummary(summary)}>Imprimir resumen</button>
+            <button type="button" className="pv-btn pv-btn-secondary" onClick={() => onPrintSummary(summary)}><Printer size={18} strokeWidth={1.75} aria-hidden="true" />Imprimir resumen</button>
             <button type="button" className="pv-btn pv-btn-primary" data-autofocus onClick={onFinish}>Listo</button>
           </>
         )}
@@ -234,7 +241,7 @@ export function CloseCashModal({
               <Row label="Venta bruta">{formatNio(totals.grossTotalNio)}</Row>
               <Row label="Descuentos">−{formatNio(totals.discountTotalNio)}</Row>
               <Row label="Total vendido" strong>{formatNio(totals.netTotalNio)}</Row>
-              {totals.reviewCount > 0 && <p className="pv-banner pv-banner-warn">{totals.reviewCount} venta(s) con revisión pendiente.</p>}
+              {totals.reviewCount > 0 && <p className="pv-banner pv-banner-warn"><TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" /><span>{totals.reviewCount} venta(s) con revisión pendiente.</span></p>}
               {totals.byChannel.length > 0 && <h3 className="pv-sub">Por canal</h3>}
               {totals.byChannel.map((item) => <Row key={item.channel} label={`${channelLabel[item.channel]} (${item.salesCount})`}>{formatNio(item.totalNio)}</Row>)}
             </section>
@@ -267,14 +274,14 @@ export function CloseCashModal({
       footer={confirming ? (
         <>
           <span className="pv-confirm-text">¿Cerrar la caja con estos montos?</span>
-          <button type="button" className="pv-btn pv-btn-ghost" onClick={() => setConfirming(false)} disabled={busy}>Revisar</button>
+          <button type="button" className="pv-btn pv-btn-secondary" onClick={() => setConfirming(false)} disabled={busy}>Revisar</button>
           <button type="button" className="pv-btn pv-btn-primary" onClick={() => { void closeCash() }} disabled={busy} data-autofocus>
             {busy ? 'Cerrando…' : 'Sí, cerrar caja'}
           </button>
         </>
       ) : (
         <>
-          <button type="button" className="pv-btn pv-btn-ghost" onClick={onCancel}>Cancelar</button>
+          <button type="button" className="pv-btn pv-btn-secondary" onClick={onCancel}>Cancelar</button>
           <button type="button" className="pv-btn pv-btn-primary" disabled={blockedReason !== null || !ready} onClick={() => setConfirming(true)}>Cerrar caja</button>
         </>
       )}
@@ -282,25 +289,32 @@ export function CloseCashModal({
       <div className="pv-close">
         {blockedReason && (
           <div className="pv-banner pv-banner-warn" role="alert">
-            {blockedReason}{' '}
-            {online && pendingCount > 0 && (
-              <button type="button" className="pv-link" onClick={onSyncNow} disabled={syncing}>{syncing ? 'Sincronizando…' : 'Sincronizar ahora'}</button>
-            )}
+            <TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span>
+              {blockedReason}{' '}
+              {online && pendingCount > 0 && (
+                <button type="button" className="pv-link" onClick={onSyncNow} disabled={syncing}>{syncing ? 'Sincronizando…' : 'Sincronizar ahora'}</button>
+              )}
+            </span>
           </div>
         )}
         {online && !blockedReason && !ready && (
           expectedError
             ? (
               <div className="pv-banner pv-banner-warn" role="alert">
-                {expectedError}{' '}
-                <button type="button" className="pv-link" onClick={() => { setExpectedError(null); setReloadKey((key) => key + 1) }}>Reintentar</button>
+                <TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+                <span>
+                  {expectedError}{' '}
+                  <button type="button" className="pv-link" onClick={() => { setExpectedError(null); setReloadKey((key) => key + 1) }}>Reintentar</button>
+                </span>
               </div>
             )
-            : <div className="pv-banner" role="status">Consultando lo esperado por el sistema…</div>
+            : <div className="pv-banner" role="status"><span className="pv-spinner pv-spinner-sm" aria-hidden="true" /><span>Consultando lo esperado por el sistema…</span></div>
         )}
         {attentionCount > 0 && (
           <div className="pv-banner pv-banner-warn" role="alert">
-            {attentionCount} {attentionCount === 1 ? 'venta fue rechazada' : 'ventas fueron rechazadas'} por el servidor y no entra{attentionCount === 1 ? '' : 'n'} en el cierre. Revisalas en «Ventas de esta caja».
+            <TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span>{attentionCount} {attentionCount === 1 ? 'venta fue rechazada' : 'ventas fueron rechazadas'} por el servidor y no entra{attentionCount === 1 ? '' : 'n'} en el cierre. Revisalas en «Ventas de esta caja».</span>
           </div>
         )}
 
@@ -308,7 +322,7 @@ export function CloseCashModal({
           <div className="pv-summary">
             <p className="pv-note">Revisá el resumen. Lo esperado lo calcula el sistema; lo verificado es lo que escribiste.</p>
             <ReconTable rows={rows} />
-            {hasDifferences && <p className="pv-banner pv-banner-warn">Hay diferencias. Podés revisar los montos o cerrar igual y dejar una nota.</p>}
+            {hasDifferences && <p className="pv-banner pv-banner-warn"><CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" /><span>Hay diferencias. Podés revisar los montos o cerrar igual y dejar una nota.</span></p>}
             {notes.trim() && <p className="pv-note">Notas: {notes.trim()}</p>}
           </div>
         ) : (

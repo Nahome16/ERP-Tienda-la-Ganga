@@ -62,7 +62,7 @@ export function Modal({ title, onClose, children, footer, size = 'md', locked = 
       <div className={`pv-modal pv-modal-${size}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef}>
         <header className="pv-modal-head">
           <h2 id={titleId}>{title}</h2>
-          <button type="button" className="pv-icon-button" onClick={onClose} disabled={locked} aria-label="Cerrar"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <button type="button" className="pv-icon-button pv-modal-close" onClick={onClose} disabled={locked} aria-label="Cerrar" title="Cerrar"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
         <div className="pv-modal-body">{children}</div>
         {footer && <footer className="pv-modal-foot">{footer}</footer>}

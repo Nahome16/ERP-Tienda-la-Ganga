@@ -4,6 +4,7 @@ import type { CashRegisterInfo, CashSession } from '../lib/apiTypes'
 import { formatDateTime } from './format'
 import { errorMessage, posRequest } from './net'
 import { parseAmount } from './payments'
+import { CircleAlert, Lock, RefreshCw, TriangleAlert, Wallet } from 'lucide-react'
 
 type OpenCashScreenProps = {
   userName: string
@@ -67,17 +68,23 @@ export function OpenCashScreen({ userName, online, onOpened }: OpenCashScreenPro
   return (
     <main className="pv-center-screen">
       <form className="pv-card pv-open-cash" onSubmit={(event) => { void submit(event) }}>
-        <p className="pv-eyebrow">Hola, {userName}</p>
-        <h1>Abrir caja</h1>
+        <header className="pv-open-head">
+          <span className="pv-badge-icon" aria-hidden="true"><Wallet size={26} strokeWidth={1.75} /></span>
+          <div>
+            <p className="pv-eyebrow">Hola, {userName}</p>
+            <h1>Abrir caja</h1>
+          </div>
+        </header>
         <p className="pv-note">Elegí tu caja e indicá cuánto efectivo hay al empezar. Necesitás conexión para abrir la caja.</p>
 
-        {!online && <p className="pv-banner pv-banner-warn" role="alert">Sin conexión. Cuando vuelva la red podrás abrir la caja.</p>}
+        {!online && <p className="pv-banner pv-banner-warn" role="alert"><TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" /><span>Sin conexión. Cuando vuelva la red podrás abrir la caja.</span></p>}
         {loadError && (
           <p className="pv-banner pv-banner-error" role="alert">
-            {loadError} <button type="button" className="pv-link" onClick={() => { void load() }}>Reintentar</button>
+            <CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+            <span>{loadError} <button type="button" className="pv-link" onClick={() => { void load() }}><RefreshCw size={14} strokeWidth={1.75} aria-hidden="true" />Reintentar</button></span>
           </p>
         )}
-        {online && !registers && !loadError && <p className="pv-note">Cargando cajas…</p>}
+        {online && !registers && !loadError && <p className="pv-note" role="status">Cargando cajas…</p>}
 
         {registers && (
           <fieldset className="pv-registers">
@@ -90,9 +97,9 @@ export function OpenCashScreen({ userName, online, onOpened }: OpenCashScreenPro
                     type="radio" name="register" value={register.id} disabled={Boolean(busyBy)}
                     checked={selected === register.id} onChange={() => setSelected(register.id)}
                   />
-                  <span>
+                  <span className="pv-register-text">
                     <strong>{register.name}</strong>
-                    <small>{busyBy ? `Ocupada por ${busyBy.openedByName} desde ${formatDateTime(busyBy.openedAtUtc)}` : 'Libre'}</small>
+                    <small>{busyBy ? <><Lock size={13} strokeWidth={1.75} aria-hidden="true" />{`Ocupada por ${busyBy.openedByName} desde ${formatDateTime(busyBy.openedAtUtc)}`}</> : 'Libre'}</small>
                   </span>
                 </label>
               )
