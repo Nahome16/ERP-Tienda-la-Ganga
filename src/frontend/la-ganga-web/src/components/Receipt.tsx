@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import type { CashSummary, Sale, StoreSettings } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
 import { diffText, reconciliationRows, visibleRows } from '../pos/reconcile'
+import { ReceiptLogo } from './ReceiptLogo'
 import './receipt.css'
 
 type ReceiptProps = { sale: Sale; settings: StoreSettings }
@@ -18,6 +19,7 @@ export function Receipt({ sale, settings }: ReceiptProps) {
   const isProvisional = sale.number.startsWith('#')
   return (
     <div className="receipt-sheet">
+      <ReceiptLogo />
       <h1>{settings.storeName}</h1>
       {settings.storeAddress && <div className="receipt-center">{settings.storeAddress}</div>}
       {settings.storePhone && <div className="receipt-center">Tel. {settings.storePhone}</div>}
