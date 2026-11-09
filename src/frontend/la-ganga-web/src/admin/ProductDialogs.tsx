@@ -1,11 +1,13 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
+import { ScanBarcode } from 'lucide-react'
 import { ApiError } from '../lib/api'
 import type { CurrentUser } from '../types'
 import { hasPermission } from '../lib/access'
 import type { ProductDetail, ProductListItem, Variant } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
-import { addVariant, createProduct, updateProduct, updateVariant, type ProductInput } from './adminApi'
+import { addVariant, createProduct, getVariantByBarcode, updateProduct, updateVariant, type ProductInput } from './adminApi'
 import { parseDecimal } from './csv'
+import { blockEnterSubmit } from './forms'
 import { messageFrom } from './format'
 import { PendingImages } from './ImageManager'
 import { uploadPendingImages, type UploadReport } from './imageApi'
@@ -13,7 +15,7 @@ import { Dialog, Notice } from './ui'
 import type { Catalogs } from './useCatalogs'
 import { categoryOptions } from './useCatalogs'
 import { VariantBuilder } from './VariantBuilder'
-import { builderToInputs, emptyBuilder, type BuilderState } from './variantBuilderLogic'
+import { assignScannedBarcodes, builderToInputs, combosOf, draftBarcodes, emptyBuilder, type BuilderState } from './variantBuilderLogic'
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -22,6 +24,8 @@ function describeError(error: unknown): string {
   }
   return messageFrom(error)
 }
+
+type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: string }
 
 type ProductFields = { name: string; categoryId: string; brandId: string; cutId: string; basePrice: string }
 
@@ -87,10 +91,14 @@ function validateFields(fields: ProductFields): { input: ProductInput | null; er
 }
 
 /** Alta de producto con su matriz de variantes. */
-export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
+export function CreateProductDialog({ user, catalogs, onClose, onCreated, initialBarcode, onOpenExisting }: {
   user: CurrentUser; catalogs: Catalogs; onClose: () => void
   /** `images` solo viene si se eligieron fotos; `failed` lista las que no se pudieron subir. */
   onCreated: (product: ProductDetail, images?: UploadReport) => void
+  /** Código escaneado que no existía: se asigna a la primera variante. */
+  initialBarcode?: string
+  /** Abre la ficha de un producto que ya tiene el código escaneado. */
+  onOpenExisting?: (productId: string) => void
 }) {
   const canImages = hasPermission(user, 'product.images.manage')
   const [pending, setPending] = useState<File[]>([])
@@ -102,9 +110,62 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Códigos escaneados que esperan una variante (todavía no se eligió talla y color).
+  const [pendingCodes, setPendingCodes] = useState<string[]>(() => (initialBarcode?.trim() ? [initialBarcode.trim()] : []))
+  const [scan, setScan] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [scanMessage, setScanMessage] = useState<ScanMessage | null>(
+    initialBarcode?.trim() ? { tone: 'ok', text: `Código nuevo ${initialBarcode.trim()}: completá los datos y elegí talla y color; se asigna a la primera variante.` } : null,
+  )
+  const scanRef = useRef<HTMLInputElement>(null)
 
   const built = builderToInputs(builder, catalogs.sizes, catalogs.colors, new Set(), canCost, canPartners)
   const needsInitialPermission = built.totalUnits > 0 && !canInitial
+
+  /** Aplica el cambio del borrador y coloca los códigos escaneados que estaban esperando. */
+  function changeBuilder(next: BuilderState, codes: string[] = pendingCodes) {
+    const placed = assignScannedBarcodes(next, combosOf(next, catalogs.sizes, catalogs.colors), codes)
+    setBuilder(placed.state)
+    setPendingCodes(placed.leftover)
+    if (codes === pendingCodes && placed.leftover.length < codes.length) {
+      setScanMessage({ tone: 'ok', text: 'Códigos escaneados asignados a las variantes: revisalos en la tabla de cantidades.' })
+    }
+    return placed
+  }
+
+  async function submitScan(event: FormEvent) {
+    event.preventDefault()
+    const code = scan.trim()
+    if (!code) return
+    setScan('')
+    if (pendingCodes.includes(code) || draftBarcodes(builder).has(code)) {
+      setScanMessage({ tone: 'warn', text: `El código ${code} ya está en este producto.` })
+      return
+    }
+    setScanning(true)
+    try {
+      const found = await getVariantByBarcode(code)
+      setScanMessage({
+        tone: 'warn', productId: found.productId ?? undefined,
+        text: `El código ${code} ya pertenece a «${found.productName}» (talla ${found.sizeName} · ${found.colorName}).`,
+      })
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        const placed = changeBuilder(builder, [...pendingCodes, code])
+        setScanMessage({
+          tone: 'ok',
+          text: placed.leftover.includes(code)
+            ? `Código ${code} listo: se asigna cuando elijas talla y color.`
+            : `Código ${code} asignado a la siguiente variante sin código.`,
+        })
+      } else {
+        setScanMessage({ tone: 'error', text: describeError(caught) })
+      }
+    } finally {
+      setScanning(false)
+      scanRef.current?.focus()
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -113,6 +174,10 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
     if (!input) { setError(fieldError); return }
     if (built.inputs.length === 0) { setError('Elegí al menos una talla y un color para crear las variantes.'); return }
     if (built.errors.length > 0) { setError(built.errors[0]); return }
+    if (pendingCodes.length > 0) {
+      setError(`Hay ${pendingCodes.length === 1 ? 'un código escaneado' : `${pendingCodes.length} códigos escaneados`} sin variante (${pendingCodes.join(', ')}). Agregá más tallas o colores, o quitalos.`)
+      return
+    }
     if (needsInitialPermission) { setError('Tu cuenta no puede registrar existencia inicial. Dejá las cantidades en cero.'); return }
     setSaving(true)
     let created: ProductDetail
@@ -147,9 +212,36 @@ export function CreateProductDialog({ user, catalogs, onClose, onCreated }: {
         </>
       )}
     >
-      <form id="create-product-form" className="adm-form" onSubmit={(event) => { void submit(event) }}>
+      <form className="adm-scanner adm-scanner-dialog" onSubmit={(event) => { void submitScan(event) }} role="search">
+        <ScanBarcode size={20} strokeWidth={1.75} aria-hidden="true" />
+        <input
+          ref={scanRef} value={scan} onChange={(event) => setScan(event.target.value)} inputMode="numeric" autoComplete="off"
+          placeholder="Escaneá la etiqueta de la prenda (opcional)" aria-label="Escanear código de la prenda"
+        />
+        <button type="submit" className="secondary-button" disabled={scanning || !scan.trim()}>{scanning ? 'Buscando…' : 'Agregar código'}</button>
+      </form>
+      {scanMessage && (
+        <Notice tone={scanMessage.tone}>
+          {scanMessage.text}
+          {scanMessage.productId && onOpenExisting && (
+            <> <button type="button" className="link-button" onClick={() => onOpenExisting(scanMessage.productId as string)}>Abrir ese producto</button></>
+          )}
+        </Notice>
+      )}
+      {pendingCodes.length > 0 && (
+        <p className="adm-scan-pending">
+          Códigos por asignar: {pendingCodes.map((code) => (
+            <span key={code} className="adm-scan-chip">
+              {code}
+              <button type="button" aria-label={`Quitar ${code}`} onClick={() => setPendingCodes((current) => current.filter((item) => item !== code))}>×</button>
+            </span>
+          ))}
+        </p>
+      )}
+      <p className="adm-scan-hint">Si la prenda no trae código, dejalo vacío: el sistema genera uno para imprimir la etiqueta.</p>
+      <form id="create-product-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
         <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} />
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} />
+        <VariantBuilder catalogs={catalogs} state={builder} onChange={(next) => { changeBuilder(next) }} canCost={canCost} canPartners={canPartners} />
         {canImages && <PendingImages onChange={setPending} />}
         {needsInitialPermission && <Notice tone="warn">Tu cuenta no tiene permiso para registrar existencia inicial: dejá las cantidades vacías.</Notice>}
         {error && <Notice tone="error">{error}</Notice>}
@@ -333,7 +425,7 @@ export function AddVariantsDialog({ product, catalogs, user, onClose, onDone, on
         </>
       )}
     >
-      <form id="add-variants-form" className="adm-form" onSubmit={(event) => { void submit(event) }}>
+      <form id="add-variants-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
         <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} />
         {error && <Notice tone="error">{error}</Notice>}
       </form>

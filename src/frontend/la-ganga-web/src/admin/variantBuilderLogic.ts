@@ -89,3 +89,27 @@ export function builderToInputs(
   }
   return { inputs, errors, totalUnits }
 }
+
+/** Códigos que ya tiene escritos el borrador (sin espacios). */
+export function draftBarcodes(state: BuilderState): Set<string> {
+  return new Set(Object.values(state.drafts).map((draft) => draft.barcode.trim()).filter(Boolean))
+}
+
+/**
+ * Coloca los códigos escaneados, en orden, en las variantes nuevas que todavía
+ * no tienen código. Devuelve el borrador actualizado y los códigos que no
+ * entraron (por ejemplo, porque aún no se eligió talla y color).
+ */
+export function assignScannedBarcodes(
+  state: BuilderState, combos: Combo[], codes: string[], existing: Set<string> = new Set(),
+): { state: BuilderState; leftover: string[] } {
+  const used = draftBarcodes(state)
+  const queue = codes.map((code) => code.trim()).filter((code) => code && !used.has(code))
+  let next = state
+  for (const combo of combos) {
+    if (queue.length === 0) break
+    if (existing.has(combo.key) || draftOf(next, combo.key).barcode.trim()) continue
+    next = setDraft(next, combo.key, { barcode: queue.shift() as string })
+  }
+  return { state: next, leftover: queue }
+}

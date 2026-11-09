@@ -129,6 +129,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
       {creating && catalogs.data && (
         <CreateProductDialog
           user={user} catalogs={catalogs.data} onClose={() => setCreating(false)}
+          onOpenExisting={(productId) => { setCreating(false); setDetail({ id: productId, labels: false }) }}
           onCreated={(product, images) => {
             setCreating(false)
             const base = `Producto «${product.name}» creado con ${product.variants.length} variante${product.variants.length === 1 ? '' : 's'}. Podés imprimir sus etiquetas desde la lista.`
