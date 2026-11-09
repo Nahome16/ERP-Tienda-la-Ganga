@@ -6,6 +6,7 @@
 .receipt-sheet .receipt-rule { border: 0; border-top: 1px dashed #000; margin: 6px 0; }
 .receipt-sheet .receipt-line-name { font-weight: 700; }
 .receipt-sheet .receipt-total { font-size: 14px; font-weight: 700; }
+.receipt-sheet .receipt-title { margin-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: .08em; }
 .receipt-sheet .receipt-bold { font-weight: 700; }
 .receipt-sheet .receipt-small { font-size: 10px; }
 .receipt-sheet .receipt-sign { margin-top: 18px; }

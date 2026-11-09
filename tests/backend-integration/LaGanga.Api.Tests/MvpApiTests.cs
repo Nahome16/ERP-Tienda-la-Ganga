@@ -394,6 +394,31 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         Assert.True(audit.GetProperty("totalCount").GetInt32() >= 1);
     }
 
+    [PostgresFact]
+    public async Task ReceiptTaxpayerDataIsSavedAndValidated()
+    {
+        using var update = await fixture.Admin.SendAsync(ApiTestHelpers.Build(
+            HttpMethod.Put,
+            "/api/v1/settings",
+            fixture.AdminCsrf,
+            new { ownerName = "  Persona de Prueba  ", taxId = "001-010190-0000a", receiptLegend = "Contribuyente Régimen de Cuota Fija" }));
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var seller = await CreateSellerAsync();
+        var settings = await GetAsync(seller.Client, "/api/v1/settings");
+        Assert.Equal("Persona de Prueba", settings.GetProperty("ownerName").GetString());
+        Assert.Equal("001-010190-0000A", settings.GetProperty("taxId").GetString());
+        Assert.Equal("Contribuyente Régimen de Cuota Fija", settings.GetProperty("receiptLegend").GetString());
+        Assert.Equal(36.7m, settings.GetProperty("usdRate").GetDecimal());
+
+        using var invalid = await fixture.Admin.SendAsync(ApiTestHelpers.Build(
+            HttpMethod.Put,
+            "/api/v1/settings",
+            fixture.AdminCsrf,
+            new { taxId = "RUC con espacios" }));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
     // ---------------------------------------------------------------- ayudas
 
     private static object Pay(string method, string currency, decimal amount, decimal? rate = null, string? bank = null) =>

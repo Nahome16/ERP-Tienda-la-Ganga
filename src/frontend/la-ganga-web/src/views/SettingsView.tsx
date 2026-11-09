@@ -9,14 +9,16 @@ import { useFetch } from '../admin/hooks'
 import { LoadError, Notice, Spinner } from '../admin/ui'
 
 type Form = {
-  usdRate: string; storeName: string; storeAddress: string; storePhone: string; receiptFooter: string
+  usdRate: string; storeName: string; storeAddress: string; storePhone: string
+  ownerName: string; taxId: string; receiptLegend: string; receiptFooter: string
   banks: string[]; sellerDiscountLimitPercent: string; lowStockThreshold: string
 }
 
 function toForm(settings: StoreSettings): Form {
   return {
     usdRate: String(settings.usdRate), storeName: settings.storeName, storeAddress: settings.storeAddress,
-    storePhone: settings.storePhone, receiptFooter: settings.receiptFooter, banks: [...settings.banks],
+    storePhone: settings.storePhone, ownerName: settings.ownerName ?? '', taxId: settings.taxId ?? '',
+    receiptLegend: settings.receiptLegend ?? '', receiptFooter: settings.receiptFooter, banks: [...settings.banks],
     sellerDiscountLimitPercent: String(settings.sellerDiscountLimitPercent), lowStockThreshold: String(settings.lowStockThreshold),
   }
 }
@@ -26,6 +28,7 @@ function validate(form: Form): { value: StoreSettings | null; errors: Record<str
   const usdRate = parseDecimal(form.usdRate)
   if (usdRate === null || usdRate <= 0) errors.usdRate = 'La tasa debe ser un número mayor que cero.'
   if (!form.storeName.trim()) errors.storeName = 'Escribí el nombre de la tienda.'
+  if (!/^[A-Za-z0-9-]*$/.test(form.taxId.trim())) errors.taxId = 'El RUC solo admite letras, números y guiones.'
   const discount = parseDecimal(form.sellerDiscountLimitPercent)
   if (discount === null || discount < 0 || discount > 100) errors.sellerDiscountLimitPercent = 'Debe estar entre 0 y 100.'
   const low = parseDecimal(form.lowStockThreshold)
@@ -35,6 +38,7 @@ function validate(form: Form): { value: StoreSettings | null; errors: Record<str
     errors,
     value: {
       usdRate: usdRate as number, storeName: form.storeName.trim(), storeAddress: form.storeAddress.trim(), storePhone: form.storePhone.trim(),
+      ownerName: form.ownerName.trim(), taxId: form.taxId.trim().toUpperCase(), receiptLegend: form.receiptLegend.trim(),
       receiptFooter: form.receiptFooter.trim(), banks: form.banks,
       sellerDiscountLimitPercent: discount as number, lowStockThreshold: low as number,
     },
@@ -116,6 +120,15 @@ function SettingsForm({ initial, canManage }: { initial: StoreSettings; canManag
             {errors.storeName && <small className="err">{errors.storeName}</small>}
           </label>
           <label className="adm-field">
+            <span>Nombre del contribuyente</span>
+            <input value={form.ownerName} maxLength={120} disabled={!canManage} placeholder="Como está inscrito en la DGI" onChange={(event) => update({ ownerName: event.target.value })} />
+          </label>
+          <label className="adm-field">
+            <span>RUC</span>
+            <input value={form.taxId} maxLength={30} disabled={!canManage} autoCapitalize="characters" spellCheck={false} onChange={(event) => update({ taxId: event.target.value })} aria-invalid={Boolean(errors.taxId)} />
+            {errors.taxId && <small className="err">{errors.taxId}</small>}
+          </label>
+          <label className="adm-field">
             <span>Dirección</span>
             <input value={form.storeAddress} maxLength={200} disabled={!canManage} onChange={(event) => update({ storeAddress: event.target.value })} />
           </label>
@@ -124,8 +137,13 @@ function SettingsForm({ initial, canManage }: { initial: StoreSettings; canManag
             <input value={form.storePhone} maxLength={40} disabled={!canManage} onChange={(event) => update({ storePhone: event.target.value })} />
           </label>
           <label className="adm-field">
+            <span>Leyenda del régimen</span>
+            <input value={form.receiptLegend} maxLength={120} disabled={!canManage} placeholder="Contribuyente Régimen de Cuota Fija" onChange={(event) => update({ receiptLegend: event.target.value })} />
+            <small>Opcional. Se imprime debajo de los datos de la tienda.</small>
+          </label>
+          <label className="adm-field">
             <span>Pie del recibo</span>
-            <input value={form.receiptFooter} maxLength={200} disabled={!canManage} onChange={(event) => update({ receiptFooter: event.target.value })} />
+            <input value={form.receiptFooter} maxLength={200} disabled={!canManage} placeholder="Ej.: Cambios en 7 días con recibo y etiqueta" onChange={(event) => update({ receiptFooter: event.target.value })} />
           </label>
         </section>
       </div>

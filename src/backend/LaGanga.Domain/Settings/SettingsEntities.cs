@@ -19,6 +19,15 @@ public sealed class StoreSettings
 
     public string StorePhone { get; set; } = string.Empty;
 
+    /// <summary>Nombre del contribuyente inscrito en la DGI (dueño o razón social).</summary>
+    public string OwnerName { get; set; } = string.Empty;
+
+    /// <summary>Número RUC del contribuyente.</summary>
+    public string TaxId { get; set; } = string.Empty;
+
+    /// <summary>Leyenda opcional del régimen, por ejemplo «Contribuyente Régimen de Cuota Fija».</summary>
+    public string ReceiptLegend { get; set; } = string.Empty;
+
     public string ReceiptFooter { get; set; } = string.Empty;
 
     public string[] Banks { get; set; } = [];
