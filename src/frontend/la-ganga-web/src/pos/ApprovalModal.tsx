@@ -52,7 +52,7 @@ export function ApprovalModal({
       locked={busy}
       footer={(
         <>
-          <button type="button" className="pv-btn pv-btn-ghost" onClick={onCancel} disabled={busy}>Cancelar</button>
+          <button type="button" className="pv-btn pv-btn-secondary" onClick={onCancel} disabled={busy}>Cancelar</button>
           <button type="submit" form="pv-approval-form" className="pv-btn pv-btn-primary" disabled={busy || !username.trim() || !password}>
             {busy ? 'Validando…' : 'Aprobar descuento'}
           </button>

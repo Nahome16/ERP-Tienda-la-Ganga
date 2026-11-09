@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import type { SaleRequestPayment, StoreSettings } from '../lib/apiTypes'
 import { formatNio, formatUsd, paymentNio } from '../lib/money'
 import { Modal } from './Modal'
-import { X } from 'lucide-react'
+import { Banknote, CircleCheck, CreditCard, Landmark, TriangleAlert, X } from 'lucide-react'
 import {
   amountForPending, checkDraft, currencyLabel, currencyShort, describePayment, emptyDraft, evaluatePayments, methodLabel,
   parseAmount, payCurrencies, payMethods, quickBills, usdToNio, type PayCurrency, type PayMethod, type PaymentDraft,
@@ -16,6 +16,8 @@ type PaymentModalProps = {
   onConfirm: (payments: SaleRequestPayment[]) => void
   onCancel: () => void
 }
+
+const methodIcons = { Cash: Banknote, Transfer: Landmark, Card: CreditCard } as const
 
 const methodKeys: Record<string, PayMethod> = { F1: 'Cash', F2: 'Transfer', F3: 'Card', 1: 'Cash', 2: 'Transfer', 3: 'Card' }
 
@@ -114,7 +116,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
       locked={busy}
       footer={(
         <>
-          <button type="button" className="pv-btn pv-btn-ghost" onClick={onCancel} disabled={busy}>Cancelar (Esc)</button>
+          <button type="button" className="pv-btn pv-btn-secondary" onClick={onCancel} disabled={busy}>Cancelar (Esc)</button>
           <button type="button" className="pv-btn pv-btn-primary pv-btn-xl" onClick={confirm} disabled={!evaluation.valid || busy}>
             {busy ? 'Guardando…' : `Confirmar cobro ${formatNio(totalNio)}`}
           </button>
@@ -137,6 +139,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
                   aria-selected={method === item} aria-controls="pay-panel" tabIndex={method === item ? 0 : -1}
                   className={method === item ? 'is-active' : ''} onClick={() => selectMethod(item)}
                 >
+                  {(() => { const Icon = methodIcons[item]; return <Icon size={18} strokeWidth={1.75} aria-hidden="true" /> })()}
                   {methodLabel[item]} <kbd>F{index + 1}</kbd>
                 </button>
               ))}
@@ -205,12 +208,12 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
               )}
 
               {method !== 'Cash' && <p className="pv-hint">No puede pasarse del total: solo el efectivo da cambio.</p>}
-              {check.error && <p className="pv-hint pv-warn" role="status">{check.error}</p>}
+              {check.error && <p className="pv-hint pv-warn" role="status"><TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" /><span>{check.error}</span></p>}
               {check.payment && check.changeNio > 0 && (
-                <p className="pv-hint pv-ok" role="status">Con este pago el cambio será {formatNio(check.changeNio)} (siempre en córdobas).</p>
+                <p className="pv-hint pv-ok" role="status"><CircleCheck size={14} strokeWidth={1.75} aria-hidden="true" /><span>Con este pago el cambio será {formatNio(check.changeNio)} (siempre en córdobas).</span></p>
               )}
 
-              <button type="button" className="pv-btn pv-btn-primary pv-add-pay" disabled={!check.payment} onClick={addDraft}>
+              <button type="button" className="pv-btn pv-btn-secondary pv-add-pay" disabled={!check.payment} onClick={addDraft}>
                 Agregar pago <kbd>Enter</kbd>
               </button>
             </div>
@@ -226,6 +229,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
                     const label = `${describePayment(payment)} ${formatMoney(payment.currency, payment.amount)}`
                     return (
                       <li key={`${payment.method}-${index}`} data-testid="pay-line">
+                        <span className="pv-pay-line-icon" aria-hidden="true">{(() => { const Icon = methodIcons[payment.method]; return <Icon size={18} strokeWidth={1.75} /> })()}</span>
                         <div className="pv-pay-line-main">
                           <strong>{methodLabel[payment.method]}</strong>
                           <span>
@@ -252,7 +256,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
             {payments.length > 0 && (
               <button type="button" className="pv-link" onClick={() => setPayments([])}>Limpiar pagos</button>
             )}
-            {evaluation.valid && <p className="pv-hint pv-ok" role="status">Cobro completo. Presioná Enter o «Confirmar cobro».</p>}
+            {evaluation.valid && <p className="pv-hint pv-ok" role="status"><CircleCheck size={14} strokeWidth={1.75} aria-hidden="true" /><span>Cobro completo. Presioná Enter o «Confirmar cobro».</span></p>}
           </aside>
         </div>
 

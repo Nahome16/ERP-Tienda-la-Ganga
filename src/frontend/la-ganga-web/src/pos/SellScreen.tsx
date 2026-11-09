@@ -18,7 +18,9 @@ import { buildIndex, findByBarcode, groupByProduct, searchVariants } from './sea
 import { availableStock, pendingUnits } from './stock'
 import { clearCartDraft, loadCartDraft, saveCartDraft } from './storage'
 import type { CartLine, DiscountApproval } from './types'
-import { Check, Plus, ScanBarcode, X } from 'lucide-react'
+import {
+  Ban, Check, ChevronDown, ChevronUp, CircleAlert, CircleCheck, Info, Minus, PackageX, Plus, Printer, ScanBarcode, ShoppingBag, Trash2, TriangleAlert, X,
+} from 'lucide-react'
 
 type SellScreenProps = {
   user: CurrentUser
@@ -66,6 +68,8 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   const [payError, setPayError] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [draftLoaded, setDraftLoaded] = useState(false)
+  /** Solo celular y tableta vertical: el carrito es una hoja inferior que se expande. */
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   const index = useMemo(() => buildIndex(snapshot?.variants ?? []), [snapshot])
   const pending = useMemo(() => pendingUnits(engineState.outbox, snapshot), [engineState.outbox, snapshot])
@@ -250,6 +254,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       setChannel('Store')
       setQuery('')
       setSelectedProductId(null)
+      setSheetOpen(false)
       setModal({ kind: 'done', clientSaleId })
       signal('ok', soundEnabled)
     } catch (error) {
@@ -272,6 +277,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   })
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !document.querySelector('.pv-overlay')) setSheetOpen(false)
       if (event.key === 'F2') {
         event.preventDefault()
         if (!document.querySelector('.pv-overlay')) focusScanner(true)
@@ -311,13 +317,19 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
           <ScanBarcode className="pv-scanner-icon" size={22} strokeWidth={1.75} aria-hidden="true" />
           <input
             id="pv-scan-input" ref={scannerRef} value={query} autoComplete="off" autoCapitalize="none" spellCheck={false}
-            placeholder="Escaneá el código o buscá (nombre, marca, talla, color)  ·  F2"
+            placeholder="Escaneá o buscá (nombre, marca, talla, color)"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => { if (event.key === 'Escape') { setQuery(''); setSelectedProductId(null) } }}
           />
-          <button type="submit" className="pv-btn pv-btn-primary">{query.trim() ? 'Agregar' : 'Cobrar'}</button>
+          <kbd className="pv-scanner-key" aria-hidden="true" title="Atajo para ir al campo de escaneo">F2</kbd>
+          <button type="submit" className="pv-btn pv-btn-secondary pv-scanner-btn">{query.trim() ? 'Agregar' : 'Cobrar'}</button>
         </form>
-        <p className={`pv-feedback pv-feedback-${feedback.tone}`} role="status" aria-live="polite">{feedback.text}</p>
+        <p className={`pv-feedback pv-feedback-${feedback.tone}`} role="status" aria-live="polite">
+          {feedback.tone === 'ok' ? <CircleCheck size={16} strokeWidth={1.75} aria-hidden="true" />
+            : feedback.tone === 'error' ? <CircleAlert size={16} strokeWidth={1.75} aria-hidden="true" />
+              : <Info size={16} strokeWidth={1.75} aria-hidden="true" />}
+          <span>{feedback.text}</span>
+        </p>
 
         {index.categories.length > 1 && (
           <div className="pv-pills" role="group" aria-label="Filtrar por categoría">
@@ -337,7 +349,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 <small>{[activeProduct.brandName, activeProduct.categoryName].filter(Boolean).join(' · ')}</small>
               </div>
               <strong>{activeProduct.minPrice === activeProduct.maxPrice ? formatNio(activeProduct.minPrice) : `${formatNio(activeProduct.minPrice)} – ${formatNio(activeProduct.maxPrice)}`}</strong>
-              <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" onClick={() => { setSelectedProductId(null); setQuery(''); focusScanner() }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+              <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" title="Cerrar variantes" onClick={() => { setSelectedProductId(null); setQuery(''); focusScanner() }}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
             </header>
             <div className="pv-variant-rows">
               {[...new Set(activeProduct.variants.map((variant) => variant.colorName))].map((color) => {
@@ -357,9 +369,13 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                             title={left <= 0 ? 'Sin existencias' : undefined}
                             onClick={() => { addVariant(variant); focusScanner() }}
                           >
-                            <span>{variant.sizeName}</span>
-                            <b>{left}</b>
-                            {variant.price !== activeProduct.minPrice && <small>{formatNio(variant.price)}</small>}
+                            <span className="pv-size-name">{variant.sizeName}</span>
+                            <small className="pv-size-state">
+                              {tone === 'out' ? <><Ban size={12} strokeWidth={2} aria-hidden="true" />Agotada</>
+                                : tone === 'low' ? <><TriangleAlert size={12} strokeWidth={2} aria-hidden="true" />Quedan {left}</>
+                                  : `${left} disp.`}
+                            </small>
+                            {variant.price !== activeProduct.minPrice && <small className="pv-size-price">{formatNio(variant.price)}</small>}
                           </button>
                         )
                       })}
@@ -368,24 +384,33 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 )
               })}
             </div>
-            <p className="pv-legend"><span className="pv-dot pv-dot-ok" /> Hay <span className="pv-dot pv-dot-low" /> Quedan pocas <span className="pv-dot pv-dot-out" /> Sin existencias (no se puede vender)</p>
+            <p className="pv-legend">
+              <span><i className="pv-dot pv-dot-ok" />Disponible</span>
+              <span><i className="pv-dot pv-dot-low" />Quedan pocas</span>
+              <span><i className="pv-dot pv-dot-out" />Agotada: no se puede vender</span>
+            </p>
           </article>
         )}
 
         <div className="pv-products" role="list">
           {shownProducts.map((group) => {
             const total = group.variants.reduce((sum, variant) => sum + Math.max(0, remaining(variant)), 0)
+            const stockTone = total <= 0 ? 'out' : total <= settings.lowStockThreshold ? 'low' : 'ok'
             return (
               <button
                 type="button" role="listitem" key={group.productId}
-                className={`pv-product${activeProduct?.productId === group.productId ? ' is-active' : ''}`}
+                className={`pv-product is-stock-${stockTone}${activeProduct?.productId === group.productId ? ' is-active' : ''}`}
                 onClick={() => { setSelectedProductId(group.productId); focusScanner() }}
               >
                 <PosThumb src={group.imageUrl} name={group.productName} size="card" />
                 <strong>{group.productName}</strong>
-                <span>{[group.brandName, group.categoryName].filter(Boolean).join(' · ')}</span>
-                <b>{group.minPrice === group.maxPrice ? formatNio(group.minPrice) : `desde ${formatNio(group.minPrice)}`}</b>
-                <small>{group.variants.length} {group.variants.length === 1 ? 'variante' : 'variantes'} · {total} en stock</small>
+                <span className="pv-product-brand">{[group.brandName, group.categoryName].filter(Boolean).join(' · ') || '\u00a0'}</span>
+                <b className="pv-price">{group.minPrice === group.maxPrice ? formatNio(group.minPrice) : `desde ${formatNio(group.minPrice)}`}</b>
+                <small className="pv-stock">
+                  {stockTone === 'out' && <span className="pv-stock-state"><PackageX size={14} strokeWidth={1.75} aria-hidden="true" />Agotado</span>}
+                  {stockTone === 'low' && <span className="pv-stock-state"><TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" />Quedan {total}</span>}
+                  <span>{group.variants.length} {group.variants.length === 1 ? 'variante' : 'variantes'}{stockTone === 'ok' ? ` · ${total} en stock` : ''}</span>
+                </small>
               </button>
             )
           })}
@@ -394,22 +419,36 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
         {results.length > MAX_PRODUCTS && <p className="pv-note">Mostrando {MAX_PRODUCTS} de {results.length} productos. Escribí más letras para afinar.</p>}
       </section>
 
-      <aside className="pv-cart" aria-label="Venta actual">
+      {sheetOpen && <div className="pv-sheet-scrim" onClick={() => setSheetOpen(false)} aria-hidden="true" />}
+      <aside className={`pv-cart${sheetOpen ? ' is-open' : ''}`} aria-label="Venta actual">
+        <span className="pv-sheet-grip" aria-hidden="true" />
         <header className="pv-cart-head">
-          <div><span>Venta actual</span><strong>{units} {units === 1 ? 'artículo' : 'artículos'}</strong></div>
-          {lines.length > 0 && (
-            <button
-              type="button" className="pv-link"
-              onClick={() => {
-                if (!confirmClear) { setConfirmClear(true); setTimeout(() => setConfirmClear(false), 3000); return }
-                setLines([]); setDiscountText(''); setApproval(null); setConfirmClear(false); focusScanner()
-              }}
-            >{confirmClear ? '¿Seguro? Tocá otra vez' : 'Vaciar'}</button>
-          )}
+          <div className="pv-cart-title">
+            <span className="pv-cart-icon" aria-hidden="true"><ShoppingBag size={20} strokeWidth={1.75} /></span>
+            <div><span>Venta actual</span><strong>{units} {units === 1 ? 'artículo' : 'artículos'}</strong></div>
+          </div>
+          <div className="pv-cart-head-actions">
+            {lines.length > 0 && (
+              <button
+                type="button" className={`pv-link pv-clear${confirmClear ? ' is-confirm' : ''}`}
+                onClick={() => {
+                  if (!confirmClear) { setConfirmClear(true); setTimeout(() => setConfirmClear(false), 3000); return }
+                  setLines([]); setDiscountText(''); setApproval(null); setConfirmClear(false); setSheetOpen(false); focusScanner()
+                }}
+              ><Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />{confirmClear ? '¿Seguro? Tocá otra vez' : 'Vaciar'}</button>
+            )}
+            <button type="button" className="pv-icon-button pv-sheet-close" aria-label="Ocultar carrito" title="Ocultar carrito" onClick={() => setSheetOpen(false)}><ChevronDown size={22} strokeWidth={1.75} aria-hidden="true" /></button>
+          </div>
         </header>
 
         <div className="pv-cart-lines">
-          {lines.length === 0 && <div className="pv-empty-cart"><strong>Carrito vacío</strong><p>Escaneá un código o elegí una variante.</p></div>}
+          {lines.length === 0 && (
+            <div className="pv-empty-cart">
+              <span className="pv-badge-icon" aria-hidden="true"><ShoppingBag size={26} strokeWidth={1.75} /></span>
+              <strong>Carrito vacío</strong>
+              <p>Escaneá un código o elegí una variante.</p>
+            </div>
+          )}
           {lines.map((line) => {
             const known = index.byId.get(line.variantId)
             const available = known ? availableStock(known.stock, line.variantId, pending) : null
@@ -420,10 +459,10 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 <div className="pv-line-info">
                   <strong>{line.productName}</strong>
                   <small>{line.colorName} · {line.sizeName} · {formatNio(line.unitPrice)}</small>
-                  {over && <em>Solo quedan {Math.max(0, available)}: ajustá la cantidad antes de cobrar.</em>}
+                  {over && <em><TriangleAlert size={13} strokeWidth={2} aria-hidden="true" />Solo quedan {Math.max(0, available)}: ajustá la cantidad antes de cobrar.</em>}
                 </div>
                 <div className="pv-qty">
-                  <button type="button" aria-label={`Quitar una unidad de ${variantLabel(line)}`} onClick={() => { setLines((current) => setLineQuantity(current, line.variantId, line.quantity - 1)); focusScanner() }}>−</button>
+                  <button type="button" aria-label={`Quitar una unidad de ${variantLabel(line)}`} onClick={() => { setLines((current) => setLineQuantity(current, line.variantId, line.quantity - 1)); focusScanner() }}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
                   <input
                     type="number" min={1} inputMode="numeric" aria-label={`Cantidad de ${variantLabel(line)}`} value={line.quantity}
                     onChange={(event) => {
@@ -435,25 +474,25 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                   <button type="button" aria-label={`Sumar una unidad de ${variantLabel(line)}`} onClick={() => { requestQuantity(line.variantId, line.quantity + 1, variantLabel(line)); focusScanner() }}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>
                 </div>
                 <b className="pv-line-total">{formatNio(Math.round(line.quantity * line.unitPrice * 100) / 100)}</b>
-                <button type="button" className="pv-icon-button" aria-label={`Quitar ${variantLabel(line)} del carrito`} onClick={() => { setLines((current) => removeLine(current, line.variantId)); focusScanner() }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+                <button type="button" className="pv-icon-button pv-line-remove" aria-label={`Quitar ${variantLabel(line)} del carrito`} title="Quitar del carrito" onClick={() => { setLines((current) => removeLine(current, line.variantId)); focusScanner() }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
               </article>
             )
           })}
         </div>
 
         <div className="pv-cart-foot">
-          <div className="pv-channel" role="group" aria-label="Canal de venta">
+          <div className="pv-seg-group pv-channel" role="group" aria-label="Canal de venta">
             {channels.map((item) => (
-              <button type="button" key={item} className={channel === item ? 'is-active' : ''} onClick={() => setChannel(item)}>{channelLabel[item]}</button>
+              <button type="button" key={item} className={channel === item ? 'is-active' : ''} aria-pressed={channel === item} onClick={() => setChannel(item)}>{channelLabel[item]}</button>
             ))}
           </div>
 
           <div className="pv-discount">
             <div className="pv-discount-row">
               <span id="pv-discount-label">Descuento</span>
-              <div className="pv-toggle" role="group" aria-labelledby="pv-discount-label">
-                <button type="button" className={discountType === 'Percent' ? 'is-active' : ''} onClick={() => setDiscountType('Percent')}>%</button>
-                <button type="button" className={discountType === 'Amount' ? 'is-active' : ''} onClick={() => setDiscountType('Amount')}>C$</button>
+              <div className="pv-seg-group pv-toggle" role="group" aria-labelledby="pv-discount-label">
+                <button type="button" className={discountType === 'Percent' ? 'is-active' : ''} aria-pressed={discountType === 'Percent'} onClick={() => setDiscountType('Percent')}>%</button>
+                <button type="button" className={discountType === 'Amount' ? 'is-active' : ''} aria-pressed={discountType === 'Amount'} onClick={() => setDiscountType('Amount')}>C$</button>
               </div>
               <input
                 inputMode="decimal" aria-label={discountType === 'Percent' ? 'Porcentaje de descuento' : 'Monto de descuento en córdobas'}
@@ -462,13 +501,16 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); focusScanner() } }}
               />
             </div>
-            {needsApproval && approvalValid && approval && <p className="pv-hint pv-ok">Aprobado por {approval.approverName}.</p>}
+            {needsApproval && approvalValid && approval && <p className="pv-hint pv-ok"><CircleCheck size={14} strokeWidth={1.75} aria-hidden="true" />Aprobado por {approval.approverName}.</p>}
             {discountBlocked && (
               <p className="pv-hint pv-warn" role="alert">
-                {offline
-                  ? `Sin conexión: un descuento mayor a ${settings.sellerDiscountLimitPercent}% necesita aprobación del administrador y no se puede pedir ahora.`
-                  : `Más de ${settings.sellerDiscountLimitPercent}%: necesita aprobación del administrador. `}
-                {!offline && <button type="button" className="pv-link" onClick={() => setModal({ kind: 'approval' })}>Pedir aprobación</button>}
+                <TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" />
+                <span>
+                  {offline
+                    ? `Sin conexión: un descuento mayor a ${settings.sellerDiscountLimitPercent}% necesita aprobación del administrador y no se puede pedir ahora.`
+                    : `Más de ${settings.sellerDiscountLimitPercent}%: necesita aprobación del administrador. `}
+                  {!offline && <button type="button" className="pv-link" onClick={() => setModal({ kind: 'approval' })}>Pedir aprobación</button>}
+                </span>
               </p>
             )}
           </div>
@@ -486,8 +528,19 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       </aside>
 
       <div className="pv-mobile-bar">
-        <span>{units} art. · <strong>{formatNio(totals.totalNio)}</strong></span>
-        <button type="button" className="pv-btn pv-btn-primary" disabled={lines.length === 0 || (discountBlocked && offline)} onClick={openPayment}>Cobrar</button>
+        <button type="button" className="pv-cart-toggle" aria-expanded={sheetOpen} onClick={() => setSheetOpen((open) => !open)}>
+          <span className="pv-cart-icon" aria-hidden="true">
+            <ShoppingBag size={22} strokeWidth={1.75} />
+            {units > 0 && <i className="pv-cart-badge">{units}</i>}
+          </span>
+          <span className="pv-cart-toggle-text">
+            <span>{units} {units === 1 ? 'artículo' : 'artículos'}</span>
+            <strong>{formatNio(totals.totalNio)}</strong>
+          </span>
+          <ChevronUp size={20} strokeWidth={1.75} aria-hidden="true" className="pv-cart-toggle-chevron" />
+          <span className="pv-sr-only">Ver carrito</span>
+        </button>
+        <button type="button" className="pv-btn pv-btn-primary pv-btn-lg" disabled={lines.length === 0 || (discountBlocked && offline)} onClick={openPayment}>Cobrar</button>
       </div>
 
       {modal?.kind === 'pay' && (
@@ -521,11 +574,11 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
           footer={(
             <>
               <button
-                type="button" className="pv-btn pv-btn-ghost"
+                type="button" className="pv-btn pv-btn-secondary"
                 onClick={() => { if (doneEntry) onPrint(doneEntry.serverSale ?? doneEntry.localSale) }}
                 disabled={!doneEntry}
-              >Imprimir recibo</button>
-              <button type="button" className="pv-btn pv-btn-primary pv-btn-xl" data-autofocus onClick={closeModal}>Sin recibo · Nueva venta</button>
+              ><Printer size={18} strokeWidth={1.75} aria-hidden="true" />Imprimir recibo</button>
+              <button type="button" className="pv-btn pv-btn-primary pv-btn-lg" data-autofocus onClick={closeModal}>Sin recibo · Nueva venta</button>
             </>
           )}
         >

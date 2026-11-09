@@ -16,7 +16,9 @@ import { SalesPanel } from './SalesPanel'
 import { SellScreen } from './SellScreen'
 import { clearCartDraft, clearCashSession, loadCashSession, saveCashSession } from './storage'
 import './pos.css'
-import { Bell, BellOff } from 'lucide-react'
+import {
+  Bell, BellOff, CircleAlert, CircleCheck, CloudOff, CloudUpload, LayoutDashboard, LogOut, Lock, ReceiptText, RefreshCw, TriangleAlert, Wifi, WifiOff,
+} from 'lucide-react'
 
 export type PosAppProps = {
   api: ApiState
@@ -204,21 +206,26 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
     <main className="pv-page">
       <header className="pv-top">
         <div className="pv-brand">
-          {canReturnToAdmin && <button type="button" className="pv-icon-button pv-on-dark" onClick={() => onNavigate('panel')} aria-label="Volver al panel">‹</button>}
-          <img src="/logo-tienda-la-ganga.png" alt="" />
-          <div>
+          <img src="/logo-tienda-la-ganga.png" alt="" width={36} height={36} />
+          <div className="pv-brand-text">
             <h1>Punto de venta</h1>
             <small>{session ? `${session.registerName} · ` : ''}{user.displayName}</small>
           </div>
         </div>
 
         <div className="pv-status" aria-label="Estado de conexión y sincronización">
-          <span className={`pv-conn pv-conn-${connectionTone}`} role="status" data-testid="connection-status"><i />{connectionLabel}</span>
+          <span className={`pv-chip pv-conn pv-conn-${connectionTone}`} role="status" data-testid="connection-status">
+            {connectionTone === 'offline' ? <WifiOff size={15} strokeWidth={1.75} aria-hidden="true" />
+              : connectionTone === 'syncing' ? <RefreshCw size={15} strokeWidth={1.75} className="pv-spin" aria-hidden="true" />
+                : <Wifi size={15} strokeWidth={1.75} aria-hidden="true" />}
+            {connectionLabel}
+          </span>
           <button
-            type="button" className={`pv-pending${pendingCount > 0 ? ' has-pending' : ''}${attentionCount > 0 ? ' has-attention' : ''}`}
+            type="button" className={`pv-chip pv-pending${pendingCount > 0 ? ' has-pending' : ''}${attentionCount > 0 ? ' has-attention' : ''}`}
             onClick={() => session && setPanel('sales')} disabled={!session} data-testid="pending-count"
             title="Ventas por enviar al servidor"
           >
+            {attentionCount > 0 ? <CircleAlert size={15} strokeWidth={1.75} aria-hidden="true" /> : <CloudUpload size={15} strokeWidth={1.75} aria-hidden="true" />}
             {pendingCount} {pendingCount === 1 ? 'pendiente' : 'pendientes'}{attentionCount > 0 ? ` · ${attentionCount} con error` : ''}
           </button>
           <span className="pv-sync-times">
@@ -227,42 +234,60 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           </span>
         </div>
 
-        <nav className="pv-actions" aria-label="Acciones de la caja">
-          <button type="button" className="pv-btn pv-btn-small pv-on-dark-btn" onClick={toggleSound} aria-pressed={soundEnabled} title="Sonido y vibración del escáner">{soundEnabled ? <Bell size={16} strokeWidth={1.75} aria-hidden="true" /> : <BellOff size={16} strokeWidth={1.75} aria-hidden="true" />}<span>{soundEnabled ? 'Sonido' : 'Sin sonido'}</span></button>
-          {session && <button type="button" className="pv-btn pv-btn-small pv-on-dark-btn" onClick={() => setPanel('sales')}>Ventas de esta caja</button>}
-          {session && <button type="button" className="pv-btn pv-btn-small pv-on-dark-btn" onClick={() => setPanel('close')}>Cerrar caja</button>}
-          <button type="button" className="pv-btn pv-btn-small pv-btn-outline-dark" onClick={requestLogout}>Cerrar sesión</button>
+        <nav className={`pv-actions${canReturnToAdmin && session ? ' is-dense' : ''}`} aria-label="Acciones de la caja">
+          {canReturnToAdmin && (
+            <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => onNavigate('panel')} aria-label="Volver al panel" title="Volver al panel">
+              <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Panel</span>
+            </button>
+          )}
+          <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={toggleSound} aria-pressed={soundEnabled} title="Sonido y vibración del escáner" aria-label={soundEnabled ? 'Sonido' : 'Sin sonido'}>
+            {soundEnabled ? <Bell size={18} strokeWidth={1.75} aria-hidden="true" /> : <BellOff size={18} strokeWidth={1.75} aria-hidden="true" />}<span className="pv-btn-label">{soundEnabled ? 'Sonido' : 'Sin sonido'}</span>
+          </button>
+          {session && (
+            <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('sales')} aria-label="Ventas de esta caja" title="Ventas de esta caja">
+              <ReceiptText size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Ventas de esta caja</span>
+            </button>
+          )}
+          {session && (
+            <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('close')} aria-label="Cerrar caja" title="Cerrar caja">
+              <Lock size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Cerrar caja</span>
+            </button>
+          )}
+          <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={requestLogout} aria-label="Cerrar sesión" title="Cerrar sesión">
+            <LogOut size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Cerrar sesión</span>
+          </button>
         </nav>
       </header>
 
       {state.sessionExpired && (
         <div className="pv-banner pv-banner-error pv-banner-bar" role="alert">
-          Tu sesión venció: iniciá sesión de nuevo para sincronizar. Tus ventas siguen guardadas en este equipo.
-          <button type="button" className="pv-btn pv-btn-small" onClick={() => (onSessionExpired ?? onLogout)()}>Iniciar sesión</button>
+          <span className="pv-banner-text"><CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />Tu sesión venció: iniciá sesión de nuevo para sincronizar. Tus ventas siguen guardadas en este equipo.</span>
+          <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={() => (onSessionExpired ?? onLogout)()}>Iniciar sesión</button>
         </div>
       )}
       {offlineStart && connection === 'offline' && !state.sessionExpired && (
         <div className="pv-banner pv-banner-warn pv-banner-bar" role="status">
-          Modo sin conexión: entraste con el usuario guardado en este equipo. Todo se sincroniza cuando vuelva la red.
+          <span className="pv-banner-text"><WifiOff size={18} strokeWidth={1.75} aria-hidden="true" />Modo sin conexión: entraste con el usuario guardado en este equipo. Todo se sincroniza cuando vuelva la red.</span>
         </div>
       )}
       {attentionCount > 0 && session && (
         <div className="pv-banner pv-banner-warn pv-banner-bar" role="alert">
-          {attentionCount} {attentionCount === 1 ? 'venta requiere' : 'ventas requieren'} atención: el servidor no las aceptó.
-          <button type="button" className="pv-btn pv-btn-small" onClick={() => setPanel('sales')}>Ver detalle</button>
+          <span className="pv-banner-text"><TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" />{attentionCount} {attentionCount === 1 ? 'venta requiere' : 'ventas requieren'} atención: el servidor no las aceptó.</span>
+          <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={() => setPanel('sales')}>Ver detalle</button>
         </div>
       )}
       {staleCatalog && connection === 'offline' && (
-        <div className="pv-banner pv-banner-warn pv-banner-bar" role="status">El catálogo tiene más de 12 horas sin actualizarse: precios y existencias pueden haber cambiado.</div>
+        <div className="pv-banner pv-banner-warn pv-banner-bar" role="status"><span className="pv-banner-text"><TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" />El catálogo tiene más de 12 horas sin actualizarse: precios y existencias pueden haber cambiado.</span></div>
       )}
 
       {phase.kind === 'loading' && (
-        <div className="pv-center-screen"><div className="pv-spinner" aria-hidden="true" /><p>Preparando el punto de venta…</p></div>
+        <div className="pv-center-screen" role="status"><div className="pv-spinner" aria-hidden="true" /><p className="pv-muted">Preparando el punto de venta…</p></div>
       )}
 
       {phase.kind === 'no-data' && (
         <div className="pv-center-screen">
           <div className="pv-card pv-nodata">
+            <span className="pv-badge-icon pv-badge-warn" aria-hidden="true"><CloudOff size={26} strokeWidth={1.75} /></span>
             <h1>No hay datos para vender</h1>
             <p>
               {connection === 'offline'
@@ -270,7 +295,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
                 : 'No pudimos descargar el catálogo ni confirmar tu caja. Comprobá la conexión e intentá de nuevo.'}
             </p>
             {state.snapshotError && <p className="pv-error">{state.snapshotError}</p>}
-            <button type="button" className="pv-btn pv-btn-primary" onClick={() => { void boot() }}>Reintentar</button>
+            <button type="button" className="pv-btn pv-btn-primary" onClick={() => { void boot() }}><RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />Reintentar</button>
           </div>
         </div>
       )}
@@ -278,9 +303,10 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
       {phase.kind === 'error' && (
         <div className="pv-center-screen">
           <div className="pv-card pv-nodata">
+            <span className="pv-badge-icon pv-badge-bad" aria-hidden="true"><CircleAlert size={26} strokeWidth={1.75} /></span>
             <h1>No pudimos preparar tu caja</h1>
             <p className="pv-error">{phase.message}</p>
-            <button type="button" className="pv-btn pv-btn-primary" onClick={() => { void boot() }}>Reintentar</button>
+            <button type="button" className="pv-btn pv-btn-primary" onClick={() => { void boot() }}><RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />Reintentar</button>
           </div>
         </div>
       )}
@@ -352,7 +378,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           onClose={() => setPanel(null)}
           footer={(
             <>
-              <button type="button" className="pv-btn pv-btn-ghost" data-autofocus onClick={() => setPanel(null)}>Quedarme</button>
+              <button type="button" className="pv-btn pv-btn-secondary" data-autofocus onClick={() => setPanel(null)}>Quedarme</button>
               <button type="button" className="pv-btn pv-btn-primary" onClick={() => { setPanel(null); onLogout() }}>Cerrar sesión de todos modos</button>
             </>
           )}
@@ -370,7 +396,14 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
         : <PrintableCashSummary key={printJob.nonce} summary={printJob.summary} storeName={settings.storeName} />)}
 
       <div className="pv-toasts" aria-live="polite">
-        {toasts.map((toast) => <div key={toast.id} className={`pv-toast pv-toast-${toast.tone}`}>{toast.text}</div>)}
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`pv-toast pv-toast-${toast.tone}`}>
+            {toast.tone === 'ok' ? <CircleCheck size={20} strokeWidth={1.75} aria-hidden="true" />
+              : toast.tone === 'warn' ? <TriangleAlert size={20} strokeWidth={1.75} aria-hidden="true" />
+                : <CircleAlert size={20} strokeWidth={1.75} aria-hidden="true" />}
+            <span>{toast.text}</span>
+          </div>
+        ))}
       </div>
     </main>
   )
