@@ -1,5 +1,5 @@
 .receipt-sheet { font-family: 'Courier New', ui-monospace, monospace; font-size: 12px; line-height: 1.35; color: #000; background: #fff; width: 80mm; max-width: 100%; padding: 4mm; margin: 0 auto; box-sizing: border-box; }
-.receipt-sheet .receipt-logo { display: block; width: 34mm; max-width: 60%; height: auto; margin: 0 auto 2mm; }
+.receipt-sheet .receipt-logo { display: block; width: 22mm; max-width: 40%; height: auto; margin: 0 auto 1.5mm; }
 .receipt-sheet h1 { font-size: 15px; margin: 0; text-align: center; }
 .receipt-sheet .receipt-center { text-align: center; }
 .receipt-sheet .receipt-row { display: flex; justify-content: space-between; gap: 6px; }
