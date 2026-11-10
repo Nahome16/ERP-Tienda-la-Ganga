@@ -149,6 +149,18 @@ public sealed class CatalogApiFixture : IAsyncLifetime, IDisposable
         await provider.GetRequiredService<CatalogSeeder>().SeedAsync(null, CancellationToken.None);
     }
 
+    /// <summary>Ejecuta SQL directamente en la base temporal de la prueba (para preparar fechas pasadas).</summary>
+    public async Task ExecuteSqlAsync(string commandText)
+    {
+        var connection = new NpgsqlConnectionStringBuilder(_serverConnection) { Database = _databaseName }.ConnectionString;
+        await using var npgsql = new NpgsqlConnection(connection);
+        await npgsql.OpenAsync();
+#pragma warning disable CA2100 // El SQL lo escribe la propia prueba; no proviene de usuarios.
+        await using var command = new NpgsqlCommand(commandText, npgsql);
+#pragma warning restore CA2100
+        await command.ExecuteNonQueryAsync();
+    }
+
     private async Task ExecuteOnServerAsync(string commandText)
     {
         await using var connection = new NpgsqlConnection(_serverConnection);

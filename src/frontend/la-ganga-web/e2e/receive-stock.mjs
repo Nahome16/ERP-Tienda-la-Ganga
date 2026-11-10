@@ -35,7 +35,7 @@ page.on('response', (r) => { if (r.status() >= 400 && !r.url().includes('auth/me
 await page.goto(BASE)
 await page.getByLabel(/usuario/i).fill('admin')
 await page.getByLabel(/contraseña/i).fill(PASSWORD)
-await page.getByRole('button', { name: /entrar|ingresar|iniciar/i }).click()
+await page.getByRole('button', { name: 'Entrar al sistema' }).click()
 await page.waitForTimeout(1200)
 const unique = `Blusa Ingreso ${Date.now() % 100000}`
 
