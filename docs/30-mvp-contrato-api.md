@@ -180,13 +180,17 @@ banco y la tarjeta contra el cierre de lote de la terminal.
 `GET /cash/sessions?from=YYYY-MM-DD&to=YYYY-MM-DD` — `cash.report.read`:
 `CashSummary[]` (por fecha de apertura, hora de Managua).
 
-`GET /cash/consolidated?date=YYYY-MM-DD` — `cash.report.read`:
+`GET /cash/consolidated?date=YYYY-MM-DD` — `cash.report.read`. Las ventas se agrupan por su
+propia fecha comercial, no por la de apertura de su caja: una caja abierta el 9 y usada el 10
+aparece en ambos días, pero sus ventas del 10 solo suman en el 10. El arqueo (efectivo esperado,
+contado y diferencias) sigue siendo por turno completo.
+
 
 ```ts
 type CashConsolidated = {
   date: string
-  sessions: CashSummary[]          // turnos abiertos ese día (Managua)
-  totals: CashTotals               // suma de todas las cajas
+  sessions: CashSummary[]          // turnos que estuvieron abiertos ese día (Managua); cada uno con su turno completo
+  totals: CashTotals               // ventas cuya fecha comercial (createdAtUtc, Managua) es ese día, de esas cajas
   expectedCashNio: number
   expectedCashUsd: number
   countedCashNio: number | null    // null si alguna caja sigue abierta
@@ -363,7 +367,7 @@ type ProductDetail = ProductListItem & { variants: Variant[] }
 - `PUT /variants/{id}` — `product.edit`, `If-Match`:
   `{ barcode, priceOverride, cost, isActive }`. `cost` solo se acepta con
   `inventory.cost.read`.
-- `GET /variants/by-barcode/{barcode}` — `product.read`: `Variant` + `productName`.
+- `GET /variants/by-barcode/{barcode}` — `product.read`: `{ productName, variant: Variant }` (el frontend lo aplana en `getVariantByBarcode`).
 - `POST /products/import` — `product.create`:
   `{ dryRun: boolean, createMissingCatalogs: boolean, rows: ImportRow[] }`
 

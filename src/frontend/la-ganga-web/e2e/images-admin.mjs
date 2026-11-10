@@ -364,7 +364,7 @@ try {
 
   // =============================== POS ===============================
   console.log('Miniaturas en el POS')
-  const user = { id: 'u1', username: 'vendedor', displayName: 'Vendedor Uno', roles: ['Vendedor'], permissions: ['catalog.read', 'product.read', 'inventory.read', 'sale.create', 'cash.operate'] }
+  const user = { id: 'u1', username: 'vendedor', displayName: 'Vendedor Uno', roles: ['Vendedor'], mustChangePassword: false, permissions: ['catalog.read', 'product.read', 'inventory.read', 'sale.create', 'cash.operate'] }
   const settings = { usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000', receiptFooter: 'x', banks: ['BAC'], sellerDiscountLimitPercent: 10, lowStockThreshold: 2 }
   const pageForJpeg = await browser.newPage()
   await pageForJpeg.goto('about:blank')

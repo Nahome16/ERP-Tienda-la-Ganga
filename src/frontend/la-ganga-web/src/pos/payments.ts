@@ -96,7 +96,7 @@ export function evaluatePayments(totalNio: number, payments: SaleRequestPayment[
   const nonCashNio = round2(paidNio - cashNio)
   let error: string | null = null
   if (changeNio > cashNio) {
-    error = `La transferencia y la tarjeta no pueden dejar pagado de más (sobran ${formatNio(round2(changeNio - cashNio))}): el cambio solo se da del efectivo.`
+    error = `Transferencia y tarjeta suman ${formatNio(round2(changeNio - cashNio))} de más. Solo el efectivo puede dar cambio: bajá ese monto o cobrá la diferencia en efectivo.`
   } else if (payments.some((payment) => payment.currency === 'USD' && !((payment.exchangeRate ?? 0) > 0))) {
     error = 'Falta la tasa del dólar. Sincronizá la configuración o cobrá en córdobas.'
   } else if (banksAvailable && payments.some((payment) => payment.method === 'Transfer' && !payment.bank)) {

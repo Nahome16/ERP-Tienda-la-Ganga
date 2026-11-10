@@ -36,8 +36,8 @@ export function CashSlip({ data }: { data: SlipData }) {
       {data.registers && data.registers.length > 0 && (
         <>
           <h2>Cajas</h2>
-          {data.registers.map((register) => (
-            <div key={register.name}>
+          {data.registers.map((register, index) => (
+            <div key={`${register.name}-${index}`}>
               <Row label={register.name} value={formatNio(register.totalNio)} />
               <div style={{ fontSize: 11 }}>{register.detail}</div>
             </div>

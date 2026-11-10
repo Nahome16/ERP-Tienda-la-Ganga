@@ -9,6 +9,7 @@ import { BreakdownTables, ReconBadge, ReconciliationBlock, TenderedBreakdown } f
 import { PrintableCashSlip, type SlipData } from '../admin/CashSlip'
 import { printCashSlip } from '../admin/cashSlipData'
 import { addDays, formatIsoDate, formatTime, managuaToday } from '../admin/format'
+import { managuaDate } from '../admin/reportsApi'
 import { useFetch } from '../admin/hooks'
 import { methodsFromConsolidated, methodsFromSummary, methodStatus } from '../admin/reconciliation'
 import { ExcelShortcut } from '../admin/reportsUi'
@@ -83,6 +84,11 @@ export function CashView({ user }: { user: CurrentUser }) {
               <span>Hay {data.openSessionsCount} caja{data.openSessionsCount === 1 ? '' : 's'} abierta{data.openSessionsCount === 1 ? '' : 's'}: los montos todavía pueden cambiar. Cerrala desde la tabla de abajo cuando termine el turno.</span>
             </Notice>
           )}
+          {data.sessions.some((item) => managuaDate(new Date(item.session.openedAtUtc)) !== date) && (
+            <Notice tone="info">
+              <span>Algunas cajas se abrieron antes de esta fecha. Los totales de arriba cuentan solo las ventas de esta fecha; en la tabla cada caja muestra su turno completo, porque el arqueo se hace por turno.</span>
+            </Notice>
+          )}
           {totals.reviewCount > 0 && (
             <Notice tone="warn">
               <span>{totals.reviewCount} venta{totals.reviewCount === 1 ? '' : 's'} requiere{totals.reviewCount === 1 ? '' : 'n'} revisión (stock, precio, tasa o caja cerrada).</span>
@@ -112,7 +118,7 @@ export function CashView({ user }: { user: CurrentUser }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.sessions.length === 0 && <tr><td colSpan={10} className="adm-empty">Ninguna caja se abrió este día.</td></tr>}
+                  {data.sessions.length === 0 && <tr><td colSpan={10} className="adm-empty">Ninguna caja estuvo abierta este día.</td></tr>}
                   {data.sessions.map((item) => {
                     const { session } = item
                     const isOpen = session.closedAtUtc === null

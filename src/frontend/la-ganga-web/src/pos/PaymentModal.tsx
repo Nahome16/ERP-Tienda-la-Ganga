@@ -207,7 +207,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
                 </>
               )}
 
-              {method !== 'Cash' && <p className="pv-hint">No puede pasarse del total: solo el efectivo da cambio.</p>}
+              {method !== 'Cash' && <p className="pv-hint">Transferencia y tarjeta se cobran por lo justo (no dan cambio). Si el cliente combina, el efectivo cubre el resto y de ahí sale el cambio.</p>}
               {check.error && <p className="pv-hint pv-warn" role="status"><TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" /><span>{check.error}</span></p>}
               {check.payment && check.changeNio > 0 && (
                 <p className="pv-hint pv-ok" role="status"><CircleCheck size={14} strokeWidth={1.75} aria-hidden="true" /><span>Con este pago el cambio será {formatNio(check.changeNio)} (siempre en córdobas).</span></p>
