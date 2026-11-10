@@ -226,10 +226,22 @@ public sealed class ProductService : IProductService
             var newBarcode = input.Barcode.Trim();
             if (!string.Equals(newBarcode, product.Barcode ?? string.Empty, StringComparison.Ordinal))
             {
-                var barcodeError = await ValidateProductBarcodeAsync(newBarcode, product.Id, cancellationToken);
+                // Si el código de fábrica estaba guardado en una talla de este mismo producto, esa talla
+                // recibe un código interno nuevo y el de fábrica pasa a ser del producto.
+                var ownVariant = newBarcode.Length == 0
+                    ? null
+                    : await dbContext.Variants.SingleOrDefaultAsync(variant => variant.ProductId == product.Id && variant.Barcode == newBarcode, cancellationToken);
+                var barcodeError = await ValidateProductBarcodeAsync(newBarcode, product.Id, cancellationToken, ownVariant?.Id);
                 if (barcodeError is not null)
                 {
                     return Result.Fail<ProductDetailDto>(barcodeError);
+                }
+
+                if (ownVariant is not null)
+                {
+                    var internalCode = await InventoryHelpers.NextBarcodeAsync(dbContext, cancellationToken);
+                    ownVariant.Update(internalCode, ownVariant.PriceOverride, ownVariant.Cost, ownVariant.IsActive);
+                    audit.Add(actor.UserId, "product.updated", "Variant", ownVariant.Id.ToString(), $"El código {newBarcode} pasó a ser del producto; la talla usa {internalCode}.");
                 }
             }
 
@@ -669,7 +681,7 @@ public sealed class ProductService : IProductService
     /// El código de fábrica del producto: opcional, con el mismo formato que el de una variante y
     /// único entre productos y variantes (al escanearlo no puede haber dudas de qué es).
     /// </summary>
-    private async Task<ServiceError?> ValidateProductBarcodeAsync(string? barcode, Guid? productId, CancellationToken cancellationToken)
+    private async Task<ServiceError?> ValidateProductBarcodeAsync(string? barcode, Guid? productId, CancellationToken cancellationToken, Guid? allowedVariantId = null)
     {
         if (string.IsNullOrEmpty(barcode))
         {
@@ -686,7 +698,7 @@ public sealed class ProductService : IProductService
             return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", "Ese código ya pertenece a otro producto.", "barcode");
         }
 
-        if (await dbContext.Variants.AnyAsync(variant => variant.Barcode == barcode, cancellationToken))
+        if (await dbContext.Variants.AnyAsync(variant => variant.Barcode == barcode && variant.Id != allowedVariantId, cancellationToken))
         {
             return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", "Ese código ya pertenece a una talla de otro producto.", "barcode");
         }

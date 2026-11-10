@@ -324,6 +324,25 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
         Assert.True(updated.IsSuccessStatusCode, await updated.Content.ReadAsStringAsync());
         using var gone = await fixture.Admin.GetAsync(new Uri($"/api/v1/products/by-barcode/{code}", UriKind.Relative));
         Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
+
+        // Un producto que tenía el código de fábrica en una talla: al pasarlo al producto, la talla recibe uno interno.
+        var legacy = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Pantalón talla única {suffix}", null, code), HttpStatusCode.Created);
+        var legacyId = legacy.GetProperty("id").GetGuid();
+        using var move = ApiTestHelpers.Build(HttpMethod.Put, $"/api/v1/products/{legacyId}", fixture.AdminCsrf, new
+        {
+            name = $"Pantalón talla única {suffix}",
+            categoryId,
+            brandId,
+            cutId = (Guid?)null,
+            basePrice = 690m,
+            isActive = true,
+            barcode = code,
+        }, legacy.GetProperty("version").GetInt64());
+        using var moved = await fixture.Admin.SendAsync(move);
+        Assert.True(moved.IsSuccessStatusCode, await moved.Content.ReadAsStringAsync());
+        var reloaded = await GetAsync(fixture.Admin, $"/api/v1/products/by-barcode/{code}");
+        Assert.Equal(legacyId, reloaded.GetProperty("id").GetGuid());
+        Assert.DoesNotContain(reloaded.GetProperty("variants").EnumerateArray(), variant => variant.GetProperty("barcode").GetString() == code);
     }
 
     private async Task<object> ProductBodyAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId, DateOnly? receivedOn)
