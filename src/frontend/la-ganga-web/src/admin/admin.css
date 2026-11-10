@@ -416,3 +416,6 @@
 .new-color-custom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; align-items: start; }
 .new-color-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 @media (max-width: 640px) { .new-color-custom { grid-template-columns: 1fr; } }
+
+.adm-scan-mode { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 6px; font-size: .84rem; font-weight: 600; }
+.adm-scan-mode input { margin-top: 3px; }

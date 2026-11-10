@@ -282,6 +282,13 @@ public static class MvpEndpoints
             .RequireAuthorization(PermissionNames.ProductEdit)
             .RequireCsrf();
 
+        products.MapGet("/by-barcode/{barcode}", async (string barcode, IProductService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.FindProductByBarcodeAsync(barcode, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.ProductRead);
+
         products.MapPost("/import", async (ImportRequest request, IProductService service, HttpContext http, CancellationToken ct) =>
             {
                 var actor = http.User.GetActor();

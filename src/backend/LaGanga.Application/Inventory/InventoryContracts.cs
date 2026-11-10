@@ -17,7 +17,8 @@ public sealed record ProductListItemDto(
     int VariantCount,
     int TotalStock,
     long Version,
-    string? PrimaryImageUrl);
+    string? PrimaryImageUrl,
+    string? Barcode = null);
 
 public sealed record VariantDto(
     Guid Id,
@@ -51,7 +52,8 @@ public sealed record ProductDetailDto(
     long Version,
     string? PrimaryImageUrl,
     IReadOnlyList<VariantDto> Variants,
-    IReadOnlyList<ProductImageDto> Images);
+    IReadOnlyList<ProductImageDto> Images,
+    string? Barcode = null);
 
 public sealed record VariantLookupDto(string ProductName, VariantDto Variant);
 
@@ -79,7 +81,8 @@ public sealed record CreateProductInput(
     Guid? CutId,
     decimal? BasePrice,
     IReadOnlyList<NewVariantInput>? Variants,
-    DateOnly? ReceivedOn = null);
+    DateOnly? ReceivedOn = null,
+    string? Barcode = null);
 
 public sealed record UpdateProductInput(
     string? Name,
@@ -87,7 +90,8 @@ public sealed record UpdateProductInput(
     Guid BrandId,
     Guid? CutId,
     decimal? BasePrice,
-    bool? IsActive);
+    bool? IsActive,
+    string? Barcode = null);
 
 public sealed record UpdateVariantInput(string? Barcode, decimal? PriceOverride, decimal? Cost, bool? IsActive);
 
@@ -148,6 +152,12 @@ public interface IProductService
         CancellationToken cancellationToken);
 
     Task<ServiceResult<VariantLookupDto>> FindByBarcodeAsync(
+        string barcode,
+        Actor actor,
+        CancellationToken cancellationToken);
+
+    /// <summary>Producto por su código de fábrica (compartido por todas las tallas).</summary>
+    Task<ServiceResult<ProductDetailDto>> FindProductByBarcodeAsync(
         string barcode,
         Actor actor,
         CancellationToken cancellationToken);

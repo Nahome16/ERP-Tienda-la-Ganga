@@ -4,6 +4,9 @@ public sealed class Product
 {
     public const int NameMaxLength = 200;
 
+    /// <summary>Largo máximo del código de fábrica del producto (igual que el de una variante).</summary>
+    public const int BarcodeMaxLength = 64;
+
     private readonly List<ProductVariant> _variants = [];
 
     private Product()
@@ -46,6 +49,12 @@ public sealed class Product
 
     public decimal BasePrice { get; private set; }
 
+    /// <summary>
+    /// Código de fábrica compartido por todas las tallas y colores. Al escanearlo, la caja abre
+    /// el producto para elegir la variante. Cada variante conserva su propio código interno.
+    /// </summary>
+    public string? Barcode { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -78,6 +87,11 @@ public sealed class Product
         IsActive = isActive;
         UpdatedBy = updatedBy;
         UpdatedAtUtc = updatedAtUtc;
+    }
+
+    public void SetBarcode(string? barcode)
+    {
+        Barcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
     }
 
     public ProductVariant AddVariant(

@@ -15,7 +15,7 @@ import { PaymentModal } from './PaymentModal'
 import { parseAmount } from './payments'
 import { buildSaleRequest, buildLocalSale, newClientSaleId } from './sale'
 import { PosThumb } from './Thumb'
-import { buildIndex, findByBarcode, groupByProduct, searchVariants } from './search'
+import { buildIndex, findByBarcode, findProductByBarcode, groupByProduct, searchVariants } from './search'
 import { availableStock, pendingUnits } from './stock'
 import { clearCartDraft, loadCartDraft, saveCartDraft } from './storage'
 import type { CartLine, DiscountApproval } from './types'
@@ -190,6 +190,16 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     if (exact) {
       addVariant(exact)
       setQuery('')
+      return
+    }
+    // Código de fábrica del producto (igual en todas las tallas): se abre el producto para elegir talla y color.
+    const productId = findProductByBarcode(index, code)
+    if (productId) {
+      const name = index.variants.find((variant) => variant.productId === productId)?.productName ?? 'el producto'
+      setCategory(null)
+      setSelectedProductId(productId)
+      setQuery('')
+      announce('info', `${name}: elegí la talla y el color.`)
       return
     }
     const matches = searchVariants(index, code, category)

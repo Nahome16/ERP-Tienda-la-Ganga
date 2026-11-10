@@ -112,6 +112,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
             <div className="adm-actions" style={{ marginBottom: 12 }}>
               <Tag tone={product.isActive ? 'ok' : 'neutral'}>{product.isActive ? 'Activo' : 'Inactivo'}</Tag>
               <span>Precio base <strong>{formatNio(product.basePrice)}</strong></span>
+              {product.barcode && <span>Código de fábrica <strong>{product.barcode}</strong></span>}
               <span>Existencia total <strong className={product.totalStock < 0 ? 'adm-neg' : undefined}>{product.totalStock}</strong></span>
               <span>{product.variantCount} variante{product.variantCount === 1 ? '' : 's'}</span>
             </div>

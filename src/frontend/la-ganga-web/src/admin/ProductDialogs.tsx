@@ -6,7 +6,7 @@ import type { CurrentUser } from '../types'
 import { hasPermission } from '../lib/access'
 import type { ProductDetail, ProductListItem, Variant } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
-import { addVariant, createProduct, getVariantByBarcode, updateProduct, updateVariant, type ProductInput } from './adminApi'
+import { addVariant, createProduct, getProductByBarcode, getVariantByBarcode, updateProduct, updateVariant, type ProductInput } from './adminApi'
 import { parseDecimal } from './csv'
 import { blockEnterSubmit } from './forms'
 import { addDays, managuaToday, messageFrom } from './format'
@@ -40,7 +40,7 @@ function useCatalogsWithNewColors(base: Catalogs) {
 
 type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: string }
 
-type ProductFields = { name: string; categoryId: string; brandId: string; cutId: string; basePrice: string }
+type ProductFields = { name: string; categoryId: string; brandId: string; cutId: string; basePrice: string; barcode: string }
 
 function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false }: {
   fields: ProductFields
@@ -84,6 +84,14 @@ function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBra
             {catalogs.cuts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
+        <label className="adm-field">
+          <span>Código de fábrica (opcional)</span>
+          <input
+            value={fields.barcode} maxLength={64} inputMode="text" autoComplete="off" placeholder="Igual para todas las tallas"
+            onChange={(event) => onChange({ ...fields, barcode: event.target.value })}
+          />
+          <small>Al escanearlo en caja se abre el producto y se elige la talla.</small>
+        </label>
         {!hidePrice && (
           <label className="adm-field">
             <span>Precio base (C$)</span>
@@ -102,8 +110,25 @@ function validateFields(fields: ProductFields): { input: ProductInput | null; er
   const basePrice = parseDecimal(fields.basePrice)
   if (basePrice === null || basePrice <= 0) return { input: null, error: 'Escribí el precio de venta (mayor que cero).' }
   return {
-    input: { name: fields.name.trim(), categoryId: fields.categoryId, brandId: fields.brandId, cutId: fields.cutId || null, basePrice },
+    input: { name: fields.name.trim(), categoryId: fields.categoryId, brandId: fields.brandId, cutId: fields.cutId || null, basePrice, barcode: fields.barcode.trim() },
     error: null,
+  }
+}
+
+/** ¿A quién pertenece un código? A una talla de un producto, a un producto entero o a nadie (null). */
+async function findCodeOwner(code: string): Promise<{ productId?: string; label: string } | null> {
+  try {
+    const variant = await getVariantByBarcode(code)
+    return { productId: variant.productId ?? undefined, label: `«${variant.productName}» (talla ${variant.sizeName} · ${variant.colorName})` }
+  } catch (caught) {
+    if (!(caught instanceof ApiError && caught.status === 404)) throw caught
+  }
+  try {
+    const product = await getProductByBarcode(code)
+    return { productId: product.id, label: `«${product.name}» (código del producto)` }
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 404) return null
+    throw caught
   }
 }
 
@@ -125,16 +150,18 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
   const canPartners = hasPermission(user, 'investment.read')
-  const [fields, setFields] = useState<ProductFields>({ name: '', categoryId: '', brandId: '', cutId: '', basePrice: '' })
+  const [fields, setFields] = useState<ProductFields>({ name: '', categoryId: '', brandId: '', cutId: '', basePrice: '', barcode: initialBarcode?.trim() ?? '' })
+  // La mayoría de la ropa trae un solo código de fábrica para todas las tallas.
+  const [codePerSize, setCodePerSize] = useState(false)
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Códigos escaneados que esperan una variante (todavía no se eligió talla y color).
-  const [pendingCodes, setPendingCodes] = useState<string[]>(() => (initialBarcode?.trim() ? [initialBarcode.trim()] : []))
+  const [pendingCodes, setPendingCodes] = useState<string[]>([])
   const [scan, setScan] = useState('')
   const [scanning, setScanning] = useState(false)
   const [scanMessage, setScanMessage] = useState<ScanMessage | null>(
-    initialBarcode?.trim() ? { tone: 'ok', text: `Código nuevo ${initialBarcode.trim()}: completá los datos y elegí talla y color; se asigna a la primera variante.` } : null,
+    initialBarcode?.trim() ? { tone: 'ok', text: `Código nuevo ${initialBarcode.trim()}: quedó como código del producto (sirve para todas las tallas). Completá los datos.` } : null,
   )
   const scanRef = useRef<HTMLInputElement>(null)
 
@@ -165,19 +192,23 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
     const code = scan.trim()
     if (!code) return
     setScan('')
-    if (pendingCodes.includes(code) || draftBarcodes(builder).has(code)) {
+    if (pendingCodes.includes(code) || draftBarcodes(builder).has(code) || fields.barcode.trim() === code) {
       setScanMessage({ tone: 'warn', text: `El código ${code} ya está en este producto.` })
       return
     }
     setScanning(true)
     try {
-      const found = await getVariantByBarcode(code)
-      setScanMessage({
-        tone: 'warn', productId: found.productId ?? undefined,
-        text: `El código ${code} ya pertenece a «${found.productName}» (talla ${found.sizeName} · ${found.colorName}).`,
-      })
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 404) {
+      const owner = await findCodeOwner(code)
+      if (owner) {
+        setScanMessage({ tone: 'warn', productId: owner.productId, text: `El código ${code} ya pertenece a ${owner.label}.` })
+      } else if (!codePerSize) {
+        const previous = fields.barcode.trim()
+        setFields({ ...fields, barcode: code })
+        setScanMessage({
+          tone: 'ok',
+          text: previous ? `Código del producto cambiado de ${previous} a ${code}.` : `Código ${code}: quedó como código del producto (sirve para todas las tallas).`,
+        })
+      } else {
         const placed = changeBuilder(builder, [...pendingCodes, code])
         setScanMessage({
           tone: 'ok',
@@ -185,9 +216,9 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
             ? `Código ${code} listo: se asigna cuando elijas talla y color.`
             : `Código ${code} asignado a la siguiente variante sin código.`,
         })
-      } else {
-        setScanMessage({ tone: 'error', text: describeError(caught) })
       }
+    } catch (caught) {
+      setScanMessage({ tone: 'error', text: describeError(caught) })
     } finally {
       setScanning(false)
       scanRef.current?.focus()
@@ -274,7 +305,11 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
           ))}
         </p>
       )}
-      <p className="adm-scan-hint">Si la prenda no trae código, dejalo vacío: el sistema genera uno para imprimir la etiqueta.</p>
+      <label className="adm-check adm-scan-mode">
+        <input type="checkbox" checked={codePerSize} onChange={(event) => setCodePerSize(event.target.checked)} />
+        <span>Cada talla trae su propio código (si no, el código escaneado es del producto y sirve para todas las tallas)</span>
+      </label>
+      <p className="adm-scan-hint">Si la prenda no trae código, dejalo vacío: el sistema genera uno por talla para imprimir la etiqueta.</p>
       <form id="create-product-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
         <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice />
 
@@ -336,7 +371,7 @@ export function EditProductDialog({ product, catalogs, onClose, onSaved, onConfl
 }) {
   const [fields, setFields] = useState<ProductFields>({
     name: product.name, categoryId: product.categoryId, brandId: product.brandId,
-    cutId: product.cutId ?? '', basePrice: String(product.basePrice),
+    cutId: product.cutId ?? '', basePrice: String(product.basePrice), barcode: product.barcode ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

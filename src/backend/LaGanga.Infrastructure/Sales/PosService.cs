@@ -47,7 +47,8 @@ public sealed class PosService(
                 variant.PriceOverride ?? product.BasePrice,
                 balance == null ? 0 : balance.Quantity,
                 dbContext.ProductImages.Where(image => image.ProductId == product.Id)
-                    .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault()))
+                    .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault(),
+                product.Barcode))
             .ToListAsync(cancellationToken);
         return new PosSnapshotDto(timeProvider.GetUtcNow(), SettingsService.Map(settings), variants);
     }

@@ -248,6 +248,84 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
         Assert.Equal(4, lot.GetProperty("quantityIn").GetInt32());
     }
 
+    [PostgresFact]
+    public async Task ProductBarcodeIsSharedBySizesAndOpensTheProduct()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var code = $"FAB-{suffix}-{Guid.NewGuid():N}"[..20];
+        async Task<Guid[]> Ids(string kind)
+        {
+            var page = await GetAsync(fixture.Admin, $"/api/v1/catalog/{kind}?pageSize=100");
+            return page.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        }
+
+        var sizes = await Ids("sizes");
+        var colorId = (await Ids("colors"))[0];
+        var categoryId = (await Ids("categories"))[0];
+        var brandId = (await Ids("brands"))[0];
+        object Body(string name, string? productBarcode, string? variantBarcode) => new
+        {
+            name,
+            categoryId,
+            brandId,
+            cutId = (Guid?)null,
+            basePrice = 690m,
+            barcode = productBarcode,
+            variants = new[]
+            {
+                new { sizeId = sizes[0], colorId, barcode = variantBarcode, priceOverride = (decimal?)null, cost = (decimal?)null, initialQuantity = 2, partnerId = (Guid?)null },
+                new { sizeId = sizes[1], colorId, barcode = (string?)null, priceOverride = (decimal?)null, cost = (decimal?)null, initialQuantity = 3, partnerId = (Guid?)null },
+            },
+        };
+
+        var created = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Pantalón Kalua {suffix}", code, null), HttpStatusCode.Created);
+        var productId = created.GetProperty("id").GetGuid();
+        Assert.Equal(code, created.GetProperty("barcode").GetString());
+
+        // El código de fábrica abre el producto (no una talla).
+        var found = await GetAsync(fixture.Admin, $"/api/v1/products/by-barcode/{code}");
+        Assert.Equal(productId, found.GetProperty("id").GetGuid());
+        Assert.Equal(2, found.GetProperty("variants").GetArrayLength());
+        using (var variantLookup = await fixture.Admin.GetAsync(new Uri($"/api/v1/variants/by-barcode/{code}", UriKind.Relative)))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, variantLookup.StatusCode);
+        }
+
+        // No se puede repetir en otro producto ni como código de una talla.
+        using (var duplicate = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Otro {suffix}", code, null)))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+            Assert.Equal("duplicate_barcode", await ApiTestHelpers.ReadProblemCodeAsync(duplicate));
+        }
+
+        using (var asVariant = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Otro talla {suffix}", null, code)))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, asVariant.StatusCode);
+        }
+
+        // La caja recibe el código del producto en cada talla.
+        var snapshot = await GetAsync(fixture.Admin, "/api/v1/pos/snapshot");
+        var rows = snapshot.GetProperty("variants").EnumerateArray().Where(row => row.GetProperty("productId").GetGuid() == productId).ToList();
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, row => Assert.Equal(code, row.GetProperty("productBarcode").GetString()));
+
+        // Una cadena vacía lo quita.
+        using var update = ApiTestHelpers.Build(HttpMethod.Put, $"/api/v1/products/{productId}", fixture.AdminCsrf, new
+        {
+            name = $"Pantalón Kalua {suffix}",
+            categoryId,
+            brandId,
+            cutId = (Guid?)null,
+            basePrice = 690m,
+            isActive = true,
+            barcode = string.Empty,
+        }, created.GetProperty("version").GetInt64());
+        using var updated = await fixture.Admin.SendAsync(update);
+        Assert.True(updated.IsSuccessStatusCode, await updated.Content.ReadAsStringAsync());
+        using var gone = await fixture.Admin.GetAsync(new Uri($"/api/v1/products/by-barcode/{code}", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
+    }
+
     private async Task<object> ProductBodyAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId, DateOnly? receivedOn)
     {
         async Task<Guid[]> Ids(string kind)

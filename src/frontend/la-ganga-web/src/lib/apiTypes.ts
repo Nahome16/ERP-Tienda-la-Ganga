@@ -32,6 +32,8 @@ export type PosVariant = {
   stock: number
   /** Miniatura de la imagen principal del producto (URL relativa) o null. */
   imageUrl?: string | null
+  /** Código de fábrica del producto, igual en todas sus tallas: al escanearlo se elige la talla. */
+  productBarcode?: string | null
 }
 
 export type PosSnapshot = {
@@ -237,6 +239,8 @@ export type ProductListItem = {
   version: number
   /** Miniatura de la imagen principal (URL relativa) o null. */
   primaryImageUrl: string | null
+  /** Código de fábrica, igual en todas las tallas (al escanearlo se elige la talla). */
+  barcode?: string | null
 }
 
 export type Variant = {

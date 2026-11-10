@@ -4,7 +4,7 @@ import { ApiError } from '../lib/api'
 import { hasPermission } from '../lib/access'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
-import { getInventorySummary, getSettings, getVariantByBarcode, listInventory } from '../admin/adminApi'
+import { getInventorySummary, getProductByBarcode, getSettings, getVariantByBarcode, listInventory } from '../admin/adminApi'
 import { formatInt, messageFrom } from '../admin/format'
 import { useDebounced, useFetch } from '../admin/hooks'
 import { noPartnerFilter, partnerFilterParam, partnerUnitsLabel } from '../admin/partners'
@@ -83,6 +83,17 @@ export function InventoryView({ user }: { user: CurrentUser }) {
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 404) {
         setScan('')
+        // ¿Es el código de fábrica de un producto (igual en todas las tallas)? Se abre el producto.
+        try {
+          const product = await getProductByBarcode(code)
+          setDetailId(product.id)
+          return
+        } catch (productError) {
+          if (!(productError instanceof ApiError && productError.status === 404)) {
+            setScanNotice({ tone: 'error', text: messageFrom(productError) })
+            return
+          }
+        }
         if (canCreate && catalogs.data) {
           // Código nuevo: se abre el alta del producto con el código ya cargado.
           setCreating({ barcode: code })

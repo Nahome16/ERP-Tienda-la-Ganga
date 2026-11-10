@@ -55,7 +55,8 @@ export type VariantInput = {
   /** Socio que ingresó la existencia inicial (solo con investment.read). */
   partnerId?: string
 }
-export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number }
+/** `barcode`: código de fábrica del producto; vacío lo quita al editar. */
+export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number; barcode?: string }
 
 export const createProduct = (input: ProductInput & { variants: VariantInput[]; receivedOn?: string }) =>
   apiRequest<ProductDetail>(`${v1}/products`, { method: 'POST', body: input })
@@ -69,6 +70,8 @@ export const updateVariant = (
 ) => apiRequest<Variant>(`${v1}/variants/${variant.id}`, { method: 'PUT', body: input, ifMatch: variant.version })
 
 export type VariantByBarcode = Variant & { productName: string }
+export const getProductByBarcode = (barcode: string, signal?: AbortSignal) =>
+  apiRequest<ProductDetail>(`${v1}/products/by-barcode/${encodeURIComponent(barcode)}`, { signal })
 export const getVariantByBarcode = (barcode: string, signal?: AbortSignal) =>
   apiRequest<VariantByBarcode>(`${v1}/variants/by-barcode/${encodeURIComponent(barcode)}`, { signal })
 

@@ -18,7 +18,8 @@ public sealed record PosVariantDto(
     string Barcode,
     decimal Price,
     int Stock,
-    string? ImageUrl);
+    string? ImageUrl,
+    string? ProductBarcode = null);
 
 public sealed record PosSnapshotDto(
     DateTimeOffset GeneratedAtUtc,
