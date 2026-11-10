@@ -85,8 +85,8 @@ export function InventoryView({ user }: { user: CurrentUser }) {
         setScan('')
         // ¿Es el código de fábrica de un producto (igual en todas las tallas)? Se abre el producto.
         try {
-          const product = await getProductByBarcode(code)
-          setDetailId(product.id)
+          const match = await getProductByBarcode(code)
+          setDetailId(match.product.id)
           return
         } catch (productError) {
           if (!(productError instanceof ApiError && productError.status === 404)) {

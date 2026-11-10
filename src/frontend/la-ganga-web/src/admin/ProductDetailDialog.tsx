@@ -4,7 +4,7 @@ import { hasPermission } from '../lib/access'
 import type { ProductDetail, Variant } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
-import { deleteProduct, getProduct, updateProduct, updateVariant } from './adminApi'
+import { deleteProduct, getProduct, setColorBarcode, updateProduct, updateVariant } from './adminApi'
 import { messageFrom } from './format'
 import { ImageManager } from './ImageManager'
 import { useFetch } from './hooks'
@@ -119,12 +119,13 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
               <span>Existencia total <strong className={product.totalStock < 0 ? 'adm-neg' : undefined}>{product.totalStock}</strong></span>
               <span>{product.variantCount} variante{product.variantCount === 1 ? '' : 's'}</span>
             </div>
+            <FactoryCodes product={product} canEdit={canEdit} onChanged={(text) => changed(text)} />
             <ImageManager key={product.id} productId={product.id} images={product.images ?? []} canManage={canImages} onChanged={onChanged} />
             <div className="table-scroll">
               <table className="adm-table">
                 <thead>
                   <tr>
-                    <th>Talla</th><th>Color</th><th>Código de barras</th><th className="numeric">Precio</th>
+                    <th>Talla</th><th>Color</th><th title="Código que genera el sistema para cada talla y color (etiquetas propias)">Código interno</th><th className="numeric">Precio</th>
                     {canCost && <th className="numeric">Costo</th>}
                     <th className="numeric">Existencia</th><th>Estado</th>
                     {canEdit && <th className="actions-col"><span className="visually-hidden">Acciones</span></th>}
@@ -249,5 +250,65 @@ function DeleteProductDialog({ product, onClose, onDeleted, onDeactivate }: {
           </>
         )}
     </Dialog>
+  )
+}
+
+/**
+ * Códigos de fábrica del producto: uno para todo el producto o uno por color. En caja,
+ * escanearlos abre el producto (o el color) para elegir la talla. Las tallas tienen además
+ * un código interno propio para las etiquetas.
+ */
+function FactoryCodes({ product, canEdit, onChanged }: { product: ProductDetail; canEdit: boolean; onChanged: (text: string) => void }) {
+  const colors = [...new Map(product.variants.map((variant) => [variant.colorId, { id: variant.colorId, name: variant.colorName, hex: variant.colorHex }])).values()]
+  const codes = new Map((product.colorBarcodes ?? []).map((item) => [item.colorId, item.barcode]))
+  const [editing, setEditing] = useState<string | null>(null)
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  if (!product.barcode && codes.size === 0 && !canEdit) return null
+
+  async function save(colorId: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      await setColorBarcode(product.id, colorId, value.trim())
+      setEditing(null)
+      onChanged(value.trim() ? 'Código del color guardado.' : 'Código del color quitado.')
+    } catch (caught) {
+      setError(messageFrom(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="adm-factory-codes" aria-label="Códigos de fábrica">
+      <h3>Códigos de fábrica <small>Al escanearlos en caja se elige la talla</small></h3>
+      <div className="adm-factory-row">
+        <span>Todo el producto</span>
+        {product.barcode ? <code>{product.barcode}</code> : <em>Sin código</em>}
+        {canEdit && <small>Se cambia en «Editar producto».</small>}
+      </div>
+      {colors.map((color) => (
+        <div className="adm-factory-row" key={color.id}>
+          <span><Swatch hex={color.hex} name={color.name} /> {color.name}</span>
+          {editing === color.id
+            ? (
+              <form className="adm-factory-edit" onSubmit={(event) => { event.preventDefault(); void save(color.id) }}>
+                <input autoFocus value={value} maxLength={64} placeholder="Escaneá o escribí el código" aria-label={`Código del color ${color.name}`} onChange={(event) => setValue(event.target.value)} />
+                <button type="submit" className="secondary-button" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</button>
+                <button type="button" className="link-button" onClick={() => { setEditing(null); setError(null) }} disabled={busy}>Cancelar</button>
+              </form>
+            )
+            : (
+              <>
+                {codes.get(color.id) ? <code>{codes.get(color.id)}</code> : <em>Sin código</em>}
+                {canEdit && <button type="button" className="link-button" onClick={() => { setEditing(color.id); setValue(codes.get(color.id) ?? ''); setError(null) }}>{codes.get(color.id) ? 'Cambiar' : 'Agregar código del color'}</button>}
+              </>
+            )}
+        </div>
+      ))}
+      {error && <Notice tone="error">{error}</Notice>}
+    </section>
   )
 }

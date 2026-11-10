@@ -40,6 +40,8 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
 
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
+    public DbSet<ProductColorBarcode> ProductColorBarcodes => Set<ProductColorBarcode>();
+
     public DbSet<Partner> Partners => Set<Partner>();
 
     public DbSet<StockLot> StockLots => Set<StockLot>();

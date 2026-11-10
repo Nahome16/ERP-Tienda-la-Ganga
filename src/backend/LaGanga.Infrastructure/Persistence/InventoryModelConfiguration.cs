@@ -80,6 +80,20 @@ public sealed class InventoryMovementConfiguration : IEntityTypeConfiguration<In
     }
 }
 
+public sealed class ProductColorBarcodeConfiguration : IEntityTypeConfiguration<ProductColorBarcode>
+{
+    public void Configure(EntityTypeBuilder<ProductColorBarcode> builder)
+    {
+        builder.ToTable("product_color_barcodes", "inventory");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Barcode).HasMaxLength(Product.BarcodeMaxLength).IsRequired();
+        builder.HasIndex(item => item.Barcode).IsUnique();
+        builder.HasIndex(item => new { item.ProductId, item.ColorId }).IsUnique();
+        builder.HasOne<Product>().WithMany().HasForeignKey(item => item.ProductId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Color>().WithMany().HasForeignKey(item => item.ColorId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class ProductImageConfiguration : IEntityTypeConfiguration<ProductImage>
 {
     public void Configure(EntityTypeBuilder<ProductImage> builder)

@@ -34,6 +34,8 @@ export type PosVariant = {
   imageUrl?: string | null
   /** Código de fábrica del producto, igual en todas sus tallas: al escanearlo se elige la talla. */
   productBarcode?: string | null
+  /** Código de fábrica del color (lo comparten las tallas de ese color): al escanearlo se elige la talla. */
+  colorBarcode?: string | null
 }
 
 export type PosSnapshot = {
@@ -268,7 +270,12 @@ export type ProductImage = {
   sortOrder: number
 }
 
-export type ProductDetail = ProductListItem & { variants: Variant[]; images: ProductImage[] }
+export type ProductDetail = ProductListItem & {
+  variants: Variant[]
+  images: ProductImage[]
+  /** Códigos de fábrica por color (los comparten todas las tallas de ese color). */
+  colorBarcodes?: ColorBarcode[]
+}
 
 export type ImportRow = {
   productName: string
@@ -499,3 +506,5 @@ export type ExchangeRequest = {
 }
 
 export type ExchangeResult = { alreadyProcessed: boolean; exchange: Exchange }
+
+export type ColorBarcode = { colorId: string; colorName: string; barcode: string }

@@ -420,3 +420,22 @@
 .adm-scan-mode { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 6px; font-size: .84rem; font-weight: 600; }
 .adm-scan-mode input { margin-top: 3px; }
 .adm-delete-list { display: grid; gap: 4px; margin: 0 0 10px; padding-left: 20px; }
+
+.adm-scan-modes { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 6px; padding: 0; border: 0; font-size: .85rem; font-weight: 600; }
+.adm-scan-modes legend { width: 100%; margin-bottom: 4px; padding: 0; color: var(--muted, #6d6860); font-size: .76rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+.adm-scan-modes label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.adm-color-codes { display: grid; gap: 8px; margin: 6px 0 4px; padding: 12px; border: 1px solid var(--line, #e4dccd); border-radius: 12px; background: var(--paper, #fff); }
+.adm-color-code { display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr); align-items: center; gap: 10px; font-size: .88rem; font-weight: 650; }
+.adm-color-code > span { display: inline-flex; align-items: center; gap: 6px; }
+.adm-color-code input { min-height: 40px; font-family: ui-monospace, monospace; }
+
+.adm-factory-codes { display: grid; gap: 6px; margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--line, #e4dccd); border-radius: 12px; background: var(--paper, #fff); }
+.adm-factory-codes h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0 0 4px; font-size: .92rem; }
+.adm-factory-codes h3 small { color: var(--muted, #6d6860); font-size: .76rem; font-weight: 600; }
+.adm-factory-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 34px; font-size: .88rem; }
+.adm-factory-row > span:first-child { display: inline-flex; align-items: center; gap: 6px; min-width: 150px; font-weight: 700; }
+.adm-factory-row code { font-size: .9rem; font-weight: 700; }
+.adm-factory-row em { color: var(--muted, #6d6860); font-style: normal; }
+.adm-factory-row small { color: var(--muted, #6d6860); }
+.adm-factory-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.adm-factory-edit input { min-height: 38px; min-width: 220px; font-family: ui-monospace, monospace; }

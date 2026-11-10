@@ -532,3 +532,6 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
 @media (max-width: 760px) {
   .pv-page .pv-thumb-hero { width: 96px; height: 96px; font-size: 1.5rem; }
 }
+
+.pv-focus-color { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 6px; font-size: .88rem; }
+.pv-focus-color .pv-link { padding: 0; border: 0; background: none; color: var(--teal, #1d6b72); font-weight: 750; text-decoration: underline; cursor: pointer; }

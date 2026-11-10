@@ -15,7 +15,7 @@ import { PaymentModal } from './PaymentModal'
 import { parseAmount } from './payments'
 import { buildSaleRequest, buildLocalSale, newClientSaleId } from './sale'
 import { PosThumb } from './Thumb'
-import { buildIndex, findByBarcode, findProductByBarcode, groupByProduct, searchVariants } from './search'
+import { buildIndex, findByBarcode, findColorByBarcode, findProductByBarcode, groupByProduct, searchVariants } from './search'
 import { availableStock, pendingUnits } from './stock'
 import { clearCartDraft, loadCartDraft, saveCartDraft } from './storage'
 import type { CartLine, DiscountApproval } from './types'
@@ -58,6 +58,8 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   const [category, setCategory] = useState<string | null>(null)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [zoomPhoto, setZoomPhoto] = useState(false)
+  // Color escaneado (código de fábrica del color): el panel muestra solo ese color.
+  const [focusColor, setFocusColor] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<ScanFeedback>({ tone: 'info', text: 'Escaneá un código o buscá por nombre, talla o color.' })
 
   const [lines, setLines] = useState<CartLine[]>([])
@@ -192,12 +194,24 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       setQuery('')
       return
     }
+    // Código de fábrica del color: se abre el producto en ese color para elegir la talla.
+    const colorMatch = findColorByBarcode(index, code)
+    if (colorMatch) {
+      const name = index.variants.find((variant) => variant.productId === colorMatch.productId)?.productName ?? 'el producto'
+      setCategory(null)
+      setSelectedProductId(colorMatch.productId)
+      setFocusColor(colorMatch.colorName)
+      setQuery('')
+      announce('info', `${name} · ${colorMatch.colorName}: elegí la talla.`)
+      return
+    }
     // Código de fábrica del producto (igual en todas las tallas): se abre el producto para elegir talla y color.
     const productId = findProductByBarcode(index, code)
     if (productId) {
       const name = index.variants.find((variant) => variant.productId === productId)?.productName ?? 'el producto'
       setCategory(null)
       setSelectedProductId(productId)
+      setFocusColor(null)
       setQuery('')
       announce('info', `${name}: elegí la talla y el color.`)
       return
@@ -360,7 +374,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 <small>{[activeProduct.brandName, activeProduct.categoryName].filter(Boolean).join(' · ')}</small>
               </div>
               <strong>{activeProduct.minPrice === activeProduct.maxPrice ? formatNio(activeProduct.minPrice) : `${formatNio(activeProduct.minPrice)} – ${formatNio(activeProduct.maxPrice)}`}</strong>
-              <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" title="Cerrar variantes" onClick={() => { setSelectedProductId(null); setQuery(''); focusScanner() }}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+              <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" title="Cerrar variantes" onClick={() => { setSelectedProductId(null); setFocusColor(null); setQuery(''); focusScanner() }}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
             </header>
             {/* Foto en la esquina: el cajero confirma que la prenda es la misma que tiene en la mano. */}
             <button
@@ -374,7 +388,15 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
               <small>{activeProduct.imageUrl ? 'Toque para ampliar' : 'Sin foto'}</small>
             </button>
             <div className="pv-variant-rows">
-              {[...new Set(activeProduct.variants.map((variant) => variant.colorName))].map((color) => {
+              {focusColor && activeProduct.variants.some((variant) => variant.colorName === focusColor) && (
+                <p className="pv-focus-color">
+                  Color escaneado: <strong>{focusColor}</strong>
+                  <button type="button" className="pv-link" onClick={() => setFocusColor(null)}>Ver todos los colores</button>
+                </p>
+              )}
+              {[...new Set(activeProduct.variants.map((variant) => variant.colorName))]
+                .filter((color) => !focusColor || !activeProduct.variants.some((variant) => variant.colorName === focusColor) || color === focusColor)
+                .map((color) => {
                 const colorVariants = activeProduct.variants.filter((variant) => variant.colorName === color)
                 return (
                   <div className="pv-variant-row" key={color}>
@@ -429,7 +451,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
               <button
                 type="button" role="listitem" key={group.productId}
                 className={`pv-product is-stock-${stockTone}${activeProduct?.productId === group.productId ? ' is-active' : ''}`}
-                onClick={() => { setSelectedProductId(group.productId); focusScanner() }}
+                onClick={() => { setSelectedProductId(group.productId); setFocusColor(null); focusScanner() }}
               >
                 <PosThumb src={group.imageUrl} name={group.productName} size="card" />
                 <strong>{group.productName}</strong>
