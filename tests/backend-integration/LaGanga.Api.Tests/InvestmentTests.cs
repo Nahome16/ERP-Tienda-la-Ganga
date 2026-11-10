@@ -429,6 +429,7 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
         using (var repeated = await fixture.Admin.SendAsync(repeat))
         {
             Assert.Equal(HttpStatusCode.Conflict, repeated.StatusCode);
+            Assert.Contains($"Pantalón Zolo {suffix}", await repeated.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         }
 
         // La caja recibe el código del color en cada talla de ese color.

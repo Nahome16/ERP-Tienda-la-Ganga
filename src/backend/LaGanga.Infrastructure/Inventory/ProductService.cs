@@ -422,7 +422,7 @@ public sealed class ProductService : IProductService
         if (!string.Equals(barcode, variant.Barcode, StringComparison.Ordinal) &&
             await BarcodeTakenAsync(barcode, cancellationToken, exceptVariantId: variantId))
         {
-            return Result.Fail<VariantDto>(ServiceErrorKind.Conflict, "duplicate_barcode", "Ese código de barras ya pertenece a otra variante.", "barcode");
+            return Result.Fail<VariantDto>(ServiceErrorKind.Conflict, "duplicate_barcode", $"Ese código ya pertenece a {await DescribeBarcodeOwnerAsync(barcode, cancellationToken)}.", "barcode");
         }
 
         // Quien no puede ver costos no los modifica: se conserva el costo actual.
@@ -596,7 +596,7 @@ public sealed class ProductService : IProductService
 
                 if (await BarcodeTakenAsync(barcode, cancellationToken))
                 {
-                    return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", $"El código «{barcode}» ya pertenece a otra variante.", "variants");
+                    return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", $"El código «{barcode}» ya pertenece a {await DescribeBarcodeOwnerAsync(barcode, cancellationToken)}.", "variants");
                 }
             }
         }
@@ -775,19 +775,11 @@ public sealed class ProductService : IProductService
             return new ServiceError(ServiceErrorKind.Validation, "validation_failed", "El código del producto debe tener entre 3 y 64 caracteres (letras, números, guion, punto o guion bajo).", "barcode");
         }
 
-        if (await dbContext.Products.AnyAsync(product => product.Barcode == barcode && product.Id != productId, cancellationToken))
+        if (await dbContext.Products.AnyAsync(product => product.Barcode == barcode && product.Id != productId, cancellationToken) ||
+            await dbContext.Variants.AnyAsync(variant => variant.Barcode == barcode && variant.Id != allowedVariantId, cancellationToken) ||
+            await dbContext.ProductColorBarcodes.AnyAsync(code => code.Barcode == barcode, cancellationToken))
         {
-            return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", "Ese código ya pertenece a otro producto.", "barcode");
-        }
-
-        if (await dbContext.Variants.AnyAsync(variant => variant.Barcode == barcode && variant.Id != allowedVariantId, cancellationToken))
-        {
-            return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", "Ese código ya pertenece a una talla de otro producto.", "barcode");
-        }
-
-        if (await dbContext.ProductColorBarcodes.AnyAsync(code => code.Barcode == barcode, cancellationToken))
-        {
-            return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", "Ese código ya pertenece a un color de un producto.", "barcode");
+            return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", $"Ese código ya pertenece a {await DescribeBarcodeOwnerAsync(barcode, cancellationToken)}.", "barcode");
         }
 
         return null;
@@ -806,6 +798,36 @@ public sealed class ProductService : IProductService
         return await dbContext.Variants.AnyAsync(variant => variant.Barcode == barcode && variant.Id != exceptVariantId, cancellationToken) ||
             await dbContext.Products.AnyAsync(product => product.Barcode == barcode, cancellationToken) ||
             await dbContext.ProductColorBarcodes.AnyAsync(code => code.Barcode == barcode && code.Id != exceptColorBarcodeId, cancellationToken);
+    }
+
+    /// <summary>Texto con el dueño de un código ya usado: «el producto «X»», «el color Azul de «X»» o «la talla M · Azul de «X»».</summary>
+    private async Task<string> DescribeBarcodeOwnerAsync(string barcode, CancellationToken cancellationToken)
+    {
+        var product = await dbContext.Products.AsNoTracking().Where(item => item.Barcode == barcode).Select(item => item.Name).FirstOrDefaultAsync(cancellationToken);
+        if (product is not null)
+        {
+            return $"el producto «{product}»";
+        }
+
+        var color = await (
+            from code in dbContext.ProductColorBarcodes.AsNoTracking()
+            join owner in dbContext.Products on code.ProductId equals owner.Id
+            join item in dbContext.Colors on code.ColorId equals item.Id
+            where code.Barcode == barcode
+            select new { Product = owner.Name, Color = item.Name }).FirstOrDefaultAsync(cancellationToken);
+        if (color is not null)
+        {
+            return $"el color {color.Color} de «{color.Product}»";
+        }
+
+        var variant = await (
+            from item in dbContext.Variants.AsNoTracking()
+            join owner in dbContext.Products on item.ProductId equals owner.Id
+            join size in dbContext.Sizes on item.SizeId equals size.Id
+            join itemColor in dbContext.Colors on item.ColorId equals itemColor.Id
+            where item.Barcode == barcode
+            select new { Product = owner.Name, Size = size.Name, Color = itemColor.Name }).FirstOrDefaultAsync(cancellationToken);
+        return variant is null ? "otro registro" : $"la talla {variant.Size} · {variant.Color} de «{variant.Product}»";
     }
 
     /// <summary>Valida los códigos por color al crear un producto (colores del producto, sin repetir).</summary>
@@ -846,9 +868,17 @@ public sealed class ProductService : IProductService
                 return new ServiceError(ServiceErrorKind.Validation, "validation_failed", $"El código «{code}» no es válido (3 a 64 caracteres: letras, números, guion, punto o guion bajo).", "colorBarcodes");
             }
 
-            if (!requestCodes.Add(code) || await BarcodeTakenAsync(code, cancellationToken))
+            if (!requestCodes.Add(code))
             {
-                return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", $"El código «{code}» ya está en uso.", "colorBarcodes");
+                return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode",
+                    string.Equals(code, productBarcode, StringComparison.Ordinal)
+                        ? $"El código «{code}» está como código de todo el producto y también de un color. Dejalo en uno solo."
+                        : $"El código «{code}» está repetido en este producto (en dos colores o en un color y una talla).", "colorBarcodes");
+            }
+
+            if (await BarcodeTakenAsync(code, cancellationToken))
+            {
+                return new ServiceError(ServiceErrorKind.Conflict, "duplicate_barcode", $"El código «{code}» ya pertenece a {await DescribeBarcodeOwnerAsync(code, cancellationToken)}.", "colorBarcodes");
             }
         }
 
@@ -889,7 +919,7 @@ public sealed class ProductService : IProductService
 
             if (await BarcodeTakenAsync(code, cancellationToken, exceptColorBarcodeId: current?.Id))
             {
-                return Result.Fail<ProductDetailDto>(ServiceErrorKind.Conflict, "duplicate_barcode", "Ese código ya pertenece a otro producto, color o talla.", "barcode");
+                return Result.Fail<ProductDetailDto>(ServiceErrorKind.Conflict, "duplicate_barcode", $"Ese código ya pertenece a {await DescribeBarcodeOwnerAsync(code, cancellationToken)}.", "barcode");
             }
 
             if (current is null)

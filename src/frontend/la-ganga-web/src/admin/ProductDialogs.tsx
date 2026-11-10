@@ -22,7 +22,8 @@ import { usePartners } from './usePartners'
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError) {
-    const details = Object.values(error.fieldErrors).flat()
+    // Los detalles por campo a veces repiten el mismo texto del mensaje principal.
+    const details = [...new Set(Object.values(error.fieldErrors).flat())].filter((detail) => detail !== error.message)
     return details.length > 0 ? `${error.message} ${details.join(' ')}` : error.message
   }
   return messageFrom(error)
@@ -181,8 +182,41 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
   const built = builderToInputs(withCost, catalogs.sizes, catalogs.colors, new Set(), canCost, canPartners)
   const needsInitialPermission = built.totalUnits > 0 && !canInitial
 
+  /**
+   * Cambia cómo vienen los códigos. El código ya escaneado como «de todo el producto» (por
+   * ejemplo, al abrir el alta desde Inventario) pasa al primer color o a la primera talla,
+   * para que no quede repetido en dos lugares.
+   */
+  function switchCodeMode(mode: 'product' | 'color' | 'size') {
+    const productCode = fields.barcode.trim()
+    if (mode !== 'product' && productCode) {
+      setFields({ ...fields, barcode: '' })
+      if (mode === 'color') {
+        const target = builder.colorIds.find((colorId) => !colorCodes[colorId]?.trim())
+        if (target) setColorCodes({ ...colorCodes, [target]: productCode })
+        else setPendingColorCodes([productCode, ...pendingColorCodes])
+        setScanMessage({ tone: 'ok', text: `El código ${productCode} pasó a ser el código del ${target ? 'primer color' : 'primer color que marques'}.` })
+      } else {
+        changeBuilder(builder, [productCode, ...pendingCodes])
+        setScanMessage({ tone: 'ok', text: `El código ${productCode} pasó a la primera talla sin código.` })
+      }
+    }
+    setCodeMode(mode)
+  }
+
   /** Aplica el cambio del borrador y coloca los códigos escaneados que estaban esperando. */
   function changeBuilder(next: BuilderState, codes: string[] = pendingCodes) {
+    const productCode = fields.barcode.trim()
+    const repeatedColor = productCode ? catalogs.colors.find((color) => builder.colorIds.includes(color.id) && colorCodes[color.id]?.trim() === productCode) : undefined
+    if (repeatedColor) {
+      setError(`El código ${productCode} está como código de todo el producto y también del color ${repeatedColor.name}. Dejalo en uno solo: borralo de «Código de fábrica» si cada color trae el suyo.`)
+      return
+    }
+    const colorValues = builder.colorIds.map((colorId) => colorCodes[colorId]?.trim()).filter(Boolean)
+    if (new Set(colorValues).size !== colorValues.length) {
+      setError('Dos colores tienen el mismo código. Cada color debe tener uno distinto (si todos comparten el mismo, usá «Uno para todo el producto»).')
+      return
+    }
     if (pendingColorCodes.length > 0) {
       const queue = [...pendingColorCodes]
       const nextCodes = { ...colorCodes }
@@ -342,9 +376,9 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
       )}
       <fieldset className="adm-scan-modes">
         <legend>¿Cómo viene el código de la prenda?</legend>
-        <label><input type="radio" name="code-mode" checked={codeMode === 'product'} onChange={() => setCodeMode('product')} /> Uno para todo el producto</label>
-        <label><input type="radio" name="code-mode" checked={codeMode === 'color'} onChange={() => setCodeMode('color')} /> Uno por color</label>
-        <label><input type="radio" name="code-mode" checked={codeMode === 'size'} onChange={() => setCodeMode('size')} /> Uno por talla</label>
+        <label><input type="radio" name="code-mode" checked={codeMode === 'product'} onChange={() => switchCodeMode('product')} /> Uno para todo el producto</label>
+        <label><input type="radio" name="code-mode" checked={codeMode === 'color'} onChange={() => switchCodeMode('color')} /> Uno por color</label>
+        <label><input type="radio" name="code-mode" checked={codeMode === 'size'} onChange={() => switchCodeMode('size')} /> Uno por talla</label>
       </fieldset>
       {pendingColorCodes.length > 0 && (
         <p className="adm-scan-pending">
