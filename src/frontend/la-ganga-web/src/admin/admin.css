@@ -439,3 +439,4 @@
 .adm-factory-row small { color: var(--muted, #6d6860); }
 .adm-factory-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .adm-factory-edit input { min-height: 38px; min-width: 220px; font-family: ui-monospace, monospace; }
+.adm-table tr.muted td { opacity: .45; }
