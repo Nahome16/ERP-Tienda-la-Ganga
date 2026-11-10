@@ -233,6 +233,12 @@ export function createMock(options = {}) {
     if ((r = m(/^\/api\/v1\/products\/([^/]+)$/))) {
       const p = s.products.find((x) => x.id === r[1])
       if (!p) return problem(route, 404, 'No existe el producto.', 'not_found', {})
+      if (method === 'DELETE') {
+        if (s.soldProductIds?.has(p.id)) return problem(route, 409, 'Este producto ya tiene ventas registradas: no se puede eliminar. Desactivalo para que no aparezca en la caja.', 'product_has_sales', {})
+        s.products = s.products.filter((x) => x.id !== p.id)
+        s.variants = s.variants.filter((x) => x.productId !== p.id)
+        return route.fulfill({ status: 204, body: '' })
+      }
       if (method === 'PUT') {
         if (request.headers()['if-match'] !== `"${p.version}"`) return problem(route, 409, 'Otra persona modificó el producto.', 'version_conflict', {})
         Object.assign(p, body, { version: p.version + 1 })

@@ -4,7 +4,7 @@ import { hasPermission } from '../lib/access'
 import type { ProductDetail, Variant } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
-import { getProduct, updateProduct, updateVariant } from './adminApi'
+import { deleteProduct, getProduct, updateProduct, updateVariant } from './adminApi'
 import { messageFrom } from './format'
 import { ImageManager } from './ImageManager'
 import { useFetch } from './hooks'
@@ -29,6 +29,7 @@ type Nested =
   | { kind: 'add-variants' }
   | { kind: 'labels' }
   | { kind: 'receive' }
+  | { kind: 'delete' }
   | null
 
 export function ProductDetailDialog({ productId, user, catalogs, openLabels, onClose, onChanged }: Props) {
@@ -36,6 +37,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canImages = hasPermission(user, 'product.images.manage')
   const canReceive = hasPermission(user, 'inventory.adjust')
+  const canDelete = hasPermission(user, 'product.archive')
   const { data: product, error, loading, reload } = useFetch<ProductDetail>(`product|${productId}`, (signal) => getProduct(productId, signal))
   const [nested, setNested] = useState<Nested>(openLabels ? { kind: 'labels' } : null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
@@ -96,6 +98,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
         onClose={onClose}
         footer={product && (
           <>
+            {canDelete && <button type="button" className="link-button danger" disabled={busy} onClick={() => setNested({ kind: 'delete' })}>Eliminar producto</button>}
             {canReceive && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'receive' })}>Ingresar mercadería</button>}
             {canEdit && <button type="button" className="secondary-button" disabled={busy} onClick={() => toggleProduct(product)}>{product.isActive ? 'Inactivar producto' : 'Activar producto'}</button>}
             {canEdit && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'add-variants' })}>Agregar variantes</button>}
@@ -175,6 +178,14 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
           onDone={() => { setNested(null); changed('Se agregaron las variantes.') }}
         />
       )}
+      {product && nested?.kind === 'delete' && (
+        <DeleteProductDialog
+          product={product}
+          onClose={() => setNested(null)}
+          onDeactivate={product.isActive && canEdit ? () => { setNested(null); toggleProduct(product) } : undefined}
+          onDeleted={() => { onChanged(); onClose() }}
+        />
+      )}
       {product && nested?.kind === 'receive' && (
         <ReceiveStockDialog productId={product.id} user={user} catalogs={catalogs} onClose={() => { setNested(null); reload() }} onChanged={() => { reload(); onChanged() }} />
       )}
@@ -182,5 +193,61 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
         <LabelsDialog title={product.name} variants={labelVariants} onClose={() => setNested(null)} />
       )}
     </>
+  )
+}
+
+/** Confirmación para eliminar un producto. Solo procede si nunca se vendió. */
+function DeleteProductDialog({ product, onClose, onDeleted, onDeactivate }: {
+  product: ProductDetail
+  onClose: () => void
+  onDeleted: () => void
+  /** Si se puede, ofrece desactivar en lugar de eliminar (producto con ventas). */
+  onDeactivate?: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<{ text: string; hasSales: boolean } | null>(null)
+  const units = product.variants.reduce((sum, variant) => sum + Math.max(variant.stock, 0), 0)
+
+  async function confirm() {
+    setBusy(true)
+    setError(null)
+    try {
+      await deleteProduct(product.id)
+      onDeleted()
+    } catch (caught) {
+      setError({ text: messageFrom(caught), hasSales: caught instanceof ApiError && caught.code === 'product_has_sales' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      title="Eliminar producto"
+      subtitle={product.name}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Cancelar</button>
+          {error?.hasSales
+            ? onDeactivate && <button type="button" className="primary-button" onClick={onDeactivate}>Desactivar producto</button>
+            : <button type="button" className="adm-danger-button" onClick={() => { void confirm() }} disabled={busy}>{busy ? 'Eliminando…' : 'Eliminar definitivamente'}</button>}
+        </>
+      )}
+    >
+      {error
+        ? <Notice tone="error">{error.text}</Notice>
+        : (
+          <>
+            <p>Se va a borrar <strong>{product.name}</strong> con todo lo suyo. No se puede deshacer:</p>
+            <ul className="adm-delete-list">
+              <li>{product.variants.length} {product.variants.length === 1 ? 'talla/color' : 'tallas y colores'} y sus códigos de barras</li>
+              <li>{units} {units === 1 ? 'unidad' : 'unidades'} en existencia, su Kardex y las entradas de socios</li>
+              {product.images.length > 0 && <li>{product.images.length} {product.images.length === 1 ? 'foto' : 'fotos'}</li>}
+            </ul>
+            <p className="adm-help">Solo se pueden eliminar productos que nunca se vendieron (por ejemplo, creados por error). Si ya tiene ventas, desactivalo: deja de aparecer en la caja y se conserva el historial.</p>
+          </>
+        )}
+    </Dialog>
   )
 }

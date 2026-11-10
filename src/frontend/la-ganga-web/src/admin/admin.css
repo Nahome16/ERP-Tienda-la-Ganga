@@ -419,3 +419,4 @@
 
 .adm-scan-mode { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 6px; font-size: .84rem; font-weight: 600; }
 .adm-scan-mode input { margin-top: 3px; }
+.adm-delete-list { display: grid; gap: 4px; margin: 0 0 10px; padding-left: 20px; }

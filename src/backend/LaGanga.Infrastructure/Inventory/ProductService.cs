@@ -16,13 +16,67 @@ public sealed class ProductService : IProductService
     private readonly IAuditWriter audit;
     private readonly TimeProvider timeProvider;
     private readonly LotService lots;
+    private readonly IImageStorage images;
 
-    public ProductService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider)
+    public ProductService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider, IImageStorage images)
     {
         this.dbContext = dbContext;
         this.audit = audit;
         this.timeProvider = timeProvider;
+        this.images = images;
         lots = new LotService(dbContext);
+    }
+
+    /// <summary>
+    /// Elimina un producto que nunca se vendió (por ejemplo, creado por error), con sus tallas,
+    /// existencias, Kardex, entradas de socios y fotos. Si alguna talla tiene ventas o cambios,
+    /// no se elimina: el historial de ventas y de caja lo necesita, y se debe desactivar.
+    /// </summary>
+    public async Task<ServiceResult<bool>> DeleteAsync(Guid id, Actor actor, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var product = await dbContext.Products.AsNoTracking().SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+        if (product is null)
+        {
+            return Result.Fail<bool>(ServiceErrorKind.NotFound, "not_found", "El producto no existe.");
+        }
+
+        var variantIds = await dbContext.Variants.Where(variant => variant.ProductId == id).Select(variant => variant.Id).ToListAsync(cancellationToken);
+        var hasSales = await dbContext.SaleLines.AnyAsync(line => variantIds.Contains(line.VariantId), cancellationToken) ||
+            await dbContext.SaleExchangeLines.AnyAsync(line => variantIds.Contains(line.ReturnedVariantId) || variantIds.Contains(line.NewVariantId), cancellationToken);
+        if (hasSales)
+        {
+            return Result.Fail<bool>(ServiceErrorKind.Conflict, "product_has_sales", "Este producto ya tiene ventas registradas: no se puede eliminar. Desactivalo para que no aparezca en la caja.");
+        }
+
+        var files = await dbContext.ProductImages.Where(image => image.ProductId == id)
+            .Select(image => new { image.FileName, image.ThumbFileName }).ToListAsync(cancellationToken);
+        var units = await dbContext.StockBalances.Where(balance => variantIds.Contains(balance.VariantId)).SumAsync(balance => (int?)balance.Quantity, cancellationToken) ?? 0;
+
+        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+        {
+            await dbContext.LotAllocations.Where(allocation => variantIds.Contains(allocation.VariantId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.StockLots.Where(lot => variantIds.Contains(lot.VariantId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Movements.Where(movement => variantIds.Contains(movement.VariantId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.StockBalances.Where(balance => variantIds.Contains(balance.VariantId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductImages.Where(image => image.ProductId == id).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Variants.Where(variant => variant.ProductId == id).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Products.Where(candidate => candidate.Id == id).ExecuteDeleteAsync(cancellationToken);
+            audit.Add(actor.UserId, "product.deleted", "Product", id.ToString(),
+                $"Producto «{product.Name}» eliminado ({variantIds.Count} variante(s), {units} unidad(es) en existencia).");
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        // Las fotos se borran después de confirmar en la base: si falla, solo quedan archivos huérfanos.
+        foreach (var file in files)
+        {
+            await images.DeleteAsync(file.FileName, CancellationToken.None);
+            await images.DeleteAsync(file.ThumbFileName, CancellationToken.None);
+        }
+
+        return Result.Ok(true);
     }
 
     public async Task<PageResult<ProductListItemDto>> ListAsync(

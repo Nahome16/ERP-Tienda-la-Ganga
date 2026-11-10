@@ -21,7 +21,7 @@ export const permissionLabels: Record<string, string> = {
   'product.create': 'Crear productos',
   'product.edit': 'Editar productos',
   'product.status.manage': 'Activar o inactivar productos',
-  'product.archive': 'Archivar productos',
+  'product.archive': 'Eliminar productos sin ventas',
   'product.images.manage': 'Administrar fotos',
   'inventory.read': 'Consultar existencias',
   'inventory.kardex.read': 'Consultar Kardex',

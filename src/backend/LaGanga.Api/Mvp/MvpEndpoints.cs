@@ -282,6 +282,16 @@ public static class MvpEndpoints
             .RequireAuthorization(PermissionNames.ProductEdit)
             .RequireCsrf();
 
+        products.MapDelete("/{id:guid}", async (Guid id, IProductService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null
+                    ? ApiHelpers.Unauthorized401()
+                    : (await service.DeleteAsync(id, actor, ct)).ToHttp(_ => Results.NoContent());
+            })
+            .RequireAuthorization(PermissionNames.ProductArchive)
+            .RequireCsrf();
+
         products.MapGet("/by-barcode/{barcode}", async (string barcode, IProductService service, HttpContext http, CancellationToken ct) =>
             {
                 var actor = http.User.GetActor();

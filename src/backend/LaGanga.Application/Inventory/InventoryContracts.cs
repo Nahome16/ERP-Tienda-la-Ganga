@@ -156,6 +156,9 @@ public interface IProductService
         Actor actor,
         CancellationToken cancellationToken);
 
+    /// <summary>Elimina un producto sin ventas, con todo lo suyo. Con ventas: conflicto «product_has_sales».</summary>
+    Task<ServiceResult<bool>> DeleteAsync(Guid id, Actor actor, CancellationToken cancellationToken);
+
     /// <summary>Producto por su código de fábrica (compartido por todas las tallas).</summary>
     Task<ServiceResult<ProductDetailDto>> FindProductByBarcodeAsync(
         string barcode,

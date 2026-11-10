@@ -70,6 +70,9 @@ export const updateVariant = (
 ) => apiRequest<Variant>(`${v1}/variants/${variant.id}`, { method: 'PUT', body: input, ifMatch: variant.version })
 
 export type VariantByBarcode = Variant & { productName: string }
+/** Solo productos sin ventas; con ventas responde 409 «product_has_sales». */
+export const deleteProduct = (productId: string) =>
+  apiRequest<void>(`${v1}/products/${productId}`, { method: 'DELETE' })
 export const getProductByBarcode = (barcode: string, signal?: AbortSignal) =>
   apiRequest<ProductDetail>(`${v1}/products/by-barcode/${encodeURIComponent(barcode)}`, { signal })
 export const getVariantByBarcode = (barcode: string, signal?: AbortSignal) =>

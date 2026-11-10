@@ -345,6 +345,41 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
         Assert.DoesNotContain(reloaded.GetProperty("variants").EnumerateArray(), variant => variant.GetProperty("barcode").GetString() == code);
     }
 
+    [PostgresFact]
+    public async Task ProductWithoutSalesCanBeDeletedButSoldOnesCannot()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var partner = await CreatePartnerAsync($"Borrar {suffix}");
+        var mistake = await CreateProductAsync($"Creado por error {suffix}", 400m, quantity: 5, cost: 150m, partnerId: partner);
+        var mistakeId = mistake.GetProperty("id").GetGuid();
+
+        using (var delete = ApiTestHelpers.Build(HttpMethod.Delete, $"/api/v1/products/{mistakeId}", fixture.AdminCsrf))
+        using (var deleted = await fixture.Admin.SendAsync(delete))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        }
+
+        using (var missing = await fixture.Admin.GetAsync(new Uri($"/api/v1/products/{mistakeId}", UriKind.Relative)))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        }
+
+        var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Creado por error {suffix}")}");
+        Assert.Empty(lots.GetProperty("items").EnumerateArray());
+
+        // Con una venta, no se elimina: se debe desactivar.
+        var sold = await CreateProductAsync($"Vendido {suffix}", 400m, quantity: 2, cost: 150m, partnerId: partner);
+        var soldId = sold.GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller);
+        _ = await PostSaleAsync(seller, session, sold.GetProperty("variants")[0].GetProperty("id").GetGuid(), 1, 400m, null, 400m);
+        using var blocked = ApiTestHelpers.Build(HttpMethod.Delete, $"/api/v1/products/{soldId}", fixture.AdminCsrf);
+        using var refused = await fixture.Admin.SendAsync(blocked);
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("product_has_sales", await ApiTestHelpers.ReadProblemCodeAsync(refused));
+        _ = await GetAsync(fixture.Admin, $"/api/v1/products/{soldId}");
+    }
+
     private async Task<object> ProductBodyAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId, DateOnly? receivedOn)
     {
         async Task<Guid[]> Ids(string kind)
