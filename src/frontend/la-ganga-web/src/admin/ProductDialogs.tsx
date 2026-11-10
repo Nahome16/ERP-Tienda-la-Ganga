@@ -206,17 +206,6 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
 
   /** Aplica el cambio del borrador y coloca los códigos escaneados que estaban esperando. */
   function changeBuilder(next: BuilderState, codes: string[] = pendingCodes) {
-    const productCode = fields.barcode.trim()
-    const repeatedColor = productCode ? catalogs.colors.find((color) => builder.colorIds.includes(color.id) && colorCodes[color.id]?.trim() === productCode) : undefined
-    if (repeatedColor) {
-      setError(`El código ${productCode} está como código de todo el producto y también del color ${repeatedColor.name}. Dejalo en uno solo: borralo de «Código de fábrica» si cada color trae el suyo.`)
-      return
-    }
-    const colorValues = builder.colorIds.map((colorId) => colorCodes[colorId]?.trim()).filter(Boolean)
-    if (new Set(colorValues).size !== colorValues.length) {
-      setError('Dos colores tienen el mismo código. Cada color debe tener uno distinto (si todos comparten el mismo, usá «Uno para todo el producto»).')
-      return
-    }
     if (pendingColorCodes.length > 0) {
       const queue = [...pendingColorCodes]
       const nextCodes = { ...colorCodes }
@@ -291,6 +280,17 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
     if (!input) { setError(fieldError); return }
     if (built.inputs.length === 0) { setError('Elegí al menos una talla y un color para crear las variantes.'); return }
     if (built.errors.length > 0) { setError(built.errors[0]); return }
+    const productCode = fields.barcode.trim()
+    const repeatedColor = productCode ? catalogs.colors.find((color) => builder.colorIds.includes(color.id) && colorCodes[color.id]?.trim() === productCode) : undefined
+    if (repeatedColor) {
+      setError(`El código ${productCode} está como código de todo el producto y también del color ${repeatedColor.name}. Dejalo en uno solo: borralo de «Código de fábrica» si cada color trae el suyo.`)
+      return
+    }
+    const colorValues = builder.colorIds.map((colorId) => colorCodes[colorId]?.trim()).filter(Boolean)
+    if (new Set(colorValues).size !== colorValues.length) {
+      setError('Dos colores tienen el mismo código. Cada color debe tener uno distinto (si todos comparten el mismo, usá «Uno para todo el producto»).')
+      return
+    }
     if (pendingColorCodes.length > 0) {
       setError(`Hay códigos de color sin color (${pendingColorCodes.join(', ')}). Marcá más colores o quitalos.`)
       return
