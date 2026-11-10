@@ -759,6 +759,39 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LaGanga.Domain.Inventory.ProductColorBarcode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ColorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Barcode")
+                        .IsUnique();
+
+                    b.HasIndex("ColorId");
+
+                    b.HasIndex("ProductId", "ColorId")
+                        .IsUnique();
+
+                    b.ToTable("product_color_barcodes", "inventory");
+                });
+
             modelBuilder.Entity("LaGanga.Domain.Inventory.ProductImage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1729,6 +1762,21 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Inventory.ProductColorBarcode", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Catalog.Color", null)
+                        .WithMany()
+                        .HasForeignKey("ColorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LaGanga.Domain.Inventory.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("LaGanga.Domain.Inventory.ProductImage", b =>
