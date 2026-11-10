@@ -9,7 +9,7 @@ const page = (items, p, size) => {
 const cat = (id, name, extra = {}) => ({ id, name, isActive: true, sortOrder: 1, version: 1, parentId: null, sizeGroupId: null, swatchHex: null, updatedAtUtc: now(), ...extra })
 
 export const adminUser = {
-  id: 'u-admin', username: 'admin', displayName: 'Administrador', roles: ['Administrador'],
+  id: 'u-admin', username: 'admin', displayName: 'Administrador', roles: ['Administrador'], mustChangePassword: false,
   permissions: ['catalog.read', 'catalog.manage', 'product.read', 'product.create', 'product.edit', 'inventory.read', 'inventory.kardex.read',
     'inventory.cost.read', 'inventory.initial.confirm', 'inventory.adjust', 'sale.create', 'sale.read', 'sale.void', 'cash.operate',
     'cash.report.read', 'settings.manage', 'audit.read', 'user.manage'],
@@ -249,7 +249,8 @@ export function createMock(options = {}) {
     if ((r = m(/^\/api\/v1\/variants\/by-barcode\/(.+)$/))) {
       const v = s.variants.find((x) => x.barcode === decodeURIComponent(r[1]))
       if (!v) return problem(route, 404, 'No existe esa variante.', 'not_found', {})
-      return json(route, 200, { ...variantView(v), productName: s.products.find((p) => p.id === v.productId).name })
+      // Forma real del servidor (docs/30): { productName, variant }.
+      return json(route, 200, { productName: s.products.find((p) => p.id === v.productId).name, variant: variantView(v) })
     }
     if ((r = m(/^\/api\/v1\/variants\/([^/]+)$/)) && method === 'PUT') {
       const v = s.variants.find((x) => x.id === r[1])

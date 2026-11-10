@@ -3,6 +3,7 @@ import { swatchFor } from '../lib/colorPalette'
 import { hasPermission } from '../lib/access'
 import type { CashSession, DiscountType, PosVariant, Sale, SaleChannel, SaleRequestPayment } from '../lib/apiTypes'
 import { computeTotals, discountExceedsLimit, formatNio } from '../lib/money'
+import { discountProblem } from './discountInput'
 import type { CurrentUser } from '../types'
 import { ApprovalModal } from './ApprovalModal'
 import { addToCart, cartQuantity, cartUnits, removeLine, setLineQuantity } from './cart'
@@ -127,6 +128,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     approval && approval.type === discountType && approval.value === discountValue && Date.parse(approval.expiresAtUtc) > now,
   )
   const discountBlocked = needsApproval && !approvalValid
+  const discountError = discountProblem(discountType, discountText, totals.subtotalNio)
   const units = cartUnits(lines)
 
   // --- Búsqueda local ---
@@ -232,6 +234,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   // --- Cobro ---
   function openPayment() {
     if (lines.length === 0 || !settings) return
+    if (discountError) { announce('error', discountError); return }
     const short = lines.find((line) => {
       const known = index.byId.get(line.variantId)
       return known !== undefined && line.quantity > availableStock(known.stock, line.variantId, pending)
@@ -552,6 +555,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); focusScanner() } }}
               />
             </div>
+            {discountError && <p className="pv-hint pv-warn" role="alert"><TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" />{discountError}</p>}
             {needsApproval && approvalValid && approval && <p className="pv-hint pv-ok"><CircleCheck size={14} strokeWidth={1.75} aria-hidden="true" />Aprobado por {approval.approverName}.</p>}
             {discountBlocked && (
               <p className="pv-hint pv-warn" role="alert">
@@ -572,7 +576,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
             <div className="pv-grand"><dt>Total</dt><dd data-testid="cart-total">{formatNio(totals.totalNio)}</dd></div>
           </dl>
 
-          <button type="button" className="pv-btn pv-btn-primary pv-btn-xl pv-charge" disabled={lines.length === 0 || (discountBlocked && offline)} onClick={openPayment}>
+          <button type="button" className="pv-btn pv-btn-primary pv-btn-xl pv-charge" disabled={lines.length === 0 || (discountBlocked && offline) || discountError !== null} onClick={openPayment}>
             Cobrar {formatNio(totals.totalNio)} <kbd>Enter</kbd>
           </button>
         </div>

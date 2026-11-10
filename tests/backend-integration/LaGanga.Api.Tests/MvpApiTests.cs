@@ -234,13 +234,62 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task SaleIsCountedInItsOwnBusinessDayEvenIfTheRegisterWasOpenedTheDayBefore()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        var product = await CreateProductAsync(catalogs, "Camisa caja abierta dos días", 690m, [(10, null)]);
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller, 0m, 0m);
+        _ = await PostSaleAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 690m)], null, null, [Pay("Cash", "NIO", 690m)]);
+
+        // La caja se había abierto ayer por la tarde (hora de Managua) y sigue abierta hoy.
+        var managua = TimeSpan.FromHours(-6);
+        var todayDate = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(managua).DateTime);
+        var yesterdayDate = todayDate.AddDays(-1);
+        var openedYesterday = new DateTimeOffset(yesterdayDate.ToDateTime(new TimeOnly(15, 0)), managua).ToUniversalTime();
+        await fixture.ExecuteSqlAsync(
+            $"UPDATE sales.cash_sessions SET \"OpenedAtUtc\" = '{openedYesterday:yyyy-MM-dd HH:mm:ss}+00' WHERE \"Id\" = '{session}'");
+
+        var yesterday = await GetAsync(fixture.Admin, $"/api/v1/cash/consolidated?date={yesterdayDate:yyyy-MM-dd}");
+        var yesterdayTotals = yesterday.GetProperty("totals");
+        Assert.Equal(0, yesterdayTotals.GetProperty("salesCount").GetInt32());
+        Assert.Equal(0m, yesterdayTotals.GetProperty("netTotalNio").GetDecimal());
+        Assert.Contains(yesterday.GetProperty("sessions").EnumerateArray(), item => item.GetProperty("session").GetProperty("id").GetGuid() == session);
+
+        var today = await GetAsync(fixture.Admin, $"/api/v1/cash/consolidated?date={todayDate:yyyy-MM-dd}");
+        Assert.True(today.GetProperty("totals").GetProperty("netTotalNio").GetDecimal() >= 690m);
+        Assert.True(today.GetProperty("totals").GetProperty("salesCount").GetInt32() >= 1);
+        Assert.Contains(today.GetProperty("sessions").EnumerateArray(), item => item.GetProperty("session").GetProperty("id").GetGuid() == session);
+
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 690m, countedCashUsd = 0m });
+    }
+
+    [PostgresFact]
+    public async Task BarcodeLookupReturnsTheProductNameAndTheVariantInsideVariant()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        var product = await CreateProductAsync(catalogs, "Camisa escaneo", 450m, [(7, null)]);
+        var barcode = product.GetProperty("variants")[0].GetProperty("barcode").GetString();
+        var lookup = await GetAsync(fixture.Admin, $"/api/v1/variants/by-barcode/{barcode}");
+        // Contrato (docs/30, sección 5): { productName, variant }. El frontend lo aplana; si cambia, falla esta prueba.
+        Assert.StartsWith("Camisa escaneo", lookup.GetProperty("productName").GetString(), StringComparison.Ordinal);
+        var variant = lookup.GetProperty("variant");
+        Assert.Equal(barcode, variant.GetProperty("barcode").GetString());
+        Assert.Equal(450m, variant.GetProperty("price").GetDecimal());
+        Assert.Equal(7, variant.GetProperty("stock").GetInt32());
+        Assert.False(lookup.TryGetProperty("stock", out _));
+    }
+
+    [PostgresFact]
     public async Task DollarsInEveryMethodAreReconciledByMethodAndCurrencyAtClosing()
     {
         var catalogs = await LoadCatalogsAsync();
         var product = await CreateProductAsync(catalogs, "Pantalón conciliación", 1000m, [(20, null)]);
         var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
-        var shirt = await CreateProductAsync(catalogs, "Camisa conciliación", 734m, [(20, null)]);
-        var shirtVariantId = shirt.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        // El servidor protege el precio: la venta B (C$ 734) usa un producto cuyo precio oficial es C$ 734.
+        var cheaper = await CreateProductAsync(catalogs, "Blusa conciliación", 734m, [(20, null)]);
+        var cheaperVariantId = cheaper.GetProperty("variants")[0].GetProperty("id").GetGuid();
         var seller = await CreateSellerAsync();
         var session = await OpenCashAsync(seller, 0m, 0m);
 
@@ -248,7 +297,7 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         _ = await PostSaleAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 1000m)], null, null,
             [Pay("Transfer", "USD", 10m, 36.7m, "BAC"), Pay("Card", "NIO", 400m), Pay("Cash", "NIO", 233m)]);
         // Venta B (C$ 734): tarjeta en dólares US$ 20.
-        _ = await PostSaleAsync(seller, session, Guid.NewGuid(), [(shirtVariantId, 1, 734m)], null, null, [Pay("Card", "USD", 20m, 36.7m)]);
+        _ = await PostSaleAsync(seller, session, Guid.NewGuid(), [(cheaperVariantId, 1, 734m)], null, null, [Pay("Card", "USD", 20m, 36.7m)]);
 
         var summary = await GetAsync(seller.Client, $"/api/v1/cash/sessions/{session}/summary");
         var totals = summary.GetProperty("totals");

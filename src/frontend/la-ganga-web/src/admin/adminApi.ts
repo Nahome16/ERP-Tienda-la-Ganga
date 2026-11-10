@@ -69,6 +69,7 @@ export const updateVariant = (
   input: { barcode: string; priceOverride: number | null; isActive: boolean; cost?: number | null },
 ) => apiRequest<Variant>(`${v1}/variants/${variant.id}`, { method: 'PUT', body: input, ifMatch: variant.version })
 
+/** Variante con el nombre de su producto: la forma plana que usan las pantallas. */
 export type VariantByBarcode = Variant & { productName: string }
 /** Solo productos sin ventas; con ventas responde 409 «product_has_sales». */
 export const deleteProduct = (productId: string) =>
@@ -79,8 +80,16 @@ export const getProductByBarcode = (barcode: string, signal?: AbortSignal) =>
 /** Pone, cambia o quita (vacío) el código de fábrica de un color del producto. */
 export const setColorBarcode = (productId: string, colorId: string, barcode: string) =>
   apiRequest<ProductDetail>(`${v1}/products/${productId}/color-barcodes/${colorId}`, { method: 'PUT', body: { barcode } })
-export const getVariantByBarcode = (barcode: string, signal?: AbortSignal) =>
-  apiRequest<VariantByBarcode>(`${v1}/variants/by-barcode/${encodeURIComponent(barcode)}`, { signal })
+/** Respuesta del servidor: `{ productName, variant }` (docs/30, sección 5). */
+export type VariantLookupResponse = { productName: string; variant: Variant }
+
+/** Aplana la respuesta de «buscar por código de barras» para que `stock`, `price`, etc. queden al nivel principal. */
+export function flattenVariantLookup(response: VariantLookupResponse): VariantByBarcode {
+  return { ...response.variant, productName: response.productName }
+}
+
+export const getVariantByBarcode = async (barcode: string, signal?: AbortSignal) =>
+  flattenVariantLookup(await apiRequest<VariantLookupResponse>(`${v1}/variants/by-barcode/${encodeURIComponent(barcode)}`, { signal }))
 
 export const importProducts = (body: { dryRun: boolean; createMissingCatalogs: boolean; createMissingPartners?: boolean; rows: ImportRow[] }) =>
   apiRequest<ImportResult>(`${v1}/products/import`, { method: 'POST', body })

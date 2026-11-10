@@ -33,7 +33,7 @@ if (SHOTS) mkdirSync(SHOTS, { recursive: true })
 
 // ---------- API simulada ----------
 const user = {
-  id: 'user-1', username: 'vendedor.uno', displayName: 'Vendedor Uno', roles: ['Vendedor'],
+  id: 'user-1', username: 'vendedor.uno', displayName: 'Vendedor Uno', roles: ['Vendedor'], mustChangePassword: false,
   permissions: ['catalog.read', 'product.read', 'inventory.read', 'sale.create', 'cash.operate'],
 }
 const settings = {
@@ -319,7 +319,7 @@ try {
   await page.keyboard.press('F3')
   await page.locator('#pay-amount').fill('20')
   check('Tarjeta US$ 20 (C$ 734 > pendiente) se rechaza: solo el efectivo da cambio',
-    await payDialog.getByText(/no pueden dejar pagado de más/).isVisible()
+    await payDialog.getByText(/Solo el efectivo puede dar cambio/).isVisible()
     && await payDialog.getByRole('button', { name: /Agregar pago/ }).isDisabled())
   await page.locator('#pay-amount').fill('3')
   await page.locator('#pay-amount').press('Enter')

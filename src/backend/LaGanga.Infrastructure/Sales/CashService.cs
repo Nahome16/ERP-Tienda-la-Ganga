@@ -201,14 +201,17 @@ public sealed class CashService(
     public async Task<CashConsolidatedDto> GetConsolidatedAsync(DateOnly businessDate, CancellationToken cancellationToken)
     {
         var (start, end) = BusinessTime.DayRangeUtc(businessDate);
+        // Cuentan las cajas que estuvieron abiertas durante el día (no solo las que se abrieron ese día):
+        // una caja abierta el 9 y usada el 10 aparece en ambos días.
         var sessions = await dbContext.CashSessions.AsNoTracking().Include(session => session.Register)
-            .Where(session => session.OpenedAtUtc >= start && session.OpenedAtUtc < end)
+            .Where(session => session.OpenedAtUtc < end && (session.ClosedAtUtc == null || session.ClosedAtUtc >= start))
             .OrderBy(session => session.Register.Name).ThenBy(session => session.OpenedAtUtc).ToListAsync(cancellationToken);
         var summaries = await SummarizeAsync(sessions, cancellationToken);
 
+        // Las ventas del día se agrupan por la fecha comercial de cada venta, no por la de apertura de su caja.
         var sessionById = sessions.ToDictionary(session => session.Id);
         var sales = (await LoadSalesAsync(sessions.Select(session => session.Id).ToArray(), cancellationToken))
-            .Where(sale => IncludedAtClose(sale, sessionById[sale.CashSessionId]))
+            .Where(sale => IsInBusinessDay(sale, start, end) && IncludedAtClose(sale, sessionById[sale.CashSessionId]))
             .ToArray();
         var open = summaries.Count(summary => summary.Session.ClosedAtUtc is null);
         return new CashConsolidatedDto(
@@ -328,6 +331,10 @@ public sealed class CashService(
                 session.CountedCardUsd is { } cardUsd ? cardUsd - totals.CardUsdTendered : null);
         }).ToArray();
     }
+
+    /// <summary>La venta ocurrió dentro del día comercial [start, end) (misma fecha que usan Ventas y los reportes).</summary>
+    internal static bool IsInBusinessDay(Sale sale, DateTimeOffset start, DateTimeOffset end) =>
+        sale.CreatedAtUtc >= start && sale.CreatedAtUtc < end;
 
     private static bool IncludedAtClose(Sale sale, CashSession session) =>
         session.ClosedAtUtc is null || sale.ReceivedAtUtc <= session.ClosedAtUtc.Value;
