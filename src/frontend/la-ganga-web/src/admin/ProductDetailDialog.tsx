@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { MoreActions } from './MoreActions'
+import { ProductBalancePanel } from './ProductBalancePanel'
+import { ProductPartnerDialog } from './ProductPartnerDialog'
 import { ApiError } from '../lib/api'
 import { hasPermission } from '../lib/access'
 import type { ProductDetail, Variant } from '../lib/apiTypes'
@@ -30,6 +33,7 @@ type Nested =
   | { kind: 'labels' }
   | { kind: 'receive' }
   | { kind: 'delete' }
+  | { kind: 'partner' }
   | null
 
 export function ProductDetailDialog({ productId, user, catalogs, openLabels, onClose, onChanged }: Props) {
@@ -38,6 +42,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
   const canImages = hasPermission(user, 'product.images.manage')
   const canReceive = hasPermission(user, 'inventory.adjust')
   const canDelete = hasPermission(user, 'product.archive')
+  const canPartner = hasPermission(user, 'investment.manage')
   const { data: product, error, loading, reload } = useFetch<ProductDetail>(`product|${productId}`, (signal) => getProduct(productId, signal))
   const [nested, setNested] = useState<Nested>(openLabels ? { kind: 'labels' } : null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
@@ -98,10 +103,13 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
         onClose={onClose}
         footer={product && (
           <>
-            {canDelete && <button type="button" className="link-button danger" disabled={busy} onClick={() => setNested({ kind: 'delete' })}>Eliminar producto</button>}
+            <MoreActions actions={[
+              ...(canPartner ? [{ label: 'Socio', hint: 'Asignar o cambiar el socio de las unidades', onSelect: () => setNested({ kind: 'partner' }) }] : []),
+              ...(canEdit ? [{ label: 'Agregar variantes', hint: 'Tallas o colores nuevos', onSelect: () => setNested({ kind: 'add-variants' }) }] : []),
+              ...(canEdit ? [{ label: product.isActive ? 'Inactivar producto' : 'Activar producto', hint: product.isActive ? 'Deja de mostrarse en caja' : 'Vuelve a mostrarse en caja', disabled: busy, onSelect: () => toggleProduct(product) }] : []),
+              ...(canDelete ? [{ label: 'Eliminar producto', danger: true, disabled: busy, onSelect: () => setNested({ kind: 'delete' }) }] : []),
+            ]} />
             {canReceive && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'receive' })}>Ingresar mercadería</button>}
-            {canEdit && <button type="button" className="secondary-button" disabled={busy} onClick={() => toggleProduct(product)}>{product.isActive ? 'Inactivar producto' : 'Activar producto'}</button>}
-            {canEdit && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'add-variants' })}>Agregar variantes</button>}
             {canEdit && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'edit-product' })}>Editar producto</button>}
             <button type="button" className="primary-button" disabled={product.variants.length === 0} onClick={() => setNested({ kind: 'labels' })}>Etiquetas</button>
           </>
@@ -119,6 +127,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
               <span>Existencia total <strong className={product.totalStock < 0 ? 'adm-neg' : undefined}>{product.totalStock}</strong></span>
               <span>{product.variantCount} variante{product.variantCount === 1 ? '' : 's'}</span>
             </div>
+            <ProductBalancePanel product={product} canSeeCosts={canCost} />
             <FactoryCodes product={product} canEdit={canEdit} onChanged={(text) => changed(text)} />
             <ImageManager key={product.id} productId={product.id} images={product.images ?? []} canManage={canImages} onChanged={onChanged} />
             <div className="table-scroll">
@@ -178,6 +187,9 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
           onClose={() => setNested(null)} onChanged={() => changed()}
           onDone={() => { setNested(null); changed('Se agregaron las variantes.') }}
         />
+      )}
+      {product && nested?.kind === 'partner' && (
+        <ProductPartnerDialog product={product} onClose={() => setNested(null)} onDone={(text) => { setNested(null); changed(text) }} />
       )}
       {product && nested?.kind === 'delete' && (
         <DeleteProductDialog

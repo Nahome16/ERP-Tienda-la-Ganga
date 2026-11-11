@@ -56,6 +56,8 @@ public static class DependencyInjection
         services.AddScoped<ICashService, CashService>();
         services.AddScoped<ISalesService, SalesService>();
         services.AddScoped<IExchangeService, ExchangeService>();
+        services.AddScoped<ISupervisorVerifier, SupervisorVerifier>();
+        services.AddScoped<IPosVoidService, PosVoidService>();
         services.AddScoped<IReportService, ReportService>();
         return services;
     }

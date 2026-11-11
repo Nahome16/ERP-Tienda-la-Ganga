@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PosVariant } from '../lib/apiTypes'
-import { buildIndex, findByBarcode, findColorByBarcode, findProductByBarcode, searchVariants } from './search'
+import { buildIndex, findByBarcode, findColorByBarcode, findProductByBarcode, liveSearchFeedback, searchVariants } from './search'
 
 function variant(overrides: Partial<PosVariant>): PosVariant {
   return {
@@ -39,5 +39,23 @@ describe('códigos en la caja', () => {
     expect(findProductByBarcode(index, '7450000000011')).toBeNull()
     expect(findColorByBarcode(index, '7450000000011')).toEqual({ productId: 'p-zolo', colorName: 'Negro' })
     expect(findColorByBarcode(index, '7450000000028')).toEqual({ productId: 'p-zolo', colorName: 'Azul' })
+  })
+})
+
+describe('mensaje de búsqueda en vivo', () => {
+  it('refleja la consulta y la cantidad de productos visibles', () => {
+    expect(liveSearchFeedback('', 6)).toBeNull()
+    expect(liveSearchFeedback('kalua', 4)).toEqual({
+      tone: 'info',
+      text: '4 productos coinciden. Elegí la talla y el color.',
+    })
+    expect(liveSearchFeedback('2000000000017', 1)).toEqual({
+      tone: 'info',
+      text: '1 producto coincide. Elegí la talla y el color o presioná Agregar.',
+    })
+    expect(liveSearchFeedback('inexistente', 0)).toEqual({
+      tone: 'error',
+      text: 'Sin coincidencias para «inexistente».',
+    })
   })
 })

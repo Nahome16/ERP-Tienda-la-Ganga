@@ -15,7 +15,8 @@ import { Modal } from './Modal'
 import { errorMessage, posRequest } from './net'
 import { OpenCashScreen } from './OpenCashScreen'
 import { SalesPanel } from './SalesPanel'
-import { SellScreen } from './SellScreen'
+import { UserMenu } from './UserMenu'
+import { SellScreen, type ReloadRequest } from './SellScreen'
 import { clearCartDraft, clearCashSession, loadCashSession, saveCashSession } from './storage'
 import './pos.css'
 import {
@@ -202,6 +203,8 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
   const staleCatalog = snapshotAge > 12 * 60 * 60 * 1000
 
   const canExchange = hasPermission(user, 'sale.exchange')
+  // Prendas de una venta anulada para volver a cobrar («Anular y cargar al carrito»).
+  const [reloadRequest, setReloadRequest] = useState<ReloadRequest | null>(null)
 
   const connectionLabel = connection === 'offline' ? 'Sin conexión' : state.syncing ? 'Sincronizando…' : 'En línea'
   const connectionTone = connection === 'offline' ? 'offline' : state.syncing ? 'syncing' : 'online'
@@ -213,12 +216,15 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           <img src="/logo-tienda-la-ganga.png" alt="" width={36} height={36} />
           <div className="pv-brand-text">
             <h1>Punto de venta</h1>
-            <small>{session ? `${session.registerName} · ` : ''}{user.displayName}</small>
+            <small>{session ? session.registerName : 'Caja cerrada'}</small>
           </div>
         </div>
 
         <div className="pv-status" aria-label="Estado de conexión y sincronización">
-          <span className={`pv-chip pv-conn pv-conn-${connectionTone}`} role="status" data-testid="connection-status">
+          <span
+            className={`pv-chip pv-conn pv-conn-${connectionTone}`} role="status" data-testid="connection-status"
+            title={`Catálogo actualizado ${state.snapshot ? timeAgo(state.snapshot.fetchedAtUtc, now) : 'nunca'} · Última sincronización ${timeAgo(state.lastSyncAtUtc, now)}`}
+          >
             {connectionTone === 'offline' ? <WifiOff size={15} strokeWidth={1.75} aria-hidden="true" />
               : connectionTone === 'syncing' ? <RefreshCw size={15} strokeWidth={1.75} className="pv-spin" aria-hidden="true" />
                 : <Wifi size={15} strokeWidth={1.75} aria-hidden="true" />}
@@ -232,26 +238,9 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
             {attentionCount > 0 ? <CircleAlert size={15} strokeWidth={1.75} aria-hidden="true" /> : <CloudUpload size={15} strokeWidth={1.75} aria-hidden="true" />}
             {pendingCount} {pendingCount === 1 ? 'pendiente' : 'pendientes'}{attentionCount > 0 ? ` · ${attentionCount} con error` : ''}
           </button>
-          <span className="pv-sync-times">
-            <span>Catálogo actualizado {state.snapshot ? timeAgo(state.snapshot.fetchedAtUtc, now) : 'nunca'}</span>
-            <span>Última sincronización {timeAgo(state.lastSyncAtUtc, now)}</span>
-          </span>
         </div>
 
-        <nav className={`pv-actions${(canReturnToAdmin || canExchange) && session ? ' is-dense' : ''}`} aria-label="Acciones de la caja">
-          {canReturnToAdmin && (
-            <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => onNavigate('panel')} aria-label="Volver al panel" title="Volver al panel">
-              <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Panel</span>
-            </button>
-          )}
-          <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={toggleSound} aria-pressed={soundEnabled} title="Sonido y vibración del escáner" aria-label={soundEnabled ? 'Sonido' : 'Sin sonido'}>
-            {soundEnabled ? <Bell size={18} strokeWidth={1.75} aria-hidden="true" /> : <BellOff size={18} strokeWidth={1.75} aria-hidden="true" />}<span className="pv-btn-label">{soundEnabled ? 'Sonido' : 'Sin sonido'}</span>
-          </button>
-          {session && (
-            <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('sales')} aria-label="Ventas de esta caja" title="Ventas de esta caja">
-              <ReceiptText size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Ventas de esta caja</span>
-            </button>
-          )}
+        <nav className="pv-actions" aria-label="Acciones de la caja">
           {session && canExchange && (
             <button
               type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('exchange')}
@@ -261,14 +250,22 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
               <Repeat size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Cambio de talla</span>
             </button>
           )}
-          {session && (
-            <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('close')} aria-label="Cerrar caja" title="Cerrar caja">
-              <Lock size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Cerrar caja</span>
-            </button>
-          )}
-          <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={requestLogout} aria-label="Cerrar sesión" title="Cerrar sesión">
-            <LogOut size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Cerrar sesión</span>
+          <button
+            type="button" className="pv-btn pv-btn-secondary pv-top-btn pv-icon-btn" onClick={toggleSound} aria-pressed={soundEnabled}
+            title={soundEnabled ? 'Sonido del escáner activado (tocá para silenciar)' : 'Sonido del escáner apagado (tocá para activar)'}
+            aria-label={soundEnabled ? 'Sonido' : 'Sin sonido'}
+          >
+            {soundEnabled ? <Bell size={18} strokeWidth={1.75} aria-hidden="true" /> : <BellOff size={18} strokeWidth={1.75} aria-hidden="true" />}
           </button>
+          <UserMenu
+            name={user.displayName}
+            items={[
+              ...(session ? [{ label: 'Ventas de esta caja', icon: <ReceiptText size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: () => setPanel('sales') }] : []),
+              ...(canReturnToAdmin ? [{ label: 'Volver al panel', icon: <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: () => onNavigate('panel') }] : []),
+              ...(session ? [{ label: 'Cerrar caja', icon: <Lock size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: () => setPanel('close') }] : []),
+              { label: 'Cerrar sesión', icon: <LogOut size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: requestLogout, danger: true },
+            ]}
+          />
         </nav>
       </header>
 
@@ -346,6 +343,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           soundEnabled={soundEnabled}
           onPrint={printSale}
           notify={notify}
+          reloadRequest={reloadRequest}
         />
       )}
 
@@ -359,6 +357,17 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           onRetry={(id) => { void engine.retry(id) }}
           onRetryAll={() => { void engine.retryAll() }}
           onClose={() => setPanel(null)}
+          canVoidDirect={hasPermission(user, 'sale.void')}
+          onVoided={(sale, reload) => {
+            notify(`Venta ${sale.number} anulada.`, 'ok')
+            // Las prendas volvieron al inventario: se actualiza la caja y, si se pidió, pasan al carrito.
+            void engine.refreshSnapshot().then(() => {
+              if (reload) {
+                setReloadRequest({ nonce: Date.now(), lines: sale.lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })) })
+                setPanel(null)
+              }
+            })
+          }}
         />
       )}
 
@@ -366,6 +375,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
         <ExchangeModal
           session={session}
           online={connection === 'online'}
+          needsApproval={!hasPermission(user, 'sale.void')}
           onPrint={(exchange) => setPrintJob({ nonce: Date.now(), exchange })}
           onDone={(exchange) => {
             notify(`Cambio ${exchange.number} registrado.`, 'ok')

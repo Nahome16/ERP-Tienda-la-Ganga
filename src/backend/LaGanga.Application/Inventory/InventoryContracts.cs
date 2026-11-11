@@ -56,6 +56,9 @@ public sealed record ProductDetailDto(
     string? Barcode = null,
     IReadOnlyList<ColorBarcodeDto>? ColorBarcodes = null);
 
+/// <summary>Lo vendido de una variante (ventas confirmadas): unidades, ingresos y costo (si se puede ver).</summary>
+public sealed record VariantSalesDto(Guid VariantId, int SoldUnits, decimal SoldRevenueNio, decimal? SoldCostNio);
+
 /// <summary>Código de fábrica de un color: lo comparten todas las tallas de ese color.</summary>
 public sealed record ColorBarcodeDto(Guid ColorId, string ColorName, string Barcode);
 
@@ -167,6 +170,9 @@ public interface IProductService
         string barcode,
         Actor actor,
         CancellationToken cancellationToken);
+
+    /// <summary>Lo vendido de cada variante del producto, para el balance de la ficha.</summary>
+    Task<ServiceResult<IReadOnlyList<VariantSalesDto>>> GetSalesSummaryAsync(Guid id, Actor actor, CancellationToken cancellationToken);
 
     /// <summary>Elimina un producto sin ventas, con todo lo suyo. Con ventas: conflicto «product_has_sales».</summary>
     Task<ServiceResult<bool>> DeleteAsync(Guid id, Actor actor, CancellationToken cancellationToken);

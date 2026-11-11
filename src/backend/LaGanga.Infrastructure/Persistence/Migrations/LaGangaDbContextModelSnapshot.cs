@@ -1125,6 +1125,10 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<Guid?>("DiscountApprovalId")
                         .HasColumnType("uuid");
 
@@ -1551,7 +1555,7 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                             Banks = new string[0],
                             ExchangeWindowDays = 4,
                             LowStockThreshold = 2,
-                            ReceiptFooter = "Recibo interno — no es factura",
+                            ReceiptFooter = "Guarde este recibo para cualquier cambio.",
                             SellerDiscountLimitPercent = 10m,
                             StoreAddress = "",
                             StoreName = "Tienda La Ganga",

@@ -33,7 +33,7 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
             StoreName = "Tienda La Ganga",
             StoreAddress = string.Empty,
             StorePhone = string.Empty,
-            ReceiptFooter = "Recibo interno — no es factura",
+            ReceiptFooter = "Guarde este recibo para cualquier cambio.",
             Banks = Array.Empty<string>(),
             SellerDiscountLimitPercent = 10m,
             LowStockThreshold = 2,

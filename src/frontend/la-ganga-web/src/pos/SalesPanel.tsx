@@ -4,6 +4,7 @@ import type { CashSession, Sale } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
 import { channelLabel, formatTime, mergeSales, type SaleRow } from './format'
 import { Modal } from './Modal'
+import { VoidSaleModal } from './VoidSaleModal'
 import { errorMessage, posRequest } from './net'
 import type { OutboxEntry } from './types'
 
@@ -16,9 +17,14 @@ type SalesPanelProps = {
   onRetry: (clientSaleId: string) => void
   onRetryAll: () => void
   onClose: () => void
+  /** El cajero puede anular sin autorización (por ejemplo, el administrador). */
+  canVoidDirect: boolean
+  /** Venta anulada desde la caja; `reload` = cargar sus prendas al carrito para cobrar de nuevo. */
+  onVoided: (sale: Sale, reload: boolean) => void
 }
 
-export function SalesPanel({ session, entries, online, syncing, onPrint, onRetry, onRetryAll, onClose }: SalesPanelProps) {
+export function SalesPanel({ session, entries, online, syncing, onPrint, onRetry, onRetryAll, onClose, canVoidDirect, onVoided }: SalesPanelProps) {
+  const [voiding, setVoiding] = useState<Sale | null>(null)
   const [serverSales, setServerSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,45 +57,65 @@ export function SalesPanel({ session, entries, online, syncing, onPrint, onRetry
   const detail = rows.find((row) => row.clientSaleId === detailId) ?? null
 
   return (
-    <Modal
-      title={`Ventas de ${session.registerName}`}
-      size="lg"
-      onClose={onClose}
-      footer={(
-        <>
-          <span className="pv-confirm-text">{rows.length} {rows.length === 1 ? 'venta' : 'ventas'} · {formatNio(total)}</span>
-          {online && <button type="button" className="pv-btn pv-btn-secondary" onClick={() => { void load() }} disabled={loading}><RefreshCw size={18} strokeWidth={1.75} className={loading ? 'pv-spin' : undefined} aria-hidden="true" />{loading ? 'Actualizando…' : 'Actualizar'}</button>}
-          {needsAttention && online && <button type="button" className="pv-btn pv-btn-secondary" onClick={onRetryAll} disabled={syncing}>Reintentar envío</button>}
-          <button type="button" className="pv-btn pv-btn-primary" onClick={onClose}>Cerrar</button>
-        </>
-      )}
-    >
-      {!online && <p className="pv-banner pv-banner-warn"><WifiOff size={18} strokeWidth={1.75} aria-hidden="true" /><span>Sin conexión: se muestran las ventas guardadas en este equipo.</span></p>}
-      {error && <p className="pv-banner pv-banner-error" role="alert"><CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" /><span>{error}</span></p>}
-      {rows.length === 0 && (
-        <div className="pv-empty">
-          <span className="pv-badge-icon" aria-hidden="true"><ReceiptText size={26} strokeWidth={1.75} /></span>
-          <p>Todavía no hay ventas en esta caja.</p>
-        </div>
-      )}
-      {rows.length > 0 && (
-        <ul className="pv-sales-list">
-          {rows.map((row) => <SaleItem key={row.clientSaleId} row={row} onPrint={onPrint} onRetry={onRetry} onDetail={() => setDetailId(detailId === row.clientSaleId ? null : row.clientSaleId)} />)}
-        </ul>
-      )}
-      {detail && (
-        <div className="pv-sale-detail" aria-live="polite">
-          <h3>{detail.sale.number}</h3>
-          <ul>
-            {detail.sale.lines.map((line) => (
-              <li key={`${line.variantId}-${line.unitPrice}`}>{line.quantity} × {line.productName} ({line.sizeName} / {line.colorName}) — {formatNio(line.lineTotalNio)}</li>
+    <>
+      <Modal
+        title={`Ventas de ${session.registerName}`}
+        size="lg"
+        onClose={onClose}
+        footer={(
+          <>
+            <span className="pv-confirm-text">{rows.length} {rows.length === 1 ? 'venta' : 'ventas'} · {formatNio(total)}</span>
+            {online && <button type="button" className="pv-btn pv-btn-secondary" onClick={() => { void load() }} disabled={loading}><RefreshCw size={18} strokeWidth={1.75} className={loading ? 'pv-spin' : undefined} aria-hidden="true" />{loading ? 'Actualizando…' : 'Actualizar'}</button>}
+            {needsAttention && online && <button type="button" className="pv-btn pv-btn-secondary" onClick={onRetryAll} disabled={syncing}>Reintentar envío</button>}
+            <button type="button" className="pv-btn pv-btn-primary" onClick={onClose}>Cerrar</button>
+          </>
+        )}
+      >
+        {!online && <p className="pv-banner pv-banner-warn"><WifiOff size={18} strokeWidth={1.75} aria-hidden="true" /><span>Sin conexión: se muestran las ventas guardadas en este equipo.</span></p>}
+        {error && <p className="pv-banner pv-banner-error" role="alert"><CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" /><span>{error}</span></p>}
+        {rows.length === 0 && (
+          <div className="pv-empty">
+            <span className="pv-badge-icon" aria-hidden="true"><ReceiptText size={26} strokeWidth={1.75} /></span>
+            <p>Todavía no hay ventas en esta caja.</p>
+          </div>
+        )}
+        {rows.length > 0 && (
+          <ul className="pv-sales-list">
+            {rows.map((row) => (
+              <SaleItem
+                key={row.clientSaleId} row={row} onPrint={onPrint} onRetry={onRetry}
+                onDetail={() => setDetailId(detailId === row.clientSaleId ? null : row.clientSaleId)}
+                onVoid={online && (row.status === 'sent' || row.status === 'review') && row.sale.id ? () => setVoiding(row.sale) : undefined}
+              />
             ))}
           </ul>
-          {detail.detail && <p className="pv-note">{detail.detail}</p>}
-          {detail.entry?.lastError && detail.status !== 'sent' && <p className="pv-error">{detail.entry.lastError}</p>}
-        </div>
+        )}
+        {detail && (
+          <div className="pv-sale-detail" aria-live="polite">
+            <h3>{detail.sale.number}{detail.sale.customerName ? ` · ${detail.sale.customerName}` : ''}</h3>
+            <ul>
+              {detail.sale.lines.map((line) => (
+                <li key={`${line.variantId}-${line.unitPrice}`}>{line.quantity} × {line.productName} ({line.sizeName} / {line.colorName}) — {formatNio(line.lineTotalNio)}</li>
+              ))}
+            </ul>
+            {detail.detail && <p className="pv-note">{detail.detail}</p>}
+            {detail.entry?.lastError && detail.status !== 'sent' && <p className="pv-error">{detail.entry.lastError}</p>}
+          </div>
+        )}
+      </Modal>
+      {voiding && (
+        <VoidSaleModal
+          sale={voiding}
+          needsApproval={!canVoidDirect}
+          onClose={() => setVoiding(null)}
+          onVoided={(sale, reload) => {
+            setVoiding(null)
+            setServerSales((current) => current.map((item) => (item.id === sale.id ? sale : item)))
+            onVoided(sale, reload)
+          }}
+        />
       )}
-    </Modal>
+    </>
   )
 }
 
@@ -97,11 +123,12 @@ const statusIcons: Record<SaleRow['status'], LucideIcon> = {
   pending: Clock, sent: CircleCheck, review: TriangleAlert, voided: Ban, attention: CircleAlert,
 }
 
-function SaleItem({ row, onPrint, onRetry, onDetail }: {
+function SaleItem({ row, onPrint, onRetry, onDetail, onVoid }: {
   row: SaleRow
   onPrint: (sale: Sale) => void
   onRetry: (clientSaleId: string) => void
   onDetail: () => void
+  onVoid?: () => void
 }) {
   const { sale } = row
   const StatusIcon = statusIcons[row.status]
@@ -109,13 +136,14 @@ function SaleItem({ row, onPrint, onRetry, onDetail }: {
     <li className={`pv-sale-item is-${row.status}`}>
       <div className="pv-sale-main">
         <strong>{sale.number}</strong>
-        <span>{formatTime(sale.createdAtUtc)} · {channelLabel[sale.channel]}{sale.isOffline ? ' · sin conexión' : ''}</span>
+        <span>{formatTime(sale.createdAtUtc)} · {channelLabel[sale.channel]}{sale.customerName ? ` · ${sale.customerName}` : ''}{sale.isOffline ? ' · sin conexión' : ''}</span>
       </div>
       <b className="pv-sale-total">{formatNio(sale.totalNio)}</b>
       <span className={`pv-pill pv-pill-${row.status}`}><StatusIcon size={13} strokeWidth={2} aria-hidden="true" />{row.label}</span>
       <div className="pv-sale-actions">
         <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={() => onPrint(sale)}><Printer size={16} strokeWidth={1.75} aria-hidden="true" />Recibo</button>
         <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={onDetail}>Detalle</button>
+        {onVoid && <button type="button" className="pv-btn pv-btn-small pv-btn-secondary pv-btn-void" onClick={onVoid}><Ban size={16} strokeWidth={1.75} aria-hidden="true" />Anular</button>}
         {row.entry && (row.status === 'attention' || (row.status === 'pending' && row.entry.attempts > 0)) && (
           <button type="button" className="pv-btn pv-btn-small pv-btn-secondary" onClick={() => onRetry(row.clientSaleId)}>Reintentar</button>
         )}

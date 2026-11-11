@@ -85,6 +85,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(sale => sale.ChangeNio).HasPrecision(18, 2);
         builder.Property(sale => sale.ReviewNote).HasMaxLength(1000);
         builder.Property(sale => sale.Note).HasMaxLength(500);
+        builder.Property(sale => sale.CustomerName).HasMaxLength(120);
         builder.Property(sale => sale.VoidReason).HasMaxLength(500);
         builder.HasOne(sale => sale.CashSession).WithMany().HasForeignKey(sale => sale.CashSessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(sale => sale.SellerUserId).OnDelete(DeleteBehavior.Restrict);

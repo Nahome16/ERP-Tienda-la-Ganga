@@ -13,7 +13,7 @@ type PaymentModalProps = {
   settings: StoreSettings
   busy: boolean
   error: string | null
-  onConfirm: (payments: SaleRequestPayment[]) => void
+  onConfirm: (payments: SaleRequestPayment[], customerName: string) => void
   onCancel: () => void
 }
 
@@ -33,6 +33,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
   const rate = settings.usdRate
   const banksAvailable = settings.banks.length > 0
   const [payments, setPayments] = useState<SaleRequestPayment[]>([])
+  const [customerName, setCustomerName] = useState('')
   const [draft, setDraft] = useState<PaymentDraft>(() => emptyDraft(settings.banks[0] ?? ''))
   const amountRef = useRef<HTMLInputElement>(null)
 
@@ -82,7 +83,7 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
   }
 
   function confirm() {
-    if (evaluation.valid && !busy) onConfirm(payments)
+    if (evaluation.valid && !busy) onConfirm(payments, customerName.trim())
   }
 
   function onPanelKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -259,6 +260,14 @@ export function PaymentModal({ totalNio, settings, busy, error, onConfirm, onCan
             {evaluation.valid && <p className="pv-hint pv-ok" role="status"><CircleCheck size={14} strokeWidth={1.75} aria-hidden="true" /><span>Cobro completo. Presioná Enter o «Confirmar cobro».</span></p>}
           </aside>
         </div>
+
+        <label className="pv-field pv-pay-customer">
+          <span>Cliente (opcional) · sale en el recibo</span>
+          <input
+            value={customerName} maxLength={120} autoComplete="off" placeholder="Nombre del cliente"
+            onChange={(event) => setCustomerName(event.target.value)} disabled={busy}
+          />
+        </label>
 
         {evaluation.error && <p className="pv-error" role="alert">{evaluation.error}</p>}
         {error && <p className="pv-error" role="alert">{error}</p>}

@@ -71,7 +71,8 @@ async function sell(page, code, expectSent = true) {
   await page.getByRole('button', { name: /Sin recibo/ }).click()
 }
 async function closeCash(page, thousands) {
-  await page.getByRole('button', { name: 'Cerrar caja' }).click()
+  await page.getByRole('button', { name: /^Menú de/ }).click()
+  await page.getByRole('menuitem', { name: 'Cerrar caja' }).click()
   await page.getByLabel('Cantidad de billetes o monedas de 1000 córdobas').fill(String(thousands))
   await page.getByRole('button', { name: 'Cerrar caja' }).last().click()
   await page.getByRole('button', { name: 'Sí, cerrar caja' }).click()

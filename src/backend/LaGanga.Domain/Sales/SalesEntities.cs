@@ -153,10 +153,12 @@ public sealed class Sale
         DateTimeOffset createdAtUtc,
         DateTimeOffset receivedAtUtc,
         bool isOffline,
-        string? note)
+        string? note,
+        string? customerName = null)
     {
         Id = id;
         ClientSaleId = clientSaleId;
+        CustomerName = string.IsNullOrWhiteSpace(customerName) ? null : customerName.Trim();
         CashSessionId = cashSessionId;
         SellerUserId = sellerUserId;
         Channel = channel;
@@ -207,6 +209,9 @@ public sealed class Sale
     public string? ReviewNote { get; private set; }
 
     public string? Note { get; private set; }
+
+    /// <summary>Nombre del cliente (opcional) que se imprime en el recibo.</summary>
+    public string? CustomerName { get; private set; }
 
     public Guid? DiscountApprovalId { get; private set; }
 

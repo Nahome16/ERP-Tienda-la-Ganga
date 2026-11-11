@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { QuickCreate } from './QuickCreate'
 import type { CatalogItem } from '../lib/catalogApi'
 import { ScanBarcode } from 'lucide-react'
+import { ScanResult } from './ScanResult'
 import { ApiError } from '../lib/api'
 import type { CurrentUser } from '../types'
 import { hasPermission } from '../lib/access'
@@ -22,28 +24,38 @@ import { usePartners } from './usePartners'
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError) {
-    const details = Object.values(error.fieldErrors).flat()
+    // Los detalles por campo a veces repiten el mismo texto del mensaje principal.
+    const details = [...new Set(Object.values(error.fieldErrors).flat())].filter((detail) => detail !== error.message)
     return details.length > 0 ? `${error.message} ${details.join(' ')}` : error.message
   }
   return messageFrom(error)
 }
 
 /** Colores creados desde el diálogo: se suman a los del catálogo hasta que la lista se recargue. */
+type CatalogList = keyof Catalogs
+
+/** Catálogos creados desde el diálogo (colores, tallas, marcas…): se suman hasta que la lista se recargue. */
 function useCatalogsWithNewColors(base: Catalogs) {
-  const [extra, setExtra] = useState<CatalogItem[]>([])
+  const [extra, setExtra] = useState<{ list: CatalogList; item: CatalogItem }[]>([])
   const catalogs = useMemo(() => {
-    const known = new Set(base.colors.map((color) => color.id))
-    return { ...base, colors: [...base.colors, ...extra.filter((color) => !known.has(color.id))] }
+    const merged = { ...base }
+    for (const { list, item } of extra) {
+      if (!merged[list].some((existing) => existing.id === item.id)) merged[list] = [...merged[list], item]
+    }
+    return merged
   }, [base, extra])
-  return { catalogs, addColor: (color: CatalogItem) => setExtra((current) => [...current, color]) }
+  const add = (list: CatalogList, item: CatalogItem) => setExtra((current) => [...current, { list, item }])
+  return { catalogs, add, addColor: (color: CatalogItem) => add('colors', color) }
 }
 
-type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: string }
+type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: string; code?: string }
 
 type ProductFields = { name: string; categoryId: string; brandId: string; cutId: string; basePrice: string; barcode: string }
 
-function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false }: {
+function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false, onCatalogCreated }: {
   fields: ProductFields
+  /** Con permiso de catálogos: crear marca, categoría o corte al momento. */
+  onCatalogCreated?: (list: 'brands' | 'cuts' | 'categories', item: CatalogItem) => void
   /** El alta pide el precio de venta al final, en «Ingreso». */
   hidePrice?: boolean
   onChange: (fields: ProductFields) => void
@@ -63,27 +75,36 @@ function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBra
         <input value={fields.name} maxLength={200} required onChange={(event) => onChange({ ...fields, name: event.target.value })} data-autofocus />
       </label>
       <div className="adm-grid-2">
-        <label className="adm-field">
+        <div className="adm-field">
           <span>Categoría</span>
-          <select value={fields.categoryId} required onChange={(event) => onChange({ ...fields, categoryId: event.target.value })}>
+          <select aria-label="Categoría" value={fields.categoryId} required onChange={(event) => onChange({ ...fields, categoryId: event.target.value })}>
             <option value="">Elegí una categoría</option>
             {categories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
-        </label>
-        <label className="adm-field">
+          {onCatalogCreated && (
+            <QuickCreate
+              kind="categories" label="categoría"
+              parents={categoryOptions(catalogs.categories).map((item) => ({ id: item.id, label: item.label }))}
+              onCreated={(item) => { onCatalogCreated('categories', item); onChange({ ...fields, categoryId: item.id }) }}
+            />
+          )}
+        </div>
+        <div className="adm-field">
           <span>Marca</span>
-          <select value={fields.brandId} required onChange={(event) => onChange({ ...fields, brandId: event.target.value })}>
+          <select aria-label="Marca" value={fields.brandId} required onChange={(event) => onChange({ ...fields, brandId: event.target.value })}>
             <option value="">Elegí una marca</option>
             {brandOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-        </label>
-        <label className="adm-field">
+          {onCatalogCreated && <QuickCreate kind="brands" label="marca" onCreated={(item) => { onCatalogCreated('brands', item); onChange({ ...fields, brandId: item.id }) }} />}
+        </div>
+        <div className="adm-field">
           <span>Corte (opcional)</span>
-          <select value={fields.cutId} onChange={(event) => onChange({ ...fields, cutId: event.target.value })}>
+          <select aria-label="Corte" value={fields.cutId} onChange={(event) => onChange({ ...fields, cutId: event.target.value })}>
             <option value="">Sin corte</option>
             {catalogs.cuts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-        </label>
+          {onCatalogCreated && <QuickCreate kind="cuts" label="corte" masculine onCreated={(item) => { onCatalogCreated('cuts', item); onChange({ ...fields, cutId: item.id }) }} />}
+        </div>
         <label className="adm-field">
           <span>Código de fábrica (opcional)</span>
           <input
@@ -145,7 +166,7 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
 }) {
   const canImages = hasPermission(user, 'product.images.manage')
   const canCreateColors = hasPermission(user, 'catalog.manage')
-  const { catalogs, addColor } = useCatalogsWithNewColors(baseCatalogs)
+  const { catalogs, add: addCatalog, addColor } = useCatalogsWithNewColors(baseCatalogs)
   const [pending, setPending] = useState<File[]>([])
   const [progress, setProgress] = useState<string | null>(null)
   const canCost = hasPermission(user, 'inventory.cost.read')
@@ -181,6 +202,28 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
   const built = builderToInputs(withCost, catalogs.sizes, catalogs.colors, new Set(), canCost, canPartners)
   const needsInitialPermission = built.totalUnits > 0 && !canInitial
 
+  /**
+   * Cambia cómo vienen los códigos. El código ya escaneado como «de todo el producto» (por
+   * ejemplo, al abrir el alta desde Inventario) pasa al primer color o a la primera talla,
+   * para que no quede repetido en dos lugares.
+   */
+  function switchCodeMode(mode: 'product' | 'color' | 'size') {
+    const productCode = fields.barcode.trim()
+    if (mode !== 'product' && productCode) {
+      setFields({ ...fields, barcode: '' })
+      if (mode === 'color') {
+        const target = builder.colorIds.find((colorId) => !colorCodes[colorId]?.trim())
+        if (target) setColorCodes({ ...colorCodes, [target]: productCode })
+        else setPendingColorCodes([productCode, ...pendingColorCodes])
+        setScanMessage({ tone: 'ok', text: `El código ${productCode} pasó a ser el código del ${target ? 'primer color' : 'primer color que marques'}.` })
+      } else {
+        changeBuilder(builder, [productCode, ...pendingCodes])
+        setScanMessage({ tone: 'ok', text: `El código ${productCode} pasó a la primera talla sin código.` })
+      }
+    }
+    setCodeMode(mode)
+  }
+
   /** Aplica el cambio del borrador y coloca los códigos escaneados que estaban esperando. */
   function changeBuilder(next: BuilderState, codes: string[] = pendingCodes) {
     if (pendingColorCodes.length > 0) {
@@ -208,42 +251,42 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
     if (!code) return
     setScan('')
     if (pendingCodes.includes(code) || pendingColorCodes.includes(code) || Object.values(colorCodes).includes(code) || draftBarcodes(builder).has(code) || fields.barcode.trim() === code) {
-      setScanMessage({ tone: 'warn', text: `El código ${code} ya está en este producto.` })
+      setScanMessage({ tone: 'warn', code, text: 'Ya lo escaneaste para este producto; no hace falta otra vez.' })
       return
     }
     setScanning(true)
     try {
       const owner = await findCodeOwner(code)
       if (owner) {
-        setScanMessage({ tone: 'warn', productId: owner.productId, text: `El código ${code} ya pertenece a ${owner.label}.` })
+        setScanMessage({ tone: 'warn', code, productId: owner.productId, text: `Ya pertenece a ${owner.label}. Si es la misma prenda, abrí ese producto y agregale las tallas o la existencia ahí.` })
       } else if (codeMode === 'color') {
         const target = builder.colorIds.find((colorId) => !colorCodes[colorId]?.trim())
         if (target) {
           setColorCodes({ ...colorCodes, [target]: code })
           const colorName = catalogs.colors.find((color) => color.id === target)?.name ?? 'el color'
-          setScanMessage({ tone: 'ok', text: `Código ${code} asignado al color ${colorName} (todas sus tallas).` })
+          setScanMessage({ tone: 'ok', code, text: `Quedó para el color ${colorName} (todas sus tallas).` })
         } else {
           setPendingColorCodes([...pendingColorCodes, code])
-          setScanMessage({ tone: 'ok', text: `Código ${code} listo: se asigna al próximo color que marques.` })
+          setScanMessage({ tone: 'ok', code, text: 'Se asigna al próximo color que marques abajo.' })
         }
       } else if (!codePerSize) {
         const previous = fields.barcode.trim()
         setFields({ ...fields, barcode: code })
         setScanMessage({
-          tone: 'ok',
-          text: previous ? `Código del producto cambiado de ${previous} a ${code}.` : `Código ${code}: quedó como código del producto (sirve para todas las tallas).`,
+          tone: 'ok', code,
+          text: previous ? `Reemplazó al código anterior (${previous}). Sirve para todas las tallas.` : 'Quedó como código del producto: sirve para todas las tallas.',
         })
       } else {
         const placed = changeBuilder(builder, [...pendingCodes, code])
         setScanMessage({
-          tone: 'ok',
+          tone: 'ok', code,
           text: placed.leftover.includes(code)
-            ? `Código ${code} listo: se asigna cuando elijas talla y color.`
-            : `Código ${code} asignado a la siguiente variante sin código.`,
+            ? 'Se asigna cuando elijas talla y color abajo.'
+            : 'Quedó en la siguiente talla sin código: revisalo en la tabla de cantidades.',
         })
       }
     } catch (caught) {
-      setScanMessage({ tone: 'error', text: describeError(caught) })
+      setScanMessage({ tone: 'error', code, text: describeError(caught) })
     } finally {
       setScanning(false)
       scanRef.current?.focus()
@@ -257,6 +300,17 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
     if (!input) { setError(fieldError); return }
     if (built.inputs.length === 0) { setError('Elegí al menos una talla y un color para crear las variantes.'); return }
     if (built.errors.length > 0) { setError(built.errors[0]); return }
+    const productCode = fields.barcode.trim()
+    const repeatedColor = productCode ? catalogs.colors.find((color) => builder.colorIds.includes(color.id) && colorCodes[color.id]?.trim() === productCode) : undefined
+    if (repeatedColor) {
+      setError(`El código ${productCode} está como código de todo el producto y también del color ${repeatedColor.name}. Dejalo en uno solo: borralo de «Código de fábrica» si cada color trae el suyo.`)
+      return
+    }
+    const colorValues = builder.colorIds.map((colorId) => colorCodes[colorId]?.trim()).filter(Boolean)
+    if (new Set(colorValues).size !== colorValues.length) {
+      setError('Dos colores tienen el mismo código. Cada color debe tener uno distinto (si todos comparten el mismo, usá «Uno para todo el producto»).')
+      return
+    }
     if (pendingColorCodes.length > 0) {
       setError(`Hay códigos de color sin color (${pendingColorCodes.join(', ')}). Marcá más colores o quitalos.`)
       return
@@ -314,21 +368,32 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
       )}
     >
       <h3 className="adm-step"><span>1</span>Producto</h3>
-      <form className="adm-scanner adm-scanner-dialog" onSubmit={(event) => { void submitScan(event) }} role="search">
-        <ScanBarcode size={20} strokeWidth={1.75} aria-hidden="true" />
-        <input
-          ref={scanRef} value={scan} onChange={(event) => setScan(event.target.value)} inputMode="numeric" autoComplete="off"
-          placeholder="Escaneá la etiqueta de la prenda (opcional)" aria-label="Escanear código de la prenda"
-        />
-        <button type="submit" className="secondary-button" disabled={scanning || !scan.trim()}>{scanning ? 'Buscando…' : 'Agregar código'}</button>
+      <form className="adm-scanzone" onSubmit={(event) => { void submitScan(event) }} role="search" onClick={() => scanRef.current?.focus()}>
+        <div className="adm-scanzone-head">
+          <span className="adm-scanzone-icon" aria-hidden="true"><ScanBarcode size={20} strokeWidth={1.75} /></span>
+          <div>
+            <strong>Escaneá la etiqueta de la prenda</strong>
+            <small>Apuntá el lector al código de barras. Es opcional: si no trae código, el sistema genera uno.</small>
+          </div>
+          <span className={`adm-scanzone-status${scanning ? ' is-busy' : ''}`} aria-live="polite">
+            <i aria-hidden="true" />
+            {scanning ? 'Buscando…' : <><span className="when-ready">Listo para escanear</span><span className="when-idle">Tocá aquí para escanear</span></>}
+          </span>
+        </div>
+        <div className="adm-scanzone-field">
+          <input
+            ref={scanRef} autoFocus value={scan} onChange={(event) => setScan(event.target.value)} inputMode="numeric" autoComplete="off"
+            placeholder="Código de barras" aria-label="Escanear código de la prenda"
+          />
+          <button type="submit" className="primary-button" disabled={scanning || !scan.trim()}>{scanning ? 'Buscando…' : 'Agregar código'}</button>
+        </div>
       </form>
       {scanMessage && (
-        <Notice tone={scanMessage.tone}>
-          {scanMessage.text}
-          {scanMessage.productId && onOpenExisting && (
-            <> <button type="button" className="link-button" onClick={() => onOpenExisting(scanMessage.productId as string)}>Abrir ese producto</button></>
-          )}
-        </Notice>
+        <ScanResult
+          message={scanMessage}
+          onOpenExisting={scanMessage.productId && onOpenExisting ? () => onOpenExisting(scanMessage.productId as string) : undefined}
+          onDismiss={() => { setScanMessage(null); scanRef.current?.focus() }}
+        />
       )}
       {pendingCodes.length > 0 && (
         <p className="adm-scan-pending">
@@ -342,9 +407,9 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
       )}
       <fieldset className="adm-scan-modes">
         <legend>¿Cómo viene el código de la prenda?</legend>
-        <label><input type="radio" name="code-mode" checked={codeMode === 'product'} onChange={() => setCodeMode('product')} /> Uno para todo el producto</label>
-        <label><input type="radio" name="code-mode" checked={codeMode === 'color'} onChange={() => setCodeMode('color')} /> Uno por color</label>
-        <label><input type="radio" name="code-mode" checked={codeMode === 'size'} onChange={() => setCodeMode('size')} /> Uno por talla</label>
+        <label><input type="radio" name="code-mode" checked={codeMode === 'product'} onChange={() => switchCodeMode('product')} /> Uno para todo el producto</label>
+        <label><input type="radio" name="code-mode" checked={codeMode === 'color'} onChange={() => switchCodeMode('color')} /> Uno por color</label>
+        <label><input type="radio" name="code-mode" checked={codeMode === 'size'} onChange={() => switchCodeMode('size')} /> Uno por talla</label>
       </fieldset>
       {pendingColorCodes.length > 0 && (
         <p className="adm-scan-pending">
@@ -356,12 +421,15 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
           ))}
         </p>
       )}
-      <p className="adm-scan-hint">Si la prenda no trae código, dejalo vacío: el sistema genera uno por talla para imprimir la etiqueta.</p>
       <form id="create-product-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
-        <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice />
+        <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice onCatalogCreated={canCreateColors ? addCatalog : undefined} />
 
         <h3 className="adm-step"><span>2</span>Colores, tallas y cantidades</h3>
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={(next) => { changeBuilder(next) }} canCost={canCost} canPartners={canPartners} externalEntry onColorCreated={canCreateColors ? addColor : undefined} />
+        <VariantBuilder
+          catalogs={catalogs} state={builder} onChange={(next) => { changeBuilder(next) }} canCost={canCost} canPartners={canPartners} externalEntry
+          onColorCreated={canCreateColors ? addColor : undefined}
+          onSizesCreated={canCreateColors ? (group, sizes) => { if (group) addCatalog('sizeGroups', group); sizes.forEach((size) => addCatalog('sizes', size)) } : undefined}
+        />
         {(codeMode === 'color' || Object.values(colorCodes).some((code) => code.trim())) && builder.colorIds.length > 0 && (
           <div className="adm-color-codes">
             <p className="adm-help" style={{ margin: 0 }}>Código de fábrica de cada color (lo comparten todas sus tallas). Escaneá en el campo de arriba o escribilo aquí.</p>
@@ -558,7 +626,7 @@ export function AddVariantsDialog({ product, catalogs: baseCatalogs, user, onClo
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
   const canPartners = hasPermission(user, 'investment.read')
-  const { catalogs, addColor } = useCatalogsWithNewColors(baseCatalogs)
+  const { catalogs, add: addCatalog, addColor } = useCatalogsWithNewColors(baseCatalogs)
   const canCreateColors = hasPermission(user, 'catalog.manage')
   const existing = new Set(product.variants.map((variant) => `${variant.sizeId}|${variant.colorId}`))
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
@@ -605,7 +673,8 @@ export function AddVariantsDialog({ product, catalogs: baseCatalogs, user, onClo
       )}
     >
       <form id="add-variants-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} onColorCreated={canCreateColors ? addColor : undefined} />
+        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} onColorCreated={canCreateColors ? addColor : undefined}
+          onSizesCreated={canCreateColors ? (group, sizes) => { if (group) addCatalog('sizeGroups', group); sizes.forEach((size) => addCatalog('sizes', size)) } : undefined} />
         {error && <Notice tone="error">{error}</Notice>}
       </form>
     </Dialog>

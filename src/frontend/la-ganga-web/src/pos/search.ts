@@ -67,6 +67,21 @@ export function searchVariants(index: VariantIndex, query: string, category: str
   return result
 }
 
+export type LiveSearchFeedback = { tone: 'info' | 'error'; text: string }
+
+/**
+ * Mensaje que acompaña los resultados mientras se escribe o escanea. Se deriva
+ * de la búsqueda visible para no dejar en pantalla el conteo de una consulta
+ * anterior.
+ */
+export function liveSearchFeedback(query: string, productCount: number): LiveSearchFeedback | null {
+  const clean = query.trim()
+  if (!clean) return null
+  if (productCount === 0) return { tone: 'error', text: `Sin coincidencias para «${clean}».` }
+  if (productCount === 1) return { tone: 'info', text: '1 producto coincide. Elegí la talla y el color o presioná Agregar.' }
+  return { tone: 'info', text: `${productCount} productos coinciden. Elegí la talla y el color.` }
+}
+
 export type ProductGroup = {
   productId: string
   productName: string

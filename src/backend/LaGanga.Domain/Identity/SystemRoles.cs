@@ -47,4 +47,26 @@ public static class SystemRoles
             [Seller] = SellerPermissions,
             [InventoryManager] = InventoryManagerPermissions,
         };
+
+    /// <summary>
+    /// Resuelve los permisos efectivos de una sesión. El rol Administrador es un
+    /// rol reservado del sistema y, por contrato, siempre tiene todos los permisos,
+    /// aunque una restauración o despliegue haya dejado incompleta la tabla de
+    /// asignaciones. Los demás roles conservan únicamente sus permisos guardados.
+    /// </summary>
+    public static IReadOnlyCollection<string> ResolvePermissions(
+        IEnumerable<string> roles,
+        IEnumerable<string> assignedPermissions)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(assignedPermissions);
+
+        var effective = assignedPermissions.ToHashSet(StringComparer.Ordinal);
+        if (roles.Contains(Administrator, StringComparer.Ordinal))
+        {
+            effective.UnionWith(PermissionNames.All);
+        }
+
+        return effective.Order(StringComparer.Ordinal).ToArray();
+    }
 }

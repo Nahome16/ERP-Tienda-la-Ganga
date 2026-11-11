@@ -72,12 +72,11 @@ public sealed class AuthService(
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        var permissions = user.Roles
+        var assignedPermissions = user.Roles
             .SelectMany(userRole => userRole.Role.Permissions)
             .Select(rolePermission => rolePermission.Permission.Name)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
             .ToArray();
+        var permissions = SystemRoles.ResolvePermissions(roles, assignedPermissions);
         return new CurrentUser(user.Id, user.Username, user.DisplayName, roles, permissions, user.MustChangePassword);
     }
 
@@ -104,12 +103,11 @@ public sealed class AuthService(
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        var permissions = session.User.Roles
+        var assignedPermissions = session.User.Roles
             .SelectMany(userRole => userRole.Role.Permissions)
             .Select(rolePermission => rolePermission.Permission.Name)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
             .ToArray();
+        var permissions = SystemRoles.ResolvePermissions(roles, assignedPermissions);
 
         return new CurrentUser(
             session.User.Id,

@@ -75,6 +75,15 @@ public static class MvpEndpoints
             })
             .RequireCsrf();
 
+        group.MapPost("/sales/{id:guid}/void", async (Guid id, PosVoidRequest request, IPosVoidService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.VoidFromPosAsync(id, request, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.SaleCreate)
+            .RequireCsrf()
+            .RequireRateLimiting(AuthConstants.LoginRateLimitPolicy);
+
         group.MapPost("/discount-approvals", async (DiscountApprovalRequest request, IPosService service, HttpContext http, CancellationToken ct) =>
             {
                 var actor = http.User.GetActor();
@@ -299,6 +308,13 @@ public static class MvpEndpoints
             })
             .RequireAuthorization(PermissionNames.ProductEdit)
             .RequireCsrf();
+
+        products.MapGet("/{id:guid}/sales-summary", async (Guid id, IProductService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.GetSalesSummaryAsync(id, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.ProductRead);
 
         products.MapGet("/by-barcode/{barcode}", async (string barcode, IProductService service, HttpContext http, CancellationToken ct) =>
             {

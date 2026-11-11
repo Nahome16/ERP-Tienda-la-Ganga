@@ -2,6 +2,7 @@ using System.Globalization;
 using LaGanga.Application.Common;
 using LaGanga.Application.Sales;
 using LaGanga.Application.Settings;
+using LaGanga.Domain.Identity;
 using LaGanga.Domain.Inventory;
 using LaGanga.Domain.Sales;
 using LaGanga.Infrastructure.Inventory;
@@ -25,11 +26,14 @@ public sealed class ExchangeService : IExchangeService
     private readonly TimeProvider timeProvider;
     private readonly LotService lots;
 
-    public ExchangeService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider)
+    private readonly ISupervisorVerifier verifier;
+
+    public ExchangeService(LaGangaDbContext dbContext, IAuditWriter audit, TimeProvider timeProvider, ISupervisorVerifier verifier)
     {
         this.dbContext = dbContext;
         this.audit = audit;
         this.timeProvider = timeProvider;
+        this.verifier = verifier;
         lots = new LotService(dbContext);
     }
 
@@ -132,6 +136,20 @@ public sealed class ExchangeService : IExchangeService
         if (existing is not null)
         {
             return Result.Ok(new ExchangeResultDto(true, existing));
+        }
+
+        // Quien no puede anular ventas necesita la autorización del administrador para un cambio.
+        string? authorizedBy = null;
+        if (!actor.Has(PermissionNames.SaleVoid))
+        {
+            var approval = await verifier.VerifyAsync(
+                new SupervisorCredentials(request.ApproverUsername, request.ApproverPassword), PermissionNames.SaleVoid, "un cambio de talla", cancellationToken);
+            if (!approval.Succeeded)
+            {
+                return Result.Fail<ExchangeResultDto>(approval.Error!);
+            }
+
+            authorizedBy = approval.Value!.DisplayName;
         }
 
         if (request.CashSessionId is { } sessionId)
@@ -300,7 +318,8 @@ public sealed class ExchangeService : IExchangeService
 
         dbContext.SaleExchanges.Add(exchange);
         var units = exchange.Lines.Sum(line => line.Quantity);
-        audit.Add(actor.UserId, "sale.exchanged", "Sale", sale.Id.ToString(), $"Cambio de talla de {units} prenda(s) de la venta {SaleNumber(sale.Number)}.");
+        audit.Add(actor.UserId, "sale.exchanged", "Sale", sale.Id.ToString(),
+            $"Cambio de talla de {units} prenda(s) de la venta {SaleNumber(sale.Number)}{(authorizedBy is null ? string.Empty : $", autorizado por {authorizedBy}")}.");
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);

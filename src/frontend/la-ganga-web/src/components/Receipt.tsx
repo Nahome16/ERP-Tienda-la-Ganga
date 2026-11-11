@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import type { CashSummary, Exchange, Sale, StoreSettings } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
 import { diffText, reconciliationRows, visibleRows } from '../pos/reconcile'
+import { ReceiptBarcode } from './ReceiptBarcode'
 import { ReceiptLogo } from './ReceiptLogo'
 import './receipt.css'
 
@@ -11,7 +12,19 @@ type ReceiptProps = { sale: Sale; settings: StoreSettings }
 const methodLabel = { Cash: 'Efectivo', Transfer: 'Transferencia', Card: 'Tarjeta (POS)' } as const
 const channelNames = { Store: 'Tienda', WhatsApp: 'WhatsApp', Facebook: 'Facebook' } as const
 
-/** Recibo interno (no fiscal, sin desglose de impuestos). Pensado para papel térmico de 80 mm. */
+/** Política de cambios impresa en el recibo, según los días configurados. */
+function exchangePolicy(days: number | undefined) {
+  if (days === undefined || days < 0) return 'Cambios de talla o color con este recibo.'
+  if (days === 0) return 'Cambios de talla o color solo el mismo día, con este recibo.'
+  return `Cambios de talla o color dentro de ${days} día${days === 1 ? '' : 's'} con este recibo.`
+}
+
+/** El pie escrito en Configuración ya explica los cambios: no se repite la política automática. */
+function mentionsExchanges(footer: string | undefined) {
+  return /cambio|devoluci/i.test(footer ?? '')
+}
+
+/** Recibo de venta (sin desglose de impuestos). Pensado para papel térmico de 80 mm. */
 export function Receipt({ sale, settings }: ReceiptProps) {
   const date = new Intl.DateTimeFormat('es-NI', {
     dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Managua',
@@ -29,6 +42,7 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       {isProvisional && <div className="receipt-center receipt-small">Referencia provisional: el número oficial se asigna al sincronizar.</div>}
       <div className="receipt-row"><span>Fecha</span><span>{date}</span></div>
       <div className="receipt-row"><span>{sale.registerName}</span><span>{sale.sellerName}</span></div>
+      {sale.customerName && <div className="receipt-row"><span>Cliente</span><span>{sale.customerName}</span></div>}
       {sale.channel !== 'Store' && <div className="receipt-row"><span>Canal</span><span>{channelNames[sale.channel]}</span></div>}
       {sale.status === 'Voided' && <div className="receipt-center"><strong>*** ANULADO ***</strong></div>}
       <hr className="receipt-rule" />
@@ -59,8 +73,14 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       ))}
       {sale.changeNio > 0 && <div className="receipt-row receipt-bold"><span>Cambio</span><span>{formatNio(sale.changeNio)}</span></div>}
       <hr className="receipt-rule" />
+      {!mentionsExchanges(settings.receiptFooter) && <div className="receipt-center receipt-small">{exchangePolicy(settings.exchangeWindowDays)}</div>}
       {settings.receiptFooter && <div className="receipt-center">{settings.receiptFooter}</div>}
       <div className="receipt-center receipt-bold">¡Gracias por su compra!</div>
+      {!isProvisional && (
+        <div className="receipt-barcode-box">
+          <ReceiptBarcode number={sale.number} />
+        </div>
+      )}
     </div>
   )
 }

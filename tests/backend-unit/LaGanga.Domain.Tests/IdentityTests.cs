@@ -45,4 +45,33 @@ public sealed class IdentityTests
         Assert.False(session.IsValidAt(createdAt.AddMinutes(6), TimeSpan.FromMinutes(30)));
         Assert.Equal("user_logout", session.RevokedReason);
     }
+
+    [Fact]
+    public void AdministratorAlwaysReceivesEverySystemPermission()
+    {
+        var permissions = SystemRoles.ResolvePermissions(
+            [SystemRoles.Administrator],
+            [PermissionNames.CatalogRead]);
+
+        Assert.Equal(PermissionNames.All.Order(StringComparer.Ordinal), permissions);
+        Assert.Contains(PermissionNames.SaleRead, permissions);
+        Assert.Contains(PermissionNames.CashReportRead, permissions);
+        Assert.Contains(PermissionNames.InventoryKardexRead, permissions);
+        Assert.Contains(PermissionNames.UserManage, permissions);
+        Assert.Contains(PermissionNames.AuditRead, permissions);
+        Assert.Contains(PermissionNames.InvestmentRead, permissions);
+    }
+
+    [Fact]
+    public void NonAdministratorKeepsOnlyAssignedPermissions()
+    {
+        var permissions = SystemRoles.ResolvePermissions(
+            [SystemRoles.Seller],
+            [PermissionNames.CatalogRead, PermissionNames.SaleCreate]);
+
+        Assert.Equal(
+            new[] { PermissionNames.CatalogRead, PermissionNames.SaleCreate }.Order(StringComparer.Ordinal),
+            permissions);
+        Assert.DoesNotContain(PermissionNames.CashReportRead, permissions);
+    }
 }

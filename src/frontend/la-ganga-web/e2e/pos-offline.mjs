@@ -38,7 +38,7 @@ const user = {
 }
 const settings = {
   usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000',
-  receiptFooter: 'Recibo interno — no es factura', banks: ['BAC', 'Banpro'],
+  receiptFooter: 'Guarde este recibo para cualquier cambio.', banks: ['BAC', 'Banpro'],
   sellerDiscountLimitPercent: 10, lowStockThreshold: 2, exchangeWindowDays: 4,
 }
 const variants = [
@@ -272,7 +272,7 @@ try {
   await page.getByLabel(/Fondo inicial en córdobas/).fill('500')
   await page.getByRole('button', { name: 'Abrir caja' }).click()
   await page.locator('#pv-scan-input').waitFor()
-  check('Caja abierta y POS listo', await page.getByText('Caja 1 · Vendedor Uno').isVisible())
+  check('Caja abierta y POS listo', (await page.locator('.pv-brand small').innerText()) === 'Caja 1' && await page.getByRole('button', { name: 'Menú de Vendedor Uno' }).isVisible())
   await shot('01-pos')
 
   // El service worker precachea el armazón para la próxima carga sin red
@@ -397,7 +397,8 @@ try {
   await shot('03-offline-queue')
 
   // 5) Cerrar caja se bloquea sin conexión / con pendientes
-  await page.getByRole('button', { name: 'Cerrar caja' }).click()
+  await page.getByRole('button', { name: /^Menú de/ }).click()
+  await page.getByRole('menuitem', { name: 'Cerrar caja' }).click()
   check('Cerrar caja bloqueado sin conexión', await page.getByText(/Sin conexión: para cerrar la caja/).isVisible()
     && await page.getByRole('button', { name: 'Cerrar caja' }).last().isDisabled())
   await page.keyboard.press('Escape')
@@ -416,7 +417,8 @@ try {
   await shot('04-synced')
 
   // 7) Ventas de esta caja
-  await page.getByRole('button', { name: 'Ventas de esta caja' }).click()
+  await page.getByRole('button', { name: /^Menú de/ }).click()
+  await page.getByRole('menuitem', { name: 'Ventas de esta caja' }).click()
   const salesText = await page.getByRole('dialog').innerText()
   await shot('07-ventas-caja')
   check('Lista de ventas con números oficiales y estado Enviada', /V-000004/.test(salesText) && (salesText.match(/Enviada/g) ?? []).length >= 4)
@@ -427,7 +429,8 @@ try {
 
   // 8) Cierre de caja: efectivo (conteo), transferencias (banco) y tarjeta (lote) contra lo esperado
   await shot('06-sales')
-  await page.getByRole('button', { name: 'Cerrar caja' }).click()
+  await page.getByRole('button', { name: /^Menú de/ }).click()
+  await page.getByRole('menuitem', { name: 'Cerrar caja' }).click()
   const closeDialog = page.getByRole('dialog', { name: 'Cerrar caja' })
   await closeDialog.getByText('Esperado por el sistema').first().waitFor()
   check('El cierre consulta lo esperado al servidor', server.summaryCalls >= 1)

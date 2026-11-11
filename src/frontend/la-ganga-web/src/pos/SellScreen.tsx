@@ -16,7 +16,7 @@ import { PaymentModal } from './PaymentModal'
 import { parseAmount } from './payments'
 import { buildSaleRequest, buildLocalSale, newClientSaleId } from './sale'
 import { PosThumb } from './Thumb'
-import { buildIndex, findByBarcode, findColorByBarcode, findProductByBarcode, groupByProduct, searchVariants } from './search'
+import { buildIndex, findByBarcode, findColorByBarcode, findProductByBarcode, groupByProduct, liveSearchFeedback, searchVariants } from './search'
 import { availableStock, pendingUnits } from './stock'
 import { clearCartDraft, loadCartDraft, saveCartDraft } from './storage'
 import type { CartLine, DiscountApproval } from './types'
@@ -32,7 +32,11 @@ type SellScreenProps = {
   soundEnabled: boolean
   onPrint: (sale: Sale) => void
   notify: (message: string, tone?: 'ok' | 'warn' | 'error') => void
+  /** Prendas a cargar en el carrito (venta anulada para corregir). Cada `nonce` se aplica una vez. */
+  reloadRequest?: ReloadRequest | null
 }
+
+export type ReloadRequest = { nonce: number; lines: { variantId: string; quantity: number }[] }
 
 type ModalState =
   | { kind: 'pay' }
@@ -48,7 +52,7 @@ function variantLabel(variant: Pick<PosVariant, 'productName' | 'colorName' | 's
   return `${variant.productName} · ${variant.colorName} · ${variant.sizeName}`
 }
 
-export function SellScreen({ user, session, engine, engineState, soundEnabled, onPrint, notify }: SellScreenProps) {
+export function SellScreen({ user, session, engine, engineState, soundEnabled, onPrint, notify, reloadRequest }: SellScreenProps) {
   const snapshot = engineState.snapshot?.snapshot ?? null
   const settings = snapshot?.settings
   const scannerRef = useRef<HTMLInputElement>(null)
@@ -138,6 +142,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   }, [index, deferredQuery, category])
   const shownProducts = results.slice(0, MAX_PRODUCTS)
   const activeProduct = results.find((group) => group.productId === selectedProductId) ?? (results.length === 1 ? results[0] : undefined)
+  const visibleFeedback = liveSearchFeedback(deferredQuery, results.length) ?? feedback
 
   const remaining = useCallback(
     (variant: PosVariant) => availableStock(variant.stock, variant.variantId, pending) - cartQuantity(lines, variant.variantId),
@@ -167,6 +172,28 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     setLines((currentLines) => setLineQuantity(currentLines, variantId, quantity))
     return true
   }
+
+  // «Anular y cargar al carrito»: las prendas de la venta anulada vuelven al carrito una sola vez.
+  const appliedReload = useRef<number | null>(null)
+  useEffect(() => {
+    if (!reloadRequest || appliedReload.current === reloadRequest.nonce || index.variants.length === 0) return
+    appliedReload.current = reloadRequest.nonce
+    let missing = 0
+    setLines((current) => {
+      let next = current
+      for (const item of reloadRequest.lines) {
+        const variant = index.byId.get(item.variantId)
+        if (!variant) { missing += 1; continue }
+        next = setLineQuantity(addToCart(next, variant), variant.variantId, cartQuantity(next, variant.variantId) + item.quantity)
+      }
+      return next
+    })
+    announce(missing > 0 ? 'error' : 'ok', missing > 0
+      ? `Algunas prendas ya no están a la venta y no se cargaron (${missing}).`
+      : 'Prendas de la venta anulada cargadas: corregí y cobrá de nuevo.')
+    // `announce` cambia en cada render; la carga depende solo del pedido y del catálogo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadRequest, index])
 
   function addVariant(variant: PosVariant) {
     const current = cartQuantity(lines, variant.variantId)
@@ -254,7 +281,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     setModal({ kind: 'pay' })
   }
 
-  async function confirmPayment(payments: SaleRequestPayment[]) {
+  async function confirmPayment(payments: SaleRequestPayment[], customerName = '') {
     if (!settings || payBusy) return
     setPayBusy(true)
     setPayError(null)
@@ -271,6 +298,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
         discountApprovalId: needsApproval && approvalValid && approval ? approval.approvalId : null,
         payments,
         note: null,
+        customerName,
       })
       const localSale = buildLocalSale(request, lines, { session, sellerName: user.displayName, settings })
       // Primero a la cola local (IndexedDB); el envío al servidor ocurre en segundo plano.
@@ -353,11 +381,11 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
           <kbd className="pv-scanner-key" aria-hidden="true" title="Atajo para ir al campo de escaneo">F2</kbd>
           <button type="submit" className="pv-btn pv-btn-secondary pv-scanner-btn">{query.trim() ? 'Agregar' : 'Cobrar'}</button>
         </form>
-        <p className={`pv-feedback pv-feedback-${feedback.tone}`} role="status" aria-live="polite">
-          {feedback.tone === 'ok' ? <CircleCheck size={16} strokeWidth={1.75} aria-hidden="true" />
-            : feedback.tone === 'error' ? <CircleAlert size={16} strokeWidth={1.75} aria-hidden="true" />
+        <p className={`pv-feedback pv-feedback-${visibleFeedback.tone}`} role="status" aria-live="polite">
+          {visibleFeedback.tone === 'ok' ? <CircleCheck size={16} strokeWidth={1.75} aria-hidden="true" />
+            : visibleFeedback.tone === 'error' ? <CircleAlert size={16} strokeWidth={1.75} aria-hidden="true" />
               : <Info size={16} strokeWidth={1.75} aria-hidden="true" />}
-          <span>{feedback.text}</span>
+          <span>{visibleFeedback.text}</span>
         </p>
 
         {index.categories.length > 1 && (
@@ -604,7 +632,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
           settings={settings}
           busy={payBusy}
           error={payError}
-          onConfirm={(payments) => { void confirmPayment(payments) }}
+          onConfirm={(payments, customerName) => { void confirmPayment(payments, customerName) }}
           onCancel={closeModal}
         />
       )}

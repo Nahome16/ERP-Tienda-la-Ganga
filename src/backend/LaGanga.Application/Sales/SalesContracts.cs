@@ -187,7 +187,8 @@ public sealed record SaleRequest(
     DiscountRequest? Discount,
     Guid? DiscountApprovalId,
     IReadOnlyList<PaymentRequest>? Payments,
-    string? Note);
+    string? Note,
+    string? CustomerName = null);
 
 public sealed record SaleLineDto(
     Guid VariantId,
@@ -233,7 +234,8 @@ public sealed record SaleDto(
     string? VoidedByName,
     string? VoidReason,
     IReadOnlyList<SaleLineDto> Lines,
-    IReadOnlyList<SalePaymentDto> Payments);
+    IReadOnlyList<SalePaymentDto> Payments,
+    string? CustomerName = null);
 
 public sealed record SaleResultDto(bool AlreadyProcessed, SaleDto Sale);
 
