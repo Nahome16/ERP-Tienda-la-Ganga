@@ -18,7 +18,7 @@ export function ScanResult({ message, onOpenExisting, onDismiss }: {
   const title = message.tone === 'warn' && onOpenExisting ? 'Este código ya existe' : titles[message.tone]
   return (
     <div className={`adm-scanresult ${message.tone}`} role={message.tone === 'error' ? 'alert' : 'status'}>
-      <span className="adm-scanresult-icon" aria-hidden="true"><Icon size={34} strokeWidth={2} /></span>
+      <span className="adm-scanresult-icon" aria-hidden="true"><Icon size={26} strokeWidth={2} /></span>
       <div className="adm-scanresult-body">
         <strong>{title}</strong>
         {message.code && <code className="adm-scanresult-code">{message.code}</code>}

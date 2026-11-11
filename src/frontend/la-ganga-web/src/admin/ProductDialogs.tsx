@@ -370,7 +370,7 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
       <h3 className="adm-step"><span>1</span>Producto</h3>
       <form className="adm-scanzone" onSubmit={(event) => { void submitScan(event) }} role="search" onClick={() => scanRef.current?.focus()}>
         <div className="adm-scanzone-head">
-          <span className="adm-scanzone-icon" aria-hidden="true"><ScanBarcode size={30} strokeWidth={1.75} /></span>
+          <span className="adm-scanzone-icon" aria-hidden="true"><ScanBarcode size={20} strokeWidth={1.75} /></span>
           <div>
             <strong>Escaneá la etiqueta de la prenda</strong>
             <small>Apuntá el lector al código de barras. Es opcional: si no trae código, el sistema genera uno.</small>

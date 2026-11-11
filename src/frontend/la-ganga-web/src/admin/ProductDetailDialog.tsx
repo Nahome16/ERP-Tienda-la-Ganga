@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MoreActions } from './MoreActions'
 import { ProductBalance } from './ProductBalance'
 import { ProductPartnerDialog } from './ProductPartnerDialog'
 import { ApiError } from '../lib/api'
@@ -102,11 +103,13 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
         onClose={onClose}
         footer={product && (
           <>
-            {canDelete && <button type="button" className="link-button danger" disabled={busy} onClick={() => setNested({ kind: 'delete' })}>Eliminar producto</button>}
-            {canPartner && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'partner' })}>Socio</button>}
+            <MoreActions actions={[
+              ...(canPartner ? [{ label: 'Socio', hint: 'Asignar o cambiar el socio de las unidades', onSelect: () => setNested({ kind: 'partner' }) }] : []),
+              ...(canEdit ? [{ label: 'Agregar variantes', hint: 'Tallas o colores nuevos', onSelect: () => setNested({ kind: 'add-variants' }) }] : []),
+              ...(canEdit ? [{ label: product.isActive ? 'Inactivar producto' : 'Activar producto', hint: product.isActive ? 'Deja de mostrarse en caja' : 'Vuelve a mostrarse en caja', disabled: busy, onSelect: () => toggleProduct(product) }] : []),
+              ...(canDelete ? [{ label: 'Eliminar producto', danger: true, disabled: busy, onSelect: () => setNested({ kind: 'delete' }) }] : []),
+            ]} />
             {canReceive && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'receive' })}>Ingresar mercadería</button>}
-            {canEdit && <button type="button" className="secondary-button" disabled={busy} onClick={() => toggleProduct(product)}>{product.isActive ? 'Inactivar producto' : 'Activar producto'}</button>}
-            {canEdit && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'add-variants' })}>Agregar variantes</button>}
             {canEdit && <button type="button" className="secondary-button" onClick={() => setNested({ kind: 'edit-product' })}>Editar producto</button>}
             <button type="button" className="primary-button" disabled={product.variants.length === 0} onClick={() => setNested({ kind: 'labels' })}>Etiquetas</button>
           </>

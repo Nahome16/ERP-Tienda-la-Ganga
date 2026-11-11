@@ -457,14 +457,14 @@
 .adm-pill-special { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #fff1d6; color: #8a5a0c; font-size: .72rem; font-weight: 800; }
 
 /* Zona de escaneo del alta de producto: grande y con estado visible. */
-.adm-scanzone { display: grid; gap: 12px; margin-bottom: 12px; padding: 16px; border: 2px dashed var(--teal); border-radius: 16px; background: var(--teal-soft); cursor: text; transition: border-color .15s, box-shadow .15s, background .15s; }
+.adm-scanzone { display: grid; gap: 8px; margin-bottom: 10px; padding: 10px 12px; border: 1.5px dashed var(--teal); border-radius: 16px; background: var(--teal-soft); cursor: text; transition: border-color .15s, box-shadow .15s, background .15s; }
 .adm-scanzone:focus-within { border-style: solid; box-shadow: 0 0 0 4px color-mix(in srgb, var(--teal) 18%, transparent); }
-.adm-scanzone-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.adm-scanzone-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .adm-scanzone-head > div { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; }
-.adm-scanzone-head strong { font-size: 1.1rem; color: var(--teal-dark); }
-.adm-scanzone-head small { color: var(--muted, #6d6860); font-size: .85rem; }
-.adm-scanzone-icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 14px; background: var(--teal); color: #fff; flex: none; }
-.adm-scanzone-status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--paper, #fff); color: var(--muted, #6d6860); font-size: .85rem; font-weight: 700; }
+.adm-scanzone-head strong { font-size: .95rem; color: var(--teal-dark); }
+.adm-scanzone-head small { color: var(--muted, #6d6860); font-size: .78rem; }
+.adm-scanzone-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--teal); color: #fff; flex: none; }
+.adm-scanzone-status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--paper, #fff); color: var(--muted, #6d6860); font-size: .76rem; font-weight: 700; }
 .adm-scanzone-status i { width: 10px; height: 10px; border-radius: 50%; background: #b9b2a6; }
 .adm-scanzone-status .when-ready { display: none; }
 .adm-scanzone:focus-within .adm-scanzone-status { color: #1d7a3e; }
@@ -474,25 +474,37 @@
 .adm-scanzone-status.is-busy i { background: #d99a1c; }
 @keyframes adm-scan-pulse { 0% { box-shadow: 0 0 0 0 rgba(34, 160, 75, .55); } 100% { box-shadow: 0 0 0 10px rgba(34, 160, 75, 0); } }
 .adm-scanzone-field { display: flex; gap: 10px; flex-wrap: wrap; }
-.adm-scanzone-field input { flex: 1 1 240px; min-width: 0; height: 60px; padding: 0 18px; border: 1.5px solid var(--teal); border-radius: 12px; background: var(--paper, #fff); font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 1.5rem; letter-spacing: .08em; }
-.adm-scanzone-field input::placeholder { font-family: inherit; font-size: 1.05rem; letter-spacing: 0; }
+.adm-scanzone-field input { flex: 1 1 240px; min-width: 0; height: 44px; padding: 0 14px; border: 1.5px solid var(--teal); border-radius: 12px; background: var(--paper, #fff); font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 1.15rem; letter-spacing: .06em; }
+.adm-scanzone-field input::placeholder { font-family: inherit; font-size: .92rem; letter-spacing: 0; }
 .adm-scanzone-field input:focus { outline: 0; }
-.adm-scanzone-field .primary-button { min-height: 60px; padding: 0 22px; font-size: 1rem; }
+.adm-scanzone-field .primary-button { min-height: 44px; padding: 0 16px; font-size: .9rem; }
 @media (max-width: 560px) { .adm-scanzone-field .primary-button { flex: 1 1 100%; } }
 @media (prefers-reduced-motion: reduce) { .adm-scanzone:focus-within .adm-scanzone-status i { animation: none; } }
 
 /* Resultado del escaneo: tarjeta grande con el código bien visible. */
-.adm-scanresult { position: relative; display: flex; align-items: flex-start; gap: 14px; margin: 0 0 12px; padding: 16px 48px 16px 16px; border: 2px solid; border-radius: 16px; animation: adm-scanresult-in .25s ease-out; }
+.adm-scanresult { position: relative; display: flex; align-items: flex-start; gap: 12px; margin: 0 0 10px; padding: 12px 44px 12px 12px; border: 2px solid; border-radius: 16px; animation: adm-scanresult-in .25s ease-out; }
 .adm-scanresult.ok { color: #0d5a3d; background: #e3f3eb; border-color: #7cc49d; }
 .adm-scanresult.warn { color: #6b4300; background: #fff0d1; border-color: #e8b860; }
 .adm-scanresult.error { color: #7c2a1f; background: #fbe6e1; border-color: #e09a8c; }
-.adm-scanresult-icon { display: grid; place-items: center; width: 56px; height: 56px; flex: none; border-radius: 50%; background: var(--paper, #fff); }
-.adm-scanresult-body { flex: 1; min-width: 0; display: grid; gap: 6px; justify-items: start; }
-.adm-scanresult-body strong { font-size: 1.2rem; }
-.adm-scanresult-body p { margin: 0; font-size: 1rem; line-height: 1.4; }
-.adm-scanresult-code { max-width: 100%; padding: 4px 12px; border-radius: 8px; background: var(--paper, #fff); color: #1f1d1a; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 1.6rem; font-weight: 700; letter-spacing: .1em; overflow-wrap: anywhere; }
+.adm-scanresult-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--paper, #fff); }
+.adm-scanresult-body { flex: 1; min-width: 0; display: grid; gap: 4px; justify-items: start; }
+.adm-scanresult-body strong { font-size: 1.05rem; }
+.adm-scanresult-body p { margin: 0; font-size: .92rem; line-height: 1.4; }
+.adm-scanresult-code { max-width: 100%; padding: 4px 12px; border-radius: 8px; background: var(--paper, #fff); color: #1f1d1a; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 1.3rem; font-weight: 700; letter-spacing: .08em; overflow-wrap: anywhere; }
 .adm-scanresult-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
 .adm-scanresult-close:hover { background: rgba(0, 0, 0, .06); }
 @keyframes adm-scanresult-in { from { transform: scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .adm-scanresult { animation: none; } }
 @media (max-width: 480px) { .adm-scanresult-icon { width: 44px; height: 44px; } .adm-scanresult-code { font-size: 1.3rem; } }
+
+/* Menú «Más acciones» del pie de la ficha. */
+.adm-more { position: relative; margin-right: auto; }
+.adm-more-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.adm-more-menu { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 30; display: grid; min-width: 260px; padding: 6px; border: 1px solid #e4dccd; border-radius: 12px; background: var(--paper, #fff); box-shadow: 0 12px 32px rgba(20, 30, 30, .18); }
+.adm-more-menu button { display: grid; gap: 2px; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink, #1f1d1a); text-align: left; font: inherit; font-weight: 700; cursor: pointer; }
+.adm-more-menu button small { color: var(--muted, #6d6860); font-weight: 500; font-size: .8rem; }
+.adm-more-menu button:hover, .adm-more-menu button:focus-visible { background: var(--teal-soft); outline: 0; }
+.adm-more-menu button:disabled { opacity: .5; cursor: default; }
+.adm-more-menu .is-danger { margin-top: 4px; border-top: 1px solid #efe4d3; border-radius: 0 0 8px 8px; color: #a1321f; }
+.adm-more-menu .is-danger:hover { background: #fbe6e1; }
+@media (max-width: 560px) { .adm-more { margin-right: 0; flex: 1 1 100%; } .adm-more-toggle { width: 100%; justify-content: center; } .adm-more-menu { right: 0; } }
