@@ -56,7 +56,14 @@ export function DashboardView({ user, onNavigate }: { user: CurrentUser; onNavig
       </header>
 
       {cash.error && <LoadError message={`No se pudo cargar el resumen del día: ${cash.error}`} onRetry={cash.reload} />}
-      {cash.loading && !cash.data && <Spinner label="Cargando el día…" />}
+      {!cash.data && !cash.error && (
+        // Mismo espacio que tendrán las tarjetas: así el panel no salta cuando llegan los datos.
+        <div className="adm-kpis is-loading" role="status" aria-label="Cargando el día…">
+          {['Vendido hoy', 'Efectivo', 'Transferencia', 'POS / Tarjeta', 'Cajas abiertas', 'Ventas por revisar'].map((label) => (
+            <Kpi key={label} label={label} value="—" hint={label === 'Vendido hoy' || label === 'Cajas abiertas' ? '\u00a0' : undefined} />
+          ))}
+        </div>
+      )}
 
       {cash.data && totals && (
         <>
@@ -82,7 +89,7 @@ export function DashboardView({ user, onNavigate }: { user: CurrentUser; onNavig
         </>
       )}
 
-      <div className="adm-split">
+      <div className="adm-split dash-split">
         <section className="panel-card adm-card">
           <h2 className="adm-card-title">Ventas de hoy por método de pago</h2>
           {!totals && !cash.error && <Spinner />}

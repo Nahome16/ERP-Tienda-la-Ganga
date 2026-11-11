@@ -508,3 +508,8 @@
 .adm-more-menu .is-danger { margin-top: 4px; border-top: 1px solid #efe4d3; border-radius: 0 0 8px 8px; color: #a1321f; }
 .adm-more-menu .is-danger:hover { background: #fbe6e1; }
 @media (max-width: 560px) { .adm-more { margin-right: 0; flex: 1 1 100%; } .adm-more-toggle { width: 100%; justify-content: center; } .adm-more-menu { right: 0; } }
+
+/* Panel: espacio reservado mientras cargan los datos (evita que el contenido salte). */
+.adm-kpis.is-loading .adm-kpi > strong { color: var(--line, #d9cdb9); }
+.dash-split .adm-card { min-height: 232px; }
+@media (max-width: 900px) { .dash-split .adm-card { min-height: 0; } .dash-split > .adm-card:first-child { min-height: 200px; } .dash-split > .adm-card:last-child { min-height: 190px; } }
