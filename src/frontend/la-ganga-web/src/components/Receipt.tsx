@@ -11,7 +11,14 @@ type ReceiptProps = { sale: Sale; settings: StoreSettings }
 const methodLabel = { Cash: 'Efectivo', Transfer: 'Transferencia', Card: 'Tarjeta (POS)' } as const
 const channelNames = { Store: 'Tienda', WhatsApp: 'WhatsApp', Facebook: 'Facebook' } as const
 
-/** Recibo interno (no fiscal, sin desglose de impuestos). Pensado para papel térmico de 80 mm. */
+/** Política de cambios impresa en el recibo, según los días configurados. */
+function exchangePolicy(days: number | undefined) {
+  if (days === undefined || days < 0) return 'Cambios de talla o color con este recibo.'
+  if (days === 0) return 'Cambios de talla o color solo el mismo día, con este recibo.'
+  return `Cambios de talla o color dentro de ${days} día${days === 1 ? '' : 's'} con este recibo.`
+}
+
+/** Recibo de venta (sin desglose de impuestos). Pensado para papel térmico de 80 mm. */
 export function Receipt({ sale, settings }: ReceiptProps) {
   const date = new Intl.DateTimeFormat('es-NI', {
     dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Managua',
@@ -59,6 +66,7 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       ))}
       {sale.changeNio > 0 && <div className="receipt-row receipt-bold"><span>Cambio</span><span>{formatNio(sale.changeNio)}</span></div>}
       <hr className="receipt-rule" />
+      <div className="receipt-center receipt-small">{exchangePolicy(settings.exchangeWindowDays)}</div>
       {settings.receiptFooter && <div className="receipt-center">{settings.receiptFooter}</div>}
       <div className="receipt-center receipt-bold">¡Gracias por su compra!</div>
     </div>

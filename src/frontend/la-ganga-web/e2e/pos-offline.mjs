@@ -38,7 +38,7 @@ const user = {
 }
 const settings = {
   usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000',
-  receiptFooter: 'Recibo interno — no es factura', banks: ['BAC', 'Banpro'],
+  receiptFooter: 'Guarde este recibo para cualquier cambio.', banks: ['BAC', 'Banpro'],
   sellerDiscountLimitPercent: 10, lowStockThreshold: 2, exchangeWindowDays: 4,
 }
 const variants = [
