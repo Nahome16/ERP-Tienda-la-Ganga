@@ -78,7 +78,6 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       {!isProvisional && (
         <div className="receipt-barcode-box">
           <ReceiptBarcode number={sale.number} />
-          <div className="receipt-center receipt-small">{sale.number}</div>
         </div>
       )}
     </div>
