@@ -102,7 +102,7 @@ function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBra
             <option value="">Sin corte</option>
             {catalogs.cuts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-          {onCatalogCreated && <QuickCreate kind="cuts" label="corte" onCreated={(item) => { onCatalogCreated('cuts', item); onChange({ ...fields, cutId: item.id }) }} />}
+          {onCatalogCreated && <QuickCreate kind="cuts" label="corte" masculine onCreated={(item) => { onCatalogCreated('cuts', item); onChange({ ...fields, cutId: item.id }) }} />}
         </div>
         <label className="adm-field">
           <span>Código de fábrica (opcional)</span>

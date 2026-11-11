@@ -6,15 +6,19 @@ import { messageFrom } from './format'
  * Crea al momento una marca, un corte o una categoría sin salir del formulario del producto.
  * Se muestra como un enlace «+ Nueva» que abre un campo pequeño debajo del selector.
  */
-export function QuickCreate({ kind, label, onCreated, parents }: {
+export function QuickCreate({ kind, label, masculine = false, onCreated, parents }: {
   kind: Extract<CatalogKind, 'brands' | 'cuts' | 'categories'>
   /** «marca», «corte», «categoría» (para los textos). */
   label: string
+  /** Género gramatical de `label`: «nueva marca» / «nuevo corte». */
+  masculine?: boolean
   onCreated: (item: CatalogItem) => void
   /** Solo categorías: posibles categorías padre (por ejemplo «Caballero»). */
   parents?: { id: string; label: string }[]
 }) {
   const [open, setOpen] = useState(false)
+  const nueva = masculine ? 'Nuevo' : 'Nueva'
+  const de = masculine ? 'del' : 'de la'
   const [name, setName] = useState('')
   const [parentId, setParentId] = useState('')
   const [busy, setBusy] = useState(false)
@@ -22,7 +26,7 @@ export function QuickCreate({ kind, label, onCreated, parents }: {
 
   async function create() {
     const clean = name.trim()
-    if (!clean) { setError(`Escribí el nombre de la ${label}.`); return }
+    if (!clean) { setError(`Escribí el nombre ${de} ${label}.`); return }
     setBusy(true)
     setError(null)
     try {
@@ -39,11 +43,11 @@ export function QuickCreate({ kind, label, onCreated, parents }: {
   }
 
   if (!open) {
-    return <button type="button" className="link-button quick-create-link" onClick={() => setOpen(true)}>+ Nueva {label}</button>
+    return <button type="button" className="link-button quick-create-link" onClick={() => setOpen(true)}>+ {nueva} {label}</button>
   }
 
   return (
-    <div className="quick-create" role="group" aria-label={`Nueva ${label}`}>
+    <div className="quick-create" role="group" aria-label={`${nueva} ${label}`}>
       {parents && (
         <select value={parentId} onChange={(event) => setParentId(event.target.value)} aria-label="Dentro de">
           <option value="">Principal (sin categoría padre)</option>
@@ -51,7 +55,7 @@ export function QuickCreate({ kind, label, onCreated, parents }: {
         </select>
       )}
       <input
-        autoFocus value={name} maxLength={100} placeholder={`Nombre de la ${label}`} aria-label={`Nombre de la ${label}`}
+        autoFocus value={name} maxLength={100} placeholder={`Nombre ${de} ${label}`} aria-label={`Nombre ${de} ${label}`}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void create() } }}
       />
