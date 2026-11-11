@@ -241,11 +241,6 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
         </div>
 
         <nav className="pv-actions" aria-label="Acciones de la caja">
-          {session && (
-            <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('sales')} aria-label="Ventas de esta caja" title="Ventas de esta caja">
-              <ReceiptText size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Ventas de esta caja</span>
-            </button>
-          )}
           {session && canExchange && (
             <button
               type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('exchange')}
@@ -265,6 +260,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           <UserMenu
             name={user.displayName}
             items={[
+              ...(session ? [{ label: 'Ventas de esta caja', icon: <ReceiptText size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: () => setPanel('sales') }] : []),
               ...(canReturnToAdmin ? [{ label: 'Volver al panel', icon: <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: () => onNavigate('panel') }] : []),
               ...(session ? [{ label: 'Cerrar caja', icon: <Lock size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: () => setPanel('close') }] : []),
               { label: 'Cerrar sesión', icon: <LogOut size={18} strokeWidth={1.75} aria-hidden="true" />, onSelect: requestLogout, danger: true },

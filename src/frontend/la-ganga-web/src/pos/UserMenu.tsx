@@ -5,7 +5,7 @@ export type UserMenuItem = { label: string; icon: ReactNode; onSelect: () => voi
 
 /**
  * Menú con el nombre de quien atiende la caja: agrupa las acciones de inicio y cierre
- * (volver al panel, cerrar caja, cerrar sesión) para que la barra muestre solo lo de cada venta.
+ * (ventas de esta caja, volver al panel, cerrar caja, cerrar sesión) para que la barra muestre solo lo de cada venta.
  */
 export function UserMenu({ name, items }: { name: string; items: UserMenuItem[] }) {
   const [open, setOpen] = useState(false)
@@ -27,7 +27,7 @@ export function UserMenu({ name, items }: { name: string; items: UserMenuItem[] 
     <div className="pv-user" ref={root}>
       <button
         type="button" className="pv-btn pv-btn-secondary pv-top-btn pv-user-toggle" aria-haspopup="menu" aria-expanded={open}
-        aria-label={`Menú de ${name}`} title="Panel, cerrar caja y cerrar sesión" onClick={() => setOpen((value) => !value)}
+        aria-label={`Menú de ${name}`} title="Ventas de esta caja, cerrar caja y cerrar sesión" onClick={() => setOpen((value) => !value)}
       >
         <CircleUser size={18} strokeWidth={1.75} aria-hidden="true" />
         <span className="pv-btn-label pv-user-name">{name}</span>

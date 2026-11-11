@@ -417,7 +417,8 @@ try {
   await shot('04-synced')
 
   // 7) Ventas de esta caja
-  await page.getByRole('button', { name: 'Ventas de esta caja' }).click()
+  await page.getByRole('button', { name: /^Menú de/ }).click()
+  await page.getByRole('menuitem', { name: 'Ventas de esta caja' }).click()
   const salesText = await page.getByRole('dialog').innerText()
   await shot('07-ventas-caja')
   check('Lista de ventas con números oficiales y estado Enviada', /V-000004/.test(salesText) && (salesText.match(/Enviada/g) ?? []).length >= 4)
