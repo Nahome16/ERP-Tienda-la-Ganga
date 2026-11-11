@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import type { CashSummary, Exchange, Sale, StoreSettings } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
 import { diffText, reconciliationRows, visibleRows } from '../pos/reconcile'
+import { ReceiptBarcode } from './ReceiptBarcode'
 import { ReceiptLogo } from './ReceiptLogo'
 import './receipt.css'
 
@@ -69,6 +70,12 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       <div className="receipt-center receipt-small">{exchangePolicy(settings.exchangeWindowDays)}</div>
       {settings.receiptFooter && <div className="receipt-center">{settings.receiptFooter}</div>}
       <div className="receipt-center receipt-bold">¡Gracias por su compra!</div>
+      {!isProvisional && (
+        <div className="receipt-barcode-box">
+          <ReceiptBarcode number={sale.number} />
+          <div className="receipt-center receipt-small">{sale.number}</div>
+        </div>
+      )}
     </div>
   )
 }
