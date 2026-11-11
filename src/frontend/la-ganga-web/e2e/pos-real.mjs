@@ -112,7 +112,8 @@ try {
   check('Tres ventas con número oficial V-', (text.match(/V-\d+/g) ?? []).length >= 3, text.replace(/\s+/g, ' ').slice(0, 160))
   await page.keyboard.press('Escape')
 
-  await page.getByRole('button', { name: 'Cerrar caja' }).click()
+  await page.getByRole('button', { name: /^Menú de/ }).click()
+  await page.getByRole('menuitem', { name: 'Cerrar caja' }).click()
   await page.getByLabel('Cantidad de billetes o monedas de 1000 córdobas').fill('1')
   await page.getByRole('button', { name: 'Cerrar caja' }).last().click()
   await page.getByRole('button', { name: 'Sí, cerrar caja' }).click()

@@ -546,3 +546,19 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
 .pv-btn-danger { color: #fff; background: #b3412e; border-color: #b3412e; }
 .pv-btn-danger:hover:not(:disabled) { background: #96331f; }
 .pv-void-lines { display: grid; gap: 2px; margin: 0 0 10px; padding-left: 18px; font-size: .9rem; }
+
+/* Barra superior: botón solo ícono (sonido) y menú de quien atiende la caja. */
+.pv-icon-btn { width: 40px; padding: 0; justify-content: center; }
+.pv-user { position: relative; }
+.pv-user-toggle { gap: 6px; }
+.pv-user-name { max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-user-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; display: grid; min-width: 220px; padding: 6px; border: 1px solid #e4d9c6; border-radius: 12px; background: var(--paper, #fffdf9); box-shadow: 0 14px 34px rgba(20, 40, 45, .18); }
+.pv-user-menu button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink, #1f2a2b); font: inherit; font-size: .9rem; font-weight: 650; text-align: left; cursor: pointer; }
+.pv-user-menu button:hover, .pv-user-menu button:focus-visible { background: #eef4f3; outline: 0; }
+.pv-user-menu .is-danger { margin-top: 4px; border-top: 1px solid #efe4d3; border-radius: 0 0 8px 8px; color: #a1321f; }
+.pv-user-menu .is-danger:hover { background: #fbe6e1; }
+@media (max-width: 1099.98px) {
+  .pv-user-toggle { width: auto; padding: 0 10px; }
+}
+/* Con el menú abierto, la barra queda por encima de los avisos flotantes. */
+.pv-top:has(.pv-user-menu) { z-index: 250; }
