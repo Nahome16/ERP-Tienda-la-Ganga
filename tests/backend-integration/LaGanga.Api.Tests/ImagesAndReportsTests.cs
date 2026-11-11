@@ -133,8 +133,11 @@ public sealed class ImagesAndReportsTests(CatalogApiFixture fixture) : IClassFix
             discountApprovalId = (Guid?)null,
             payments = new[] { new { method = "Transfer", currency = "NIO", amount = 900m, exchangeRate = (decimal?)null, bank = "BAC", reference = "123" } },
             note = (string?)null,
+            customerName = "  María Pérez  ",
         }, HttpStatusCode.Created);
         Assert.Equal(900m, sale.GetProperty("sale").GetProperty("totalNio").GetDecimal());
+        // El nombre del cliente se guarda limpio y vuelve para imprimirlo en el recibo.
+        Assert.Equal("María Pérez", sale.GetProperty("sale").GetProperty("customerName").GetString());
 
         var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-6)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var salesFile = await DownloadAsync(fixture.Admin, $"/api/v1/reports/sales?from={today}&to={today}");

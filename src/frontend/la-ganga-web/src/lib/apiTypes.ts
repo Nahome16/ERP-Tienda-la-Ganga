@@ -164,6 +164,7 @@ export type SaleRequest = {
   discountApprovalId: string | null
   payments: SaleRequestPayment[]
   note: string | null
+  customerName?: string | null
 }
 
 export type SaleLine = {
@@ -208,6 +209,8 @@ export type Sale = {
   requiresReview: boolean
   reviewNote: string | null
   note: string | null
+  /** Nombre del cliente (opcional), impreso en el recibo. */
+  customerName?: string | null
   voidedAtUtc: string | null
   voidedByName: string | null
   voidReason: string | null

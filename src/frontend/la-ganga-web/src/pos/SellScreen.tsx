@@ -280,7 +280,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     setModal({ kind: 'pay' })
   }
 
-  async function confirmPayment(payments: SaleRequestPayment[]) {
+  async function confirmPayment(payments: SaleRequestPayment[], customerName = '') {
     if (!settings || payBusy) return
     setPayBusy(true)
     setPayError(null)
@@ -297,6 +297,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
         discountApprovalId: needsApproval && approvalValid && approval ? approval.approvalId : null,
         payments,
         note: null,
+        customerName,
       })
       const localSale = buildLocalSale(request, lines, { session, sellerName: user.displayName, settings })
       // Primero a la cola local (IndexedDB); el envío al servidor ocurre en segundo plano.
@@ -630,7 +631,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
           settings={settings}
           busy={payBusy}
           error={payError}
-          onConfirm={(payments) => { void confirmPayment(payments) }}
+          onConfirm={(payments, customerName) => { void confirmPayment(payments, customerName) }}
           onCancel={closeModal}
         />
       )}

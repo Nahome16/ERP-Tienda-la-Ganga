@@ -42,6 +42,7 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       {isProvisional && <div className="receipt-center receipt-small">Referencia provisional: el número oficial se asigna al sincronizar.</div>}
       <div className="receipt-row"><span>Fecha</span><span>{date}</span></div>
       <div className="receipt-row"><span>{sale.registerName}</span><span>{sale.sellerName}</span></div>
+      {sale.customerName && <div className="receipt-row"><span>Cliente</span><span>{sale.customerName}</span></div>}
       {sale.channel !== 'Store' && <div className="receipt-row"><span>Canal</span><span>{channelNames[sale.channel]}</span></div>}
       {sale.status === 'Voided' && <div className="receipt-center"><strong>*** ANULADO ***</strong></div>}
       <hr className="receipt-rule" />

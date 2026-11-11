@@ -1125,6 +1125,10 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<Guid?>("DiscountApprovalId")
                         .HasColumnType("uuid");
 

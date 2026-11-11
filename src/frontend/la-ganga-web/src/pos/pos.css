@@ -562,3 +562,7 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
 }
 /* Con el menú abierto, la barra queda por encima de los avisos flotantes. */
 .pv-top:has(.pv-user-menu) { z-index: 250; }
+
+/* Nombre del cliente en el cobro (opcional). */
+.pv-pay-customer { margin-top: 12px; }
+.pv-pay-customer input { width: 100%; }

@@ -145,6 +145,7 @@ export function SaleDialog({ sale, user, onClose, onChanged }: {
           <section>
             <h3 className="adm-card-title">Datos</h3>
             <Row label="Vendedor">{sale.sellerName}</Row>
+            {sale.customerName && <Row label="Cliente">{sale.customerName}</Row>}
             <Row label="Caja">{sale.registerName}</Row>
             <Row label="Hora del equipo">{formatDateTime(sale.createdAtUtc)}</Row>
             <Row label="Recibida en el servidor">{formatDateTime(sale.receivedAtUtc)}</Row>
