@@ -5,6 +5,7 @@ using LaGanga.Application.Settings;
 using LaGanga.Domain.Catalog;
 using LaGanga.Domain.Identity;
 using LaGanga.Domain.Inventory;
+using LaGanga.Domain.Sales;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,49 @@ public sealed class ProductService : IProductService
         this.timeProvider = timeProvider;
         this.images = images;
         lots = new LotService(dbContext);
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<VariantSalesDto>>> GetSalesSummaryAsync(Guid id, Actor actor, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var variants = await dbContext.Variants.AsNoTracking().Where(variant => variant.ProductId == id)
+            .Select(variant => new { variant.Id, variant.Cost }).ToListAsync(cancellationToken);
+        if (variants.Count == 0 && !await dbContext.Products.AnyAsync(product => product.Id == id, cancellationToken))
+        {
+            return Result.Fail<IReadOnlyList<VariantSalesDto>>(ServiceErrorKind.NotFound, "not_found", "El producto no existe.");
+        }
+
+        var ids = variants.Select(variant => variant.Id).ToArray();
+        var sold = await (
+            from line in dbContext.SaleLines.AsNoTracking()
+            join sale in dbContext.Sales on line.SaleId equals sale.Id
+            where ids.Contains(line.VariantId) && sale.Status == SaleStatus.Confirmed
+            group line by line.VariantId into lines
+            select new { VariantId = lines.Key, Units = lines.Sum(line => line.Quantity), Revenue = lines.Sum(line => line.LineTotalNio) })
+            .ToListAsync(cancellationToken);
+
+        // Costo de lo vendido: el de la entrada de donde salió cada unidad (PEPS) o, si no tiene, el de la variante.
+        var allocations = await (
+            from allocation in dbContext.LotAllocations.AsNoTracking()
+            join sale in dbContext.Sales on allocation.SaleId equals sale.Id
+            join lot in dbContext.StockLots on allocation.LotId equals (Guid?)lot.Id into lotJoin
+            from lot in lotJoin.DefaultIfEmpty()
+            where ids.Contains(allocation.VariantId) && allocation.Kind == AllocationKind.Sale && sale.Status == SaleStatus.Confirmed
+            select new { allocation.VariantId, allocation.Quantity, UnitCost = lot == null ? null : lot.UnitCost })
+            .ToListAsync(cancellationToken);
+        var variantCost = variants.ToDictionary(variant => variant.Id, variant => variant.Cost);
+        var costs = allocations
+            .GroupBy(item => item.VariantId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Quantity * (item.UnitCost ?? variantCost.GetValueOrDefault(group.Key) ?? 0m)));
+
+        var result = sold.Select(item => new VariantSalesDto(
+                item.VariantId,
+                item.Units,
+                item.Revenue,
+                actor.CanSeeCosts ? costs.GetValueOrDefault(item.VariantId) : null))
+            .ToList();
+        return Result.Ok<IReadOnlyList<VariantSalesDto>>(result);
     }
 
     /// <summary>

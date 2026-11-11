@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { CatalogItem } from '../lib/catalogApi'
 import { NewColorPanel } from './ColorPicker'
+import { NewSizesPanel } from './QuickCreate'
 import type { Catalogs } from './useCatalogs'
 import { PartnerSelect, PartnersHint } from './PartnerSelect'
 import { Swatch } from './ui'
@@ -22,11 +23,14 @@ type Props = {
   externalEntry?: boolean
   /** Con permiso de catálogos: crea un color nuevo y lo marca (el padre lo suma a la lista). */
   onColorCreated?: (color: CatalogItem) => void
+  /** Con permiso de catálogos: crea tallas (y su grupo) y las marca. */
+  onSizesCreated?: (group: CatalogItem | null, sizes: CatalogItem[]) => void
 }
 
 /** Elige tallas y colores y arma la matriz talla × color con cantidades iniciales. */
-export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners = false, existing, externalEntry = false, onColorCreated }: Props) {
+export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners = false, existing, externalEntry = false, onColorCreated, onSizesCreated }: Props) {
   const [creatingColor, setCreatingColor] = useState(false)
+  const [creatingSizes, setCreatingSizes] = useState(false)
   const [groupId, setGroupId] = useState('')
   const [colorFilter, setColorFilter] = useState('')
   const [bulkQty, setBulkQty] = useState('')
@@ -109,7 +113,22 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
               onChange({ ...state, sizeIds: allVisibleSizesOn ? state.sizeIds.filter((id) => !ids.includes(id)) : Array.from(new Set([...state.sizeIds, ...ids])) })
             }}
           >{allVisibleSizesOn ? 'Quitar las del grupo' : 'Elegir todas las del grupo'}</button>
+          {onSizesCreated && !creatingSizes && <button type="button" className="secondary-button" onClick={() => setCreatingSizes(true)}>+ Nueva talla</button>}
         </div>
+        {onSizesCreated && creatingSizes && (
+          <NewSizesPanel
+            groups={catalogs.sizeGroups}
+            sizes={catalogs.sizes}
+            onCancel={() => setCreatingSizes(false)}
+            onCreated={({ group, sizes }) => {
+              onSizesCreated(group, sizes)
+              const groupOfNew = group?.id ?? sizes[0]?.sizeGroupId ?? ''
+              if (groupOfNew) setGroupId(groupOfNew)
+              onChange({ ...state, sizeIds: Array.from(new Set([...state.sizeIds, ...sizes.map((size) => size.id)])) })
+              setCreatingSizes(false)
+            }}
+          />
+        )}
         {visibleSizes.length === 0 && <p className="adm-muted">No hay tallas activas en este grupo.</p>}
         <div className="adm-chips">
           {visibleSizes.map((size) => (

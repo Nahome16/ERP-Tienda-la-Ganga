@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { PasswordChecklist, PasswordInput } from '../components/PasswordInput'
+import { isPasswordStrong } from '../lib/passwordRules'
 import { ApiError } from '../lib/api'
 import {
   createUser,
   changeOwnPassword,
   listRoles,
   listUsers,
-  passwordMinLength,
   permissionLabels,
   resetPassword,
   roleDescriptions,
@@ -192,7 +193,6 @@ function UserDialog({ roles, user, currentUserId, onClose, onSaved }: UserDialog
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [username, setUsername] = useState(user?.username ?? '')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [roleIds, setRoleIds] = useState<string[]>(user?.roles.map((role) => role.id) ?? [])
   const [isActive, setIsActive] = useState(user?.isActive ?? true)
   const [saving, setSaving] = useState(false)
@@ -211,8 +211,8 @@ function UserDialog({ roles, user, currentUserId, onClose, onSaved }: UserDialog
       setFieldErrors({ roleIds: ['Asigná al menos un rol.'] })
       return
     }
-    if (!user && password.length < passwordMinLength) {
-      setFieldErrors({ password: [`La contraseña debe tener al menos ${passwordMinLength} caracteres.`] })
+    if (!user && !isPasswordStrong(password)) {
+      setFieldErrors({ password: ['La contraseña todavía no cumple todos los requisitos de la lista.'] })
       return
     }
 
@@ -253,10 +253,10 @@ function UserDialog({ roles, user, currentUserId, onClose, onSaved }: UserDialog
           <label className="catalog-field">
             <span>Contraseña inicial</span>
             <div className="swatch-input">
-              <input type={showPassword ? 'text' : 'password'} value={password} autoComplete="new-password" onChange={(event) => setPassword(event.target.value)} required aria-invalid={Boolean(fieldError('password'))} />
-              <button type="button" className="link-button" onClick={() => setShowPassword((value) => !value)}>{showPassword ? 'Ocultar' : 'Mostrar'}</button>
+              <PasswordInput value={password} autoComplete="new-password" onChange={(event) => setPassword(event.target.value)} required aria-invalid={Boolean(fieldError('password'))} />
             </div>
-            <small className="field-hint">Mínimo {passwordMinLength} caracteres. Entregala a la persona en privado.</small>
+            <PasswordChecklist password={password} />
+            <small className="field-hint">Entregala a la persona en privado.</small>
             {fieldError('password') && <small className="field-error">{fieldError('password')}</small>}
           </label>
         </>
@@ -309,8 +309,8 @@ function PasswordDialog({ user, isSelf, onClose, onSaved }: { user: UserSummary;
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    if (password.length < passwordMinLength) {
-      setError(`La contraseña debe tener al menos ${passwordMinLength} caracteres.`)
+    if (!isPasswordStrong(password)) {
+      setError('La contraseña todavía no cumple todos los requisitos de la lista.')
       return
     }
     if (password !== confirmation) {
@@ -336,16 +336,17 @@ function PasswordDialog({ user, isSelf, onClose, onSaved }: { user: UserSummary;
     <Dialog title={`Nueva contraseña para ${user.displayName}`} onClose={onClose} onSubmit={(event) => { void submit(event) }}>
       {isSelf && <label className="catalog-field">
         <span>Contraseña actual</span>
-        <input type="password" value={currentPassword} autoComplete="current-password" onChange={(event) => setCurrentPassword(event.target.value)} required autoFocus />
+        <PasswordInput value={currentPassword} autoComplete="current-password" onChange={(event) => setCurrentPassword(event.target.value)} required autoFocus />
       </label>}
       <label className="catalog-field">
         <span>Nueva contraseña</span>
-        <input type="password" value={password} autoComplete="new-password" onChange={(event) => setPassword(event.target.value)} required autoFocus={!isSelf} />
+        <PasswordInput value={password} autoComplete="new-password" onChange={(event) => setPassword(event.target.value)} required autoFocus={!isSelf} />
       </label>
       <label className="catalog-field">
         <span>Repetila</span>
-        <input type="password" value={confirmation} autoComplete="new-password" onChange={(event) => setConfirmation(event.target.value)} required />
+        <PasswordInput value={confirmation} autoComplete="new-password" onChange={(event) => setConfirmation(event.target.value)} required />
       </label>
+      <PasswordChecklist password={password} confirmation={confirmation} />
       <p className="field-hint">Las sesiones abiertas de esta cuenta se cerrarán.</p>
       {error && <p className="catalog-notice error" role="alert">{error}</p>}
       <footer>

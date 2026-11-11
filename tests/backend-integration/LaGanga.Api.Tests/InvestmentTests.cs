@@ -374,7 +374,16 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
         var soldId = sold.GetProperty("id").GetGuid();
         var seller = await CreateSellerAsync();
         var session = await OpenCashAsync(seller);
-        _ = await PostSaleAsync(seller, session, sold.GetProperty("variants")[0].GetProperty("id").GetGuid(), 1, 400m, null, 400m);
+        var soldVariant = sold.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        _ = await PostSaleAsync(seller, session, soldVariant, 1, 400m, null, 400m);
+
+        // Balance de la ficha: lo vendido de cada variante, con su costo de la entrada.
+        var summary = await GetAsync(fixture.Admin, $"/api/v1/products/{soldId}/sales-summary");
+        var row = Assert.Single(summary.EnumerateArray());
+        Assert.Equal(soldVariant, row.GetProperty("variantId").GetGuid());
+        Assert.Equal(1, row.GetProperty("soldUnits").GetInt32());
+        Assert.Equal(400m, row.GetProperty("soldRevenueNio").GetDecimal());
+        Assert.Equal(150m, row.GetProperty("soldCostNio").GetDecimal());
         using var blocked = ApiTestHelpers.Build(HttpMethod.Delete, $"/api/v1/products/{soldId}", fixture.AdminCsrf);
         using var refused = await fixture.Admin.SendAsync(blocked);
         Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);

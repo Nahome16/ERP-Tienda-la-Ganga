@@ -15,7 +15,7 @@ import { Modal } from './Modal'
 import { errorMessage, posRequest } from './net'
 import { OpenCashScreen } from './OpenCashScreen'
 import { SalesPanel } from './SalesPanel'
-import { SellScreen } from './SellScreen'
+import { SellScreen, type ReloadRequest } from './SellScreen'
 import { clearCartDraft, clearCashSession, loadCashSession, saveCashSession } from './storage'
 import './pos.css'
 import {
@@ -202,6 +202,8 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
   const staleCatalog = snapshotAge > 12 * 60 * 60 * 1000
 
   const canExchange = hasPermission(user, 'sale.exchange')
+  // Prendas de una venta anulada para volver a cobrar («Anular y cargar al carrito»).
+  const [reloadRequest, setReloadRequest] = useState<ReloadRequest | null>(null)
 
   const connectionLabel = connection === 'offline' ? 'Sin conexión' : state.syncing ? 'Sincronizando…' : 'En línea'
   const connectionTone = connection === 'offline' ? 'offline' : state.syncing ? 'syncing' : 'online'
@@ -346,6 +348,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           soundEnabled={soundEnabled}
           onPrint={printSale}
           notify={notify}
+          reloadRequest={reloadRequest}
         />
       )}
 
@@ -359,6 +362,17 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           onRetry={(id) => { void engine.retry(id) }}
           onRetryAll={() => { void engine.retryAll() }}
           onClose={() => setPanel(null)}
+          canVoidDirect={hasPermission(user, 'sale.void')}
+          onVoided={(sale, reload) => {
+            notify(`Venta ${sale.number} anulada.`, 'ok')
+            // Las prendas volvieron al inventario: se actualiza la caja y, si se pidió, pasan al carrito.
+            void engine.refreshSnapshot().then(() => {
+              if (reload) {
+                setReloadRequest({ nonce: Date.now(), lines: sale.lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })) })
+                setPanel(null)
+              }
+            })
+          }}
         />
       )}
 
@@ -366,6 +380,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
         <ExchangeModal
           session={session}
           online={connection === 'online'}
+          needsApproval={!hasPermission(user, 'sale.void')}
           onPrint={(exchange) => setPrintJob({ nonce: Date.now(), exchange })}
           onDone={(exchange) => {
             notify(`Cambio ${exchange.number} registrado.`, 'ok')

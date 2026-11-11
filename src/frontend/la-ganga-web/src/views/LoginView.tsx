@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { PasswordInput } from '../components/PasswordInput'
 import type { ApiState } from '../types'
 import { ShieldCheck } from 'lucide-react'
 
@@ -90,10 +91,9 @@ export function LoginView({
             </label>
             <label>
               <span>Contraseña</span>
-              <input
+              <PasswordInput
                 autoComplete="current-password"
                 maxLength={256}
-                type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Tu contraseña"

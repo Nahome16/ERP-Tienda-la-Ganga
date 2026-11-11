@@ -440,3 +440,18 @@
 .adm-factory-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .adm-factory-edit input { min-height: 38px; min-width: 220px; font-family: ui-monospace, monospace; }
 .adm-table tr.muted td { opacity: .45; }
+
+/* Crear catálogos al momento desde el alta */
+.quick-create-link { justify-self: start; margin-top: 2px; font-size: .82rem; }
+.quick-create { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.quick-create input, .quick-create select { flex: 1 1 160px; min-height: 38px; }
+.quick-create .err { flex-basis: 100%; }
+
+/* Balance del producto */
+.adm-balance { display: grid; gap: 6px; margin: 10px 0 14px; }
+.adm-balance h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0; font-size: .92rem; }
+.adm-balance h3 small { color: var(--muted, #6d6860); font-size: .76rem; font-weight: 600; }
+.adm-balance-table td, .adm-balance-table th { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.adm-balance-table td:first-child { white-space: normal; min-width: 180px; }
+.adm-balance-table tr.is-total td { border-top: 2px solid var(--line, #e4dccd); font-weight: 800; }
+.adm-pill-special { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #fff1d6; color: #8a5a0c; font-size: .72rem; font-weight: 800; }

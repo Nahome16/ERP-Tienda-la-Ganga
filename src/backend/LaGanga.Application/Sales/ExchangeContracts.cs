@@ -71,7 +71,9 @@ public sealed record ExchangeRequest(
     Guid SaleId,
     Guid? CashSessionId,
     IReadOnlyList<ExchangeItemRequest>? Items,
-    string? Note);
+    string? Note,
+    string? ApproverUsername = null,
+    string? ApproverPassword = null);
 
 public sealed record ExchangeResultDto(bool AlreadyProcessed, ExchangeDto Exchange);
 

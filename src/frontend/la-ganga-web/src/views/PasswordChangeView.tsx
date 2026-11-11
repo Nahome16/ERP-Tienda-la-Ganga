@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react'
+import { PasswordChecklist, PasswordInput } from '../components/PasswordInput'
+import { isPasswordStrong } from '../lib/passwordRules'
 import { changeOwnPassword, passwordMinLength } from '../lib/usersApi'
 import type { CurrentUser } from '../types'
 
@@ -15,8 +17,8 @@ export function PasswordChangeView({ user, onChanged, onLogout }: {
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    if (password.length < passwordMinLength) {
-      setError(`La contraseña debe tener al menos ${passwordMinLength} caracteres.`)
+    if (!isPasswordStrong(password)) {
+      setError('La contraseña todavía no cumple todos los requisitos de la lista.')
       return
     }
     if (password !== confirmation) {
@@ -48,10 +50,11 @@ export function PasswordChangeView({ user, onChanged, onLogout }: {
       </section>
       <section className="login-form-panel">
         <div className="login-form-wrap">
-          <header><p>{user.displayName}</p><h2>Nueva contraseña</h2><span>Mínimo {passwordMinLength} caracteres.</span></header>
+          <header><p>{user.displayName}</p><h2>Nueva contraseña</h2><span>Mínimo {passwordMinLength} caracteres, con mayúscula, minúscula, número y símbolo.</span></header>
           <form className="login-form" onSubmit={(event) => { void submit(event) }}>
-            <label><span>Nueva contraseña</span><input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus /></label>
-            <label><span>Repetí la contraseña</span><input type="password" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
+            <label><span>Nueva contraseña</span><PasswordInput autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus /></label>
+            <label><span>Repetí la contraseña</span><PasswordInput autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
+            <PasswordChecklist password={password} confirmation={confirmation} />
             {error && <div className="login-error" role="alert">{error}</div>}
             <button className="login-button" disabled={saving} type="submit">{saving ? 'Guardando…' : 'Guardar y entrar'}</button>
             <button className="secondary-button" type="button" onClick={onLogout}>Salir</button>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ProductBalance } from './ProductBalance'
 import { ProductPartnerDialog } from './ProductPartnerDialog'
 import { ApiError } from '../lib/api'
 import { hasPermission } from '../lib/access'
@@ -123,6 +124,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
               <span>Existencia total <strong className={product.totalStock < 0 ? 'adm-neg' : undefined}>{product.totalStock}</strong></span>
               <span>{product.variantCount} variante{product.variantCount === 1 ? '' : 's'}</span>
             </div>
+            <ProductBalance product={product} canSeeCosts={canCost} />
             <FactoryCodes product={product} canEdit={canEdit} onChanged={(text) => changed(text)} />
             <ImageManager key={product.id} productId={product.id} images={product.images ?? []} canManage={canImages} onChanged={onChanged} />
             <div className="table-scroll">

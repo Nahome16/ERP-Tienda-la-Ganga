@@ -5,6 +5,8 @@ import { formatNio } from '../lib/money'
 import {
   buildExchangeRequest, choiceError, exchangeOptions, normalizeReceiptNumber, optionLabel, windowText, type ExchangeChoices,
 } from './exchange'
+import { AuthorizationFields } from './Authorization'
+import { approverReady, emptyApprover, type Approver } from './approver'
 import { Modal } from './Modal'
 import { errorMessage, posRequest } from './net'
 import { newClientSaleId } from './sale'
@@ -12,6 +14,8 @@ import { newClientSaleId } from './sale'
 type Props = {
   session: CashSession
   online: boolean
+  /** El cajero necesita la autorización del administrador para registrar el cambio. */
+  needsApproval: boolean
   onPrint: (exchange: Exchange) => void
   onDone: (exchange: Exchange) => void
   onClose: () => void
@@ -21,7 +25,8 @@ type Props = {
  * Cambio de talla o color con el recibo: la prenda regresa al inventario y
  * sale otra talla/color del mismo producto. No mueve dinero ni cambia la venta.
  */
-export function ExchangeModal({ session, online, onPrint, onDone, onClose }: Props) {
+export function ExchangeModal({ session, online, needsApproval, onPrint, onDone, onClose }: Props) {
+  const [approver, setApprover] = useState<Approver>(emptyApprover)
   const [number, setNumber] = useState('')
   const [lookup, setLookup] = useState<ExchangeLookup | null>(null)
   const [choices, setChoices] = useState<ExchangeChoices>({})
@@ -80,12 +85,16 @@ export function ExchangeModal({ session, online, onPrint, onDone, onClose }: Pro
     setBusy(true)
     setError(null)
     try {
-      const result = await posRequest<ExchangeResult>('/api/v1/exchanges', { method: 'POST', body: built.request })
+      const body = needsApproval
+        ? { ...built.request, approverUsername: approver.username.trim(), approverPassword: approver.password }
+        : built.request
+      const result = await posRequest<ExchangeResult>('/api/v1/exchanges', { method: 'POST', body })
       setDone(result.exchange)
       onDone(result.exchange)
       onPrint(result.exchange)
     } catch (caught) {
       setError(errorMessage(caught, 'No fue posible registrar el cambio.'))
+      setApprover((current) => ({ ...current, password: '' }))
     } finally {
       setBusy(false)
     }
@@ -131,7 +140,7 @@ export function ExchangeModal({ session, online, onPrint, onDone, onClose }: Pro
         <>
           <button type="button" className="pv-btn pv-btn-secondary" onClick={onClose} disabled={busy}>Cancelar</button>
           {lookup?.canExchange && (
-            <button type="button" className="pv-btn pv-btn-primary" onClick={() => { void confirm() }} disabled={busy || !online || selectedCount === 0}>
+            <button type="button" className="pv-btn pv-btn-primary" onClick={() => { void confirm() }} disabled={busy || !online || selectedCount === 0 || (needsApproval && !approverReady(approver))}>
               <Repeat size={18} strokeWidth={1.75} aria-hidden="true" />{busy ? 'Registrando…' : 'Registrar cambio'}
             </button>
           )}
@@ -219,6 +228,7 @@ export function ExchangeModal({ session, online, onPrint, onDone, onClose }: Pro
                 <span>Nota (opcional)</span>
                 <input value={note} maxLength={500} placeholder="Ej.: le quedó pequeña" onChange={(event) => setNote(event.target.value)} disabled={busy} />
               </label>
+              {needsApproval && <AuthorizationFields value={approver} onChange={setApprover} action="este cambio de talla" disabled={busy} />}
               {errors.form && <p className="pv-error" role="alert">{errors.form}</p>}
             </>
           )}

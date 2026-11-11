@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { QuickCreate } from './QuickCreate'
 import type { CatalogItem } from '../lib/catalogApi'
 import { ScanBarcode } from 'lucide-react'
 import { ApiError } from '../lib/api'
@@ -30,21 +31,30 @@ function describeError(error: unknown): string {
 }
 
 /** Colores creados desde el diálogo: se suman a los del catálogo hasta que la lista se recargue. */
+type CatalogList = keyof Catalogs
+
+/** Catálogos creados desde el diálogo (colores, tallas, marcas…): se suman hasta que la lista se recargue. */
 function useCatalogsWithNewColors(base: Catalogs) {
-  const [extra, setExtra] = useState<CatalogItem[]>([])
+  const [extra, setExtra] = useState<{ list: CatalogList; item: CatalogItem }[]>([])
   const catalogs = useMemo(() => {
-    const known = new Set(base.colors.map((color) => color.id))
-    return { ...base, colors: [...base.colors, ...extra.filter((color) => !known.has(color.id))] }
+    const merged = { ...base }
+    for (const { list, item } of extra) {
+      if (!merged[list].some((existing) => existing.id === item.id)) merged[list] = [...merged[list], item]
+    }
+    return merged
   }, [base, extra])
-  return { catalogs, addColor: (color: CatalogItem) => setExtra((current) => [...current, color]) }
+  const add = (list: CatalogList, item: CatalogItem) => setExtra((current) => [...current, { list, item }])
+  return { catalogs, add, addColor: (color: CatalogItem) => add('colors', color) }
 }
 
 type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: string }
 
 type ProductFields = { name: string; categoryId: string; brandId: string; cutId: string; basePrice: string; barcode: string }
 
-function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false }: {
+function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false, onCatalogCreated }: {
   fields: ProductFields
+  /** Con permiso de catálogos: crear marca, categoría o corte al momento. */
+  onCatalogCreated?: (list: 'brands' | 'cuts' | 'categories', item: CatalogItem) => void
   /** El alta pide el precio de venta al final, en «Ingreso». */
   hidePrice?: boolean
   onChange: (fields: ProductFields) => void
@@ -64,27 +74,36 @@ function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBra
         <input value={fields.name} maxLength={200} required onChange={(event) => onChange({ ...fields, name: event.target.value })} data-autofocus />
       </label>
       <div className="adm-grid-2">
-        <label className="adm-field">
+        <div className="adm-field">
           <span>Categoría</span>
-          <select value={fields.categoryId} required onChange={(event) => onChange({ ...fields, categoryId: event.target.value })}>
+          <select aria-label="Categoría" value={fields.categoryId} required onChange={(event) => onChange({ ...fields, categoryId: event.target.value })}>
             <option value="">Elegí una categoría</option>
             {categories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
-        </label>
-        <label className="adm-field">
+          {onCatalogCreated && (
+            <QuickCreate
+              kind="categories" label="categoría"
+              parents={categoryOptions(catalogs.categories).map((item) => ({ id: item.id, label: item.label }))}
+              onCreated={(item) => { onCatalogCreated('categories', item); onChange({ ...fields, categoryId: item.id }) }}
+            />
+          )}
+        </div>
+        <div className="adm-field">
           <span>Marca</span>
-          <select value={fields.brandId} required onChange={(event) => onChange({ ...fields, brandId: event.target.value })}>
+          <select aria-label="Marca" value={fields.brandId} required onChange={(event) => onChange({ ...fields, brandId: event.target.value })}>
             <option value="">Elegí una marca</option>
             {brandOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-        </label>
-        <label className="adm-field">
+          {onCatalogCreated && <QuickCreate kind="brands" label="marca" onCreated={(item) => { onCatalogCreated('brands', item); onChange({ ...fields, brandId: item.id }) }} />}
+        </div>
+        <div className="adm-field">
           <span>Corte (opcional)</span>
-          <select value={fields.cutId} onChange={(event) => onChange({ ...fields, cutId: event.target.value })}>
+          <select aria-label="Corte" value={fields.cutId} onChange={(event) => onChange({ ...fields, cutId: event.target.value })}>
             <option value="">Sin corte</option>
             {catalogs.cuts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-        </label>
+          {onCatalogCreated && <QuickCreate kind="cuts" label="corte" onCreated={(item) => { onCatalogCreated('cuts', item); onChange({ ...fields, cutId: item.id }) }} />}
+        </div>
         <label className="adm-field">
           <span>Código de fábrica (opcional)</span>
           <input
@@ -146,7 +165,7 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
 }) {
   const canImages = hasPermission(user, 'product.images.manage')
   const canCreateColors = hasPermission(user, 'catalog.manage')
-  const { catalogs, addColor } = useCatalogsWithNewColors(baseCatalogs)
+  const { catalogs, add: addCatalog, addColor } = useCatalogsWithNewColors(baseCatalogs)
   const [pending, setPending] = useState<File[]>([])
   const [progress, setProgress] = useState<string | null>(null)
   const canCost = hasPermission(user, 'inventory.cost.read')
@@ -392,10 +411,14 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
       )}
       <p className="adm-scan-hint">Si la prenda no trae código, dejalo vacío: el sistema genera uno por talla para imprimir la etiqueta.</p>
       <form id="create-product-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
-        <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice />
+        <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice onCatalogCreated={canCreateColors ? addCatalog : undefined} />
 
         <h3 className="adm-step"><span>2</span>Colores, tallas y cantidades</h3>
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={(next) => { changeBuilder(next) }} canCost={canCost} canPartners={canPartners} externalEntry onColorCreated={canCreateColors ? addColor : undefined} />
+        <VariantBuilder
+          catalogs={catalogs} state={builder} onChange={(next) => { changeBuilder(next) }} canCost={canCost} canPartners={canPartners} externalEntry
+          onColorCreated={canCreateColors ? addColor : undefined}
+          onSizesCreated={canCreateColors ? (group, sizes) => { if (group) addCatalog('sizeGroups', group); sizes.forEach((size) => addCatalog('sizes', size)) } : undefined}
+        />
         {(codeMode === 'color' || Object.values(colorCodes).some((code) => code.trim())) && builder.colorIds.length > 0 && (
           <div className="adm-color-codes">
             <p className="adm-help" style={{ margin: 0 }}>Código de fábrica de cada color (lo comparten todas sus tallas). Escaneá en el campo de arriba o escribilo aquí.</p>
@@ -592,7 +615,7 @@ export function AddVariantsDialog({ product, catalogs: baseCatalogs, user, onClo
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
   const canPartners = hasPermission(user, 'investment.read')
-  const { catalogs, addColor } = useCatalogsWithNewColors(baseCatalogs)
+  const { catalogs, add: addCatalog, addColor } = useCatalogsWithNewColors(baseCatalogs)
   const canCreateColors = hasPermission(user, 'catalog.manage')
   const existing = new Set(product.variants.map((variant) => `${variant.sizeId}|${variant.colorId}`))
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
@@ -639,7 +662,8 @@ export function AddVariantsDialog({ product, catalogs: baseCatalogs, user, onClo
       )}
     >
       <form id="add-variants-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
-        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} onColorCreated={canCreateColors ? addColor : undefined} />
+        <VariantBuilder catalogs={catalogs} state={builder} onChange={setBuilder} canCost={canCost} canPartners={canPartners} existing={existing} onColorCreated={canCreateColors ? addColor : undefined}
+          onSizesCreated={canCreateColors ? (group, sizes) => { if (group) addCatalog('sizeGroups', group); sizes.forEach((size) => addCatalog('sizes', size)) } : undefined} />
         {error && <Notice tone="error">{error}</Notice>}
       </form>
     </Dialog>

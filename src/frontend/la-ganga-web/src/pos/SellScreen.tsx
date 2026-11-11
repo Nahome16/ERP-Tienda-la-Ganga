@@ -32,7 +32,11 @@ type SellScreenProps = {
   soundEnabled: boolean
   onPrint: (sale: Sale) => void
   notify: (message: string, tone?: 'ok' | 'warn' | 'error') => void
+  /** Prendas a cargar en el carrito (venta anulada para corregir). Cada `nonce` se aplica una vez. */
+  reloadRequest?: ReloadRequest | null
 }
+
+export type ReloadRequest = { nonce: number; lines: { variantId: string; quantity: number }[] }
 
 type ModalState =
   | { kind: 'pay' }
@@ -48,7 +52,7 @@ function variantLabel(variant: Pick<PosVariant, 'productName' | 'colorName' | 's
   return `${variant.productName} · ${variant.colorName} · ${variant.sizeName}`
 }
 
-export function SellScreen({ user, session, engine, engineState, soundEnabled, onPrint, notify }: SellScreenProps) {
+export function SellScreen({ user, session, engine, engineState, soundEnabled, onPrint, notify, reloadRequest }: SellScreenProps) {
   const snapshot = engineState.snapshot?.snapshot ?? null
   const settings = snapshot?.settings
   const scannerRef = useRef<HTMLInputElement>(null)
@@ -167,6 +171,28 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     setLines((currentLines) => setLineQuantity(currentLines, variantId, quantity))
     return true
   }
+
+  // «Anular y cargar al carrito»: las prendas de la venta anulada vuelven al carrito una sola vez.
+  const appliedReload = useRef<number | null>(null)
+  useEffect(() => {
+    if (!reloadRequest || appliedReload.current === reloadRequest.nonce || index.variants.length === 0) return
+    appliedReload.current = reloadRequest.nonce
+    let missing = 0
+    setLines((current) => {
+      let next = current
+      for (const item of reloadRequest.lines) {
+        const variant = index.byId.get(item.variantId)
+        if (!variant) { missing += 1; continue }
+        next = setLineQuantity(addToCart(next, variant), variant.variantId, cartQuantity(next, variant.variantId) + item.quantity)
+      }
+      return next
+    })
+    announce(missing > 0 ? 'error' : 'ok', missing > 0
+      ? `Algunas prendas ya no están a la venta y no se cargaron (${missing}).`
+      : 'Prendas de la venta anulada cargadas: corregí y cobrá de nuevo.')
+    // `announce` cambia en cada render; la carga depende solo del pedido y del catálogo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadRequest, index])
 
   function addVariant(variant: PosVariant) {
     const current = cartQuantity(lines, variant.variantId)

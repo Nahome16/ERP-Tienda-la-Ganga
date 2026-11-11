@@ -1,3 +1,4 @@
+import { PasswordInput } from '../components/PasswordInput'
 import { useState, type FormEvent } from 'react'
 import type { DiscountType } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
@@ -68,7 +69,7 @@ export function ApprovalModal({
           <input data-autofocus value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" autoCapitalize="none" />
         </label>
         <label>Contraseña
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
+          <PasswordInput value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
         </label>
         {error && <p className="pv-error" role="alert">{error}</p>}
       </form>

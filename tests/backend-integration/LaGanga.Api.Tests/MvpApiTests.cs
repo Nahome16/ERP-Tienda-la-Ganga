@@ -471,14 +471,22 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         Assert.Equal(large, option.GetProperty("variantId").GetGuid());
         Assert.Equal(2, option.GetProperty("stock").GetInt32());
 
-        object Body(Guid clientId, Guid newVariant, int quantity) => new
+        object Body(Guid clientId, Guid newVariant, int quantity, string? approverPassword = CatalogApiFixture.DefaultPassword) => new
         {
             clientExchangeId = clientId,
             saleId,
             cashSessionId = session,
             items = new[] { new { saleLineId, quantity, newVariantId = newVariant } },
             note = "Le quedó pequeño",
+            approverUsername = CatalogApiFixture.AdminUsername,
+            approverPassword,
         };
+
+        // El vendedor necesita la autorización del administrador (usuario y contraseña correctos).
+        var unauthorized = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", Body(Guid.NewGuid(), large, 1, approverPassword: null));
+        Assert.Equal("approval_required", await ApiTestHelpers.ReadProblemCodeAsync(unauthorized));
+        var wrongPassword = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", Body(Guid.NewGuid(), large, 1, approverPassword: "Incorrecta-2026!"));
+        Assert.Equal("invalid_credentials", await ApiTestHelpers.ReadProblemCodeAsync(wrongPassword));
 
         var otherProduct = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", Body(Guid.NewGuid(), otherVariant, 1));
         Assert.Equal("different_product", await ApiTestHelpers.ReadProblemCodeAsync(otherProduct));
@@ -535,8 +543,22 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
             cashSessionId = session,
             items = new[] { new { saleLineId = expired.GetProperty("lines")[0].GetProperty("saleLineId").GetGuid(), quantity = 1, newVariantId = large } },
             note = (string?)null,
+            approverUsername = CatalogApiFixture.AdminUsername,
+            approverPassword = CatalogApiFixture.DefaultPassword,
         });
         Assert.Equal("exchange_window_expired", await ApiTestHelpers.ReadProblemCodeAsync(expiredPost));
+
+        // Anular desde la caja: el vendedor necesita la autorización del administrador.
+        var oldSaleId = oldSale.GetProperty("id").GetGuid();
+        var voidWithout = await PostRawAsync(seller.Client, seller.Csrf, $"/api/v1/pos/sales/{oldSaleId}/void", new { reason = "Se cobró de más por error" });
+        Assert.Equal("approval_required", await ApiTestHelpers.ReadProblemCodeAsync(voidWithout));
+        var voidedFromPos = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/pos/sales/{oldSaleId}/void", new
+        {
+            reason = "Se cobró de más por error",
+            approverUsername = CatalogApiFixture.AdminUsername,
+            approverPassword = CatalogApiFixture.DefaultPassword,
+        });
+        Assert.Equal("Voided", voidedFromPos.GetProperty("status").GetString());
 
         _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 2700m, countedCashUsd = 0m });
     }

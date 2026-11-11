@@ -535,3 +535,14 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
 
 .pv-focus-color { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 6px; font-size: .88rem; }
 .pv-focus-color .pv-link { padding: 0; border: 0; background: none; color: var(--teal, #1d6b72); font-weight: 750; text-decoration: underline; cursor: pointer; }
+
+/* Autorización del administrador dentro de la caja */
+.pv-auth { display: grid; gap: 6px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid #e3b26b; border-radius: 12px; background: #fff7e8; }
+.pv-auth legend { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; font-weight: 800; font-size: .88rem; color: #7a4a0c; }
+.pv-auth .pv-hint { margin: 0; }
+.pv-auth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.pv-auth-grid .pv-field { margin-top: 0; }
+.pv-btn-void { color: #a33a2b; }
+.pv-btn-danger { color: #fff; background: #b3412e; border-color: #b3412e; }
+.pv-btn-danger:hover:not(:disabled) { background: #96331f; }
+.pv-void-lines { display: grid; gap: 2px; margin: 0 0 10px; padding-left: 18px; font-size: .9rem; }
