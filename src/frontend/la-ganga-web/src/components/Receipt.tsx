@@ -19,6 +19,11 @@ function exchangePolicy(days: number | undefined) {
   return `Cambios de talla o color dentro de ${days} día${days === 1 ? '' : 's'} con este recibo.`
 }
 
+/** El pie escrito en Configuración ya explica los cambios: no se repite la política automática. */
+function mentionsExchanges(footer: string | undefined) {
+  return /cambio|devoluci/i.test(footer ?? '')
+}
+
 /** Recibo de venta (sin desglose de impuestos). Pensado para papel térmico de 80 mm. */
 export function Receipt({ sale, settings }: ReceiptProps) {
   const date = new Intl.DateTimeFormat('es-NI', {
@@ -67,7 +72,7 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       ))}
       {sale.changeNio > 0 && <div className="receipt-row receipt-bold"><span>Cambio</span><span>{formatNio(sale.changeNio)}</span></div>}
       <hr className="receipt-rule" />
-      <div className="receipt-center receipt-small">{exchangePolicy(settings.exchangeWindowDays)}</div>
+      {!mentionsExchanges(settings.receiptFooter) && <div className="receipt-center receipt-small">{exchangePolicy(settings.exchangeWindowDays)}</div>}
       {settings.receiptFooter && <div className="receipt-center">{settings.receiptFooter}</div>}
       <div className="receipt-center receipt-bold">¡Gracias por su compra!</div>
       {!isProvisional && (
