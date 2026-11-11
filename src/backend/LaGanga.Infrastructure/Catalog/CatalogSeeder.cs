@@ -32,10 +32,53 @@ public sealed class CatalogSeeder(LaGangaDbContext dbContext, TimeProvider timeP
         ("Camisas", ["S", "M", "L", "XL", "1XL", "2XL", "3XL"]),
     ];
 
-    private static readonly string[] Colors =
+    /// <summary>
+    /// Paleta de colores de ropa con su tono. Es la misma lista que usa el panel
+    /// (src/frontend/la-ganga-web/src/lib/colorPalette.ts); si cambia una, cambiar la otra.
+    /// </summary>
+    internal static readonly (string Name, string Hex)[] Colors =
     [
-        "Negro", "Azul", "Azul oscuro", "Azul claro", "Celeste", "Petróleo", "Caqui", "Beige",
-        "Café", "Gris",
+        ("Negro", "#111111"),
+        ("Blanco", "#FFFFFF"),
+        ("Hueso", "#F2EBDD"),
+        ("Crema", "#F3E5C3"),
+        ("Beige", "#D9C3A0"),
+        ("Caqui", "#B5A36E"),
+        ("Camel", "#B9874B"),
+        ("Café", "#6B4226"),
+        ("Chocolate", "#4A2C1D"),
+        ("Gris claro", "#C9C9C9"),
+        ("Gris", "#8A8A8A"),
+        ("Gris oscuro", "#4A4A4A"),
+        ("Plomo", "#5E6670"),
+        ("Azul", "#1F5FBF"),
+        ("Azul claro", "#7FB2E5"),
+        ("Azul oscuro", "#1B2F5C"),
+        ("Azul marino", "#14213D"),
+        ("Celeste", "#9CD3F0"),
+        ("Turquesa", "#2BB7B3"),
+        ("Petróleo", "#1F5A66"),
+        ("Mezclilla", "#3E5F8A"),
+        ("Verde", "#2E8B57"),
+        ("Verde claro", "#9BD39B"),
+        ("Verde oscuro", "#1F4D2E"),
+        ("Verde olivo", "#6B7A3A"),
+        ("Verde menta", "#A8E6CF"),
+        ("Amarillo", "#F2C531"),
+        ("Mostaza", "#C99A2E"),
+        ("Naranja", "#EE7A2B"),
+        ("Coral", "#F2786B"),
+        ("Rojo", "#C62828"),
+        ("Vino", "#6D1A2B"),
+        ("Terracota", "#B5543A"),
+        ("Rosa", "#F2A2B8"),
+        ("Rosa palo", "#E8C4C4"),
+        ("Fucsia", "#D6247A"),
+        ("Lila", "#C3A6D8"),
+        ("Morado", "#6A3D9A"),
+        ("Dorado", "#C9A13B"),
+        ("Plateado", "#BFC4C9"),
+        ("Multicolor", "#9B7BD1"),
     ];
 
     private static readonly (string Root, string[] Children)[] Categories =
@@ -75,11 +118,7 @@ public sealed class CatalogSeeder(LaGangaDbContext dbContext, TimeProvider timeP
             }
         }
 
-        if (!await dbContext.Colors.AnyAsync(cancellationToken))
-        {
-            dbContext.Colors.AddRange(Colors.Select((name, index) =>
-                new Color(Guid.NewGuid(), name, null, (index + 1) * 10, createdBy, now)));
-        }
+        await SeedColorsAsync(createdBy, now, cancellationToken);
 
         if (!await dbContext.Categories.AnyAsync(cancellationToken))
         {
@@ -94,5 +133,36 @@ public sealed class CatalogSeeder(LaGangaDbContext dbContext, TimeProvider timeP
         }
 
         return await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Agrega los colores de la paleta que falten (comparando nombres sin tildes ni
+    /// mayúsculas, también contra los inactivos) y pone el tono a los colores de la
+    /// paleta que no lo tienen. No cambia un tono que la tienda ya eligió.
+    /// </summary>
+    private async Task SeedColorsAsync(Guid? createdBy, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.Colors.ToListAsync(cancellationToken);
+        var byName = existing
+            .GroupBy(color => color.NormalizedName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var nextOrder = existing.Count == 0 ? 10 : existing.Max(color => color.SortOrder) + 10;
+        for (var index = 0; index < Colors.Length; index++)
+        {
+            var (name, hex) = Colors[index];
+            if (byName.TryGetValue(CatalogText.Normalize(name), out var color))
+            {
+                if (color.SwatchHex is null)
+                {
+                    color.ChangeSwatch(hex, createdBy, now);
+                }
+
+                continue;
+            }
+
+            var order = existing.Count == 0 ? (index + 1) * 10 : nextOrder;
+            nextOrder += 10;
+            dbContext.Colors.Add(new Color(Guid.NewGuid(), name, hex, order, createdBy, now));
+        }
     }
 }

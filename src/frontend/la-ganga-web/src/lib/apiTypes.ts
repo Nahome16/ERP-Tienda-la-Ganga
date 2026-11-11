@@ -14,6 +14,8 @@ export type StoreSettings = {
   banks: string[]
   sellerDiscountLimitPercent: number
   lowStockThreshold: number
+  /** Días desde la venta en que se aceptan cambios de talla o color. */
+  exchangeWindowDays: number
 }
 
 export type PosVariant = {
@@ -30,6 +32,10 @@ export type PosVariant = {
   stock: number
   /** Miniatura de la imagen principal del producto (URL relativa) o null. */
   imageUrl?: string | null
+  /** Código de fábrica del producto, igual en todas sus tallas: al escanearlo se elige la talla. */
+  productBarcode?: string | null
+  /** Código de fábrica del color (lo comparten las tallas de ese color): al escanearlo se elige la talla. */
+  colorBarcode?: string | null
 }
 
 export type PosSnapshot = {
@@ -158,6 +164,7 @@ export type SaleRequest = {
   discountApprovalId: string | null
   payments: SaleRequestPayment[]
   note: string | null
+  customerName?: string | null
 }
 
 export type SaleLine = {
@@ -202,6 +209,8 @@ export type Sale = {
   requiresReview: boolean
   reviewNote: string | null
   note: string | null
+  /** Nombre del cliente (opcional), impreso en el recibo. */
+  customerName?: string | null
   voidedAtUtc: string | null
   voidedByName: string | null
   voidReason: string | null
@@ -235,6 +244,8 @@ export type ProductListItem = {
   version: number
   /** Miniatura de la imagen principal (URL relativa) o null. */
   primaryImageUrl: string | null
+  /** Código de fábrica, igual en todas las tallas (al escanearlo se elige la talla). */
+  barcode?: string | null
 }
 
 export type Variant = {
@@ -262,7 +273,12 @@ export type ProductImage = {
   sortOrder: number
 }
 
-export type ProductDetail = ProductListItem & { variants: Variant[]; images: ProductImage[] }
+export type ProductDetail = ProductListItem & {
+  variants: Variant[]
+  images: ProductImage[]
+  /** Códigos de fábrica por color (los comparten todas las tallas de ese color). */
+  colorBarcodes?: ColorBarcode[]
+}
 
 export type ImportRow = {
   productName: string
@@ -315,7 +331,7 @@ export type InventoryRow = {
   imageUrl?: string | null
 }
 
-export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid'
+export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid' | 'ExchangeIn' | 'ExchangeOut'
 
 export type KardexRow = {
   type: KardexType
@@ -415,3 +431,83 @@ export type Lot = {
 }
 
 export type PartnerUnits = { partnerId: string | null; name: string; units: number }
+
+// --- Cambios de talla o color ---
+
+export type ExchangeOption = {
+  variantId: string
+  sizeName: string
+  colorName: string
+  colorHex: string | null
+  barcode: string
+  stock: number
+  price: number
+  isActive: boolean
+}
+
+export type ExchangeableLine = {
+  saleLineId: string
+  variantId: string
+  productId: string
+  productName: string
+  sizeName: string
+  colorName: string
+  barcode: string
+  quantity: number
+  alreadyExchanged: number
+  available: number
+  unitPrice: number
+  options: ExchangeOption[]
+}
+
+export type ExchangeLine = {
+  productName: string
+  quantity: number
+  unitPrice: number
+  returnedSizeName: string
+  returnedColorName: string
+  returnedBarcode: string
+  newSizeName: string
+  newColorName: string
+  newBarcode: string
+}
+
+export type Exchange = {
+  id: string
+  number: string
+  saleId: string
+  saleNumber: string
+  createdAtUtc: string
+  userName: string
+  registerName: string | null
+  note: string | null
+  lines: ExchangeLine[]
+}
+
+export type ExchangeLookup = {
+  saleId: string
+  saleNumber: string
+  saleCreatedAtUtc: string
+  status: 'Confirmed' | 'Voided'
+  totalNio: number
+  daysSinceSale: number
+  windowDays: number
+  canExchange: boolean
+  blockedReason: string | null
+  lines: ExchangeableLine[]
+  exchanges: Exchange[]
+}
+
+export type ExchangeItemRequest = { saleLineId: string; quantity: number; newVariantId: string }
+
+export type ExchangeRequest = {
+  clientExchangeId: string
+  saleId: string
+  cashSessionId: string | null
+  items: ExchangeItemRequest[]
+  note: string | null
+}
+
+export type ExchangeResult = { alreadyProcessed: boolean; exchange: Exchange }
+
+export type ColorBarcode = { colorId: string; colorName: string; barcode: string }

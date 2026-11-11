@@ -15,7 +15,7 @@ const failedUrls = new Set<string>()
  * mientras carga o si falla (sin conexión y fuera de la caché) esas iniciales son lo que se ve,
  * y el tamaño no cambia, así que no hay saltos.
  */
-export function PosThumb({ src, name, size }: { src: string | null | undefined; name: string; size: 'card' | 'row' | 'line' }) {
+export function PosThumb({ src, name, size }: { src: string | null | undefined; name: string; size: 'card' | 'row' | 'line' | 'hero' | 'zoom' }) {
   const [, setFailures] = useState(0)
   const showImage = Boolean(src) && !failedUrls.has(src ?? '')
   return (

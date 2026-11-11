@@ -5,6 +5,7 @@ import type { ProductDetail } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
 import { adjustInventory, getProduct } from './adminApi'
+import { blockEnterSubmit } from './forms'
 import { messageFrom } from './format'
 import { useFetch } from './hooks'
 import { ImageManager } from './ImageManager'
@@ -132,7 +133,7 @@ export function ReceiveStockDialog({ productId, user, catalogs, onClose, onChang
 
             {!canAdjust && <Notice tone="info">Tu cuenta no tiene permiso para registrar entradas de inventario.</Notice>}
 
-            <form id="receive-stock-form" className="adm-form" onSubmit={(event) => { void submit(event) }}>
+            <form id="receive-stock-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
               <section className="adm-section">
                 <h3>Cantidad que ingresa por talla y color</h3>
                 {variants.length === 0 && <p className="adm-help">Este producto no tiene tallas ni colores todavía. Usá «Agregar talla o color nuevo».</p>}
@@ -156,7 +157,7 @@ export function ReceiveStockDialog({ productId, user, catalogs, onClose, onChang
                         {variants.map((variant) => (
                           <tr key={variant.id} className={variant.isActive ? undefined : 'inactive-row'}>
                             <td>{variant.sizeName}</td>
-                            <td><Swatch hex={variant.colorHex} /> {variant.colorName}</td>
+                            <td><Swatch hex={variant.colorHex} name={variant.colorName} /> {variant.colorName}</td>
                             <td className="adm-mono">{variant.barcode}</td>
                             <td className={variant.stock < 0 ? 'numeric adm-neg' : 'numeric'}>{variant.stock}</td>
                             <td className="numeric">

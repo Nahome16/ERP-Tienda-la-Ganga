@@ -14,6 +14,7 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
             table.HasCheckConstraint("CK_store_settings_singleton", "\"Id\" = 1");
             table.HasCheckConstraint("CK_store_settings_rate", "\"UsdRate\" > 0");
             table.HasCheckConstraint("CK_store_settings_limit", "\"SellerDiscountLimitPercent\" BETWEEN 0 AND 100");
+            table.HasCheckConstraint("CK_store_settings_exchange_window", "\"ExchangeWindowDays\" BETWEEN 0 AND 365");
         });
         builder.HasKey(settings => settings.Id);
         builder.Property(settings => settings.Id).ValueGeneratedNever();
@@ -23,6 +24,7 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
         builder.Property(settings => settings.StoreAddress).HasMaxLength(250).IsRequired();
         builder.Property(settings => settings.StorePhone).HasMaxLength(50).IsRequired();
         builder.Property(settings => settings.ReceiptFooter).HasMaxLength(250).IsRequired();
+        builder.Property(settings => settings.ExchangeWindowDays).HasDefaultValue(4);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(settings => settings.UpdatedBy).OnDelete(DeleteBehavior.Restrict);
         builder.HasData(new
         {
@@ -31,10 +33,11 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
             StoreName = "Tienda La Ganga",
             StoreAddress = string.Empty,
             StorePhone = string.Empty,
-            ReceiptFooter = "Recibo interno — no es factura",
+            ReceiptFooter = "Guarde este recibo para cualquier cambio.",
             Banks = Array.Empty<string>(),
             SellerDiscountLimitPercent = 10m,
             LowStockThreshold = 2,
+            ExchangeWindowDays = 4,
             UpdatedAtUtc = new DateTimeOffset(2026, 11, 8, 0, 0, 0, TimeSpan.Zero),
         });
     }

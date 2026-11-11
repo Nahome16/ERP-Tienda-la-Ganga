@@ -267,10 +267,13 @@ public sealed class UserAdminService(
             : null;
     }
 
-    private static UserAdminError? ValidatePassword(string? password) =>
-        password is null || password.Length < UserRules.PasswordMinLength || password.Length > UserRules.PasswordMaxLength
-            ? Validation("password", $"La contraseña debe tener al menos {UserRules.PasswordMinLength} caracteres.")
-            : null;
+    private static UserAdminError? ValidatePassword(string? password)
+    {
+        var problems = UserRules.PasswordProblems(password);
+        return problems.Count == 0
+            ? null
+            : Validation("password", $"La contraseña debe tener {string.Join(", ", problems)}.");
+    }
 
     private static UserSummaryDto Map(UserAccount user) =>
         new(

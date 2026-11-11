@@ -32,6 +32,8 @@ export type BuildSaleInput = {
   discountApprovalId: string | null
   payments: SaleRequestPayment[]
   note: string | null
+  /** Nombre del cliente para el recibo (opcional). */
+  customerName?: string | null
 }
 
 export function buildSaleRequest(input: BuildSaleInput): SaleRequest {
@@ -46,6 +48,7 @@ export function buildSaleRequest(input: BuildSaleInput): SaleRequest {
     discountApprovalId: input.discountApprovalId,
     payments: input.payments,
     note: input.note && input.note.trim() ? input.note.trim() : null,
+    customerName: input.customerName && input.customerName.trim() ? input.customerName.trim().slice(0, 120) : null,
   }
 }
 
@@ -78,6 +81,7 @@ export function buildLocalSale(
     requiresReview: false,
     reviewNote: null,
     note: request.note,
+    customerName: request.customerName ?? null,
     voidedAtUtc: null,
     voidedByName: null,
     voidReason: null,

@@ -96,7 +96,8 @@ public sealed class SalesService : ISalesService
             request.IsOffline ? request.CreatedAtUtc.ToUniversalTime() : receivedAtUtc,
             receivedAtUtc,
             request.IsOffline,
-            request.Note);
+            request.Note,
+            request.CustomerName);
 
         // Totales: se calculan aquí; lo que mande el equipo no se toma como definitivo.
         foreach (var line in lines)
@@ -433,6 +434,14 @@ public sealed class SalesService : ISalesService
             return Result.Fail<SaleDto>(ServiceErrorKind.Conflict, "already_voided", "Esta venta ya fue anulada.");
         }
 
+        if (await dbContext.SaleExchanges.AnyAsync(exchange => exchange.SaleId == sale.Id, cancellationToken))
+        {
+            return Result.Fail<SaleDto>(
+                ServiceErrorKind.Conflict,
+                "sale_has_exchanges",
+                "Esta venta tiene cambios de talla registrados y ya no se puede anular. Registrá un ajuste de inventario si hace falta.");
+        }
+
         var cashSession = await LockCashSessionAsync(sale.CashSessionId, cancellationToken);
         if (cashSession is null)
         {
@@ -528,6 +537,11 @@ public sealed class SalesService : ISalesService
         if (request.Note is { Length: > 500 })
         {
             return Bad("La nota admite hasta 500 caracteres.", "note");
+        }
+
+        if (request.CustomerName is { } customer && customer.Trim().Length > 120)
+        {
+            return Bad("El nombre del cliente admite hasta 120 caracteres.", "customerName");
         }
 
         if (request.CreatedAtUtc == default)
@@ -764,7 +778,8 @@ public sealed class SalesService : ISalesService
             sale.Lines.Select(line => new SaleLineDto(
                 line.VariantId, line.ProductName, line.SizeName, line.ColorName, line.Barcode, line.Quantity, line.UnitPrice, line.LineTotalNio)).ToArray(),
             sale.Payments.Select(payment => new SalePaymentDto(
-                payment.Method, payment.Currency, payment.Amount, payment.ExchangeRate, payment.AmountNio, payment.Bank, payment.Reference)).ToArray()))
+                payment.Method, payment.Currency, payment.Amount, payment.ExchangeRate, payment.AmountNio, payment.Bank, payment.Reference)).ToArray(),
+            sale.CustomerName))
             .ToArray();
     }
 

@@ -227,6 +227,254 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
     private async Task<Guid> CreatePartnerAsync(string name) =>
         (await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/investment/partners", new { name, phone = "8888-0000", notes = (string?)null }, HttpStatusCode.Created)).GetProperty("id").GetGuid();
 
+    [PostgresFact]
+    public async Task ProductEntryKeepsTheReceivedDateAndRejectsFutureDates()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var partner = await CreatePartnerAsync($"Fecha {suffix}");
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-6)).DateTime);
+
+        var future = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products",
+            await ProductBodyAsync($"Camisa futura {suffix}", 500m, 2, 200m, partner, today.AddDays(2)));
+        Assert.Equal(HttpStatusCode.BadRequest, future.StatusCode);
+
+        var received = today.AddDays(-3);
+        _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products",
+            await ProductBodyAsync($"Camisa oxford fecha {suffix}", 500m, 4, 200m, partner, received), HttpStatusCode.Created);
+        var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Camisa oxford fecha {suffix}")}");
+        var lot = Assert.Single(lots.GetProperty("items").EnumerateArray());
+        var entered = lot.GetProperty("enteredAtUtc").GetDateTimeOffset().ToOffset(TimeSpan.FromHours(-6));
+        Assert.Equal(received, DateOnly.FromDateTime(entered.DateTime));
+        Assert.Equal(4, lot.GetProperty("quantityIn").GetInt32());
+    }
+
+    [PostgresFact]
+    public async Task ProductBarcodeIsSharedBySizesAndOpensTheProduct()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var code = $"FAB-{suffix}-{Guid.NewGuid():N}"[..20];
+        async Task<Guid[]> Ids(string kind)
+        {
+            var page = await GetAsync(fixture.Admin, $"/api/v1/catalog/{kind}?pageSize=100");
+            return page.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        }
+
+        var sizes = await Ids("sizes");
+        var colorId = (await Ids("colors"))[0];
+        var categoryId = (await Ids("categories"))[0];
+        var brandId = (await Ids("brands"))[0];
+        object Body(string name, string? productBarcode, string? variantBarcode) => new
+        {
+            name,
+            categoryId,
+            brandId,
+            cutId = (Guid?)null,
+            basePrice = 690m,
+            barcode = productBarcode,
+            variants = new[]
+            {
+                new { sizeId = sizes[0], colorId, barcode = variantBarcode, priceOverride = (decimal?)null, cost = (decimal?)null, initialQuantity = 2, partnerId = (Guid?)null },
+                new { sizeId = sizes[1], colorId, barcode = (string?)null, priceOverride = (decimal?)null, cost = (decimal?)null, initialQuantity = 3, partnerId = (Guid?)null },
+            },
+        };
+
+        var created = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Pantalón Kalua {suffix}", code, null), HttpStatusCode.Created);
+        var productId = created.GetProperty("id").GetGuid();
+        Assert.Equal(code, created.GetProperty("barcode").GetString());
+
+        // El código de fábrica abre el producto (no una talla).
+        var match = await GetAsync(fixture.Admin, $"/api/v1/products/by-barcode/{code}");
+        var found = match.GetProperty("product");
+        Assert.Equal(productId, found.GetProperty("id").GetGuid());
+        Assert.Equal(2, found.GetProperty("variants").GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, match.GetProperty("colorId").ValueKind);
+        using (var variantLookup = await fixture.Admin.GetAsync(new Uri($"/api/v1/variants/by-barcode/{code}", UriKind.Relative)))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, variantLookup.StatusCode);
+        }
+
+        // No se puede repetir en otro producto ni como código de una talla.
+        using (var duplicate = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Otro {suffix}", code, null)))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+            Assert.Equal("duplicate_barcode", await ApiTestHelpers.ReadProblemCodeAsync(duplicate));
+        }
+
+        using (var asVariant = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Otro talla {suffix}", null, code)))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, asVariant.StatusCode);
+        }
+
+        // La caja recibe el código del producto en cada talla.
+        var snapshot = await GetAsync(fixture.Admin, "/api/v1/pos/snapshot");
+        var rows = snapshot.GetProperty("variants").EnumerateArray().Where(row => row.GetProperty("productId").GetGuid() == productId).ToList();
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, row => Assert.Equal(code, row.GetProperty("productBarcode").GetString()));
+
+        // Una cadena vacía lo quita.
+        using var update = ApiTestHelpers.Build(HttpMethod.Put, $"/api/v1/products/{productId}", fixture.AdminCsrf, new
+        {
+            name = $"Pantalón Kalua {suffix}",
+            categoryId,
+            brandId,
+            cutId = (Guid?)null,
+            basePrice = 690m,
+            isActive = true,
+            barcode = string.Empty,
+        }, created.GetProperty("version").GetInt64());
+        using var updated = await fixture.Admin.SendAsync(update);
+        Assert.True(updated.IsSuccessStatusCode, await updated.Content.ReadAsStringAsync());
+        using var gone = await fixture.Admin.GetAsync(new Uri($"/api/v1/products/by-barcode/{code}", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
+
+        // Un producto que tenía el código de fábrica en una talla: al pasarlo al producto, la talla recibe uno interno.
+        var legacy = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", Body($"Pantalón talla única {suffix}", null, code), HttpStatusCode.Created);
+        var legacyId = legacy.GetProperty("id").GetGuid();
+        using var move = ApiTestHelpers.Build(HttpMethod.Put, $"/api/v1/products/{legacyId}", fixture.AdminCsrf, new
+        {
+            name = $"Pantalón talla única {suffix}",
+            categoryId,
+            brandId,
+            cutId = (Guid?)null,
+            basePrice = 690m,
+            isActive = true,
+            barcode = code,
+        }, legacy.GetProperty("version").GetInt64());
+        using var moved = await fixture.Admin.SendAsync(move);
+        Assert.True(moved.IsSuccessStatusCode, await moved.Content.ReadAsStringAsync());
+        var reloaded = (await GetAsync(fixture.Admin, $"/api/v1/products/by-barcode/{code}")).GetProperty("product");
+        Assert.Equal(legacyId, reloaded.GetProperty("id").GetGuid());
+        Assert.DoesNotContain(reloaded.GetProperty("variants").EnumerateArray(), variant => variant.GetProperty("barcode").GetString() == code);
+    }
+
+    [PostgresFact]
+    public async Task ProductWithoutSalesCanBeDeletedButSoldOnesCannot()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var partner = await CreatePartnerAsync($"Borrar {suffix}");
+        var mistake = await CreateProductAsync($"Creado por error {suffix}", 400m, quantity: 5, cost: 150m, partnerId: partner);
+        var mistakeId = mistake.GetProperty("id").GetGuid();
+
+        using (var delete = ApiTestHelpers.Build(HttpMethod.Delete, $"/api/v1/products/{mistakeId}", fixture.AdminCsrf))
+        using (var deleted = await fixture.Admin.SendAsync(delete))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        }
+
+        using (var missing = await fixture.Admin.GetAsync(new Uri($"/api/v1/products/{mistakeId}", UriKind.Relative)))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        }
+
+        var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?search={Uri.EscapeDataString($"Creado por error {suffix}")}");
+        Assert.Empty(lots.GetProperty("items").EnumerateArray());
+
+        // Con una venta, no se elimina: se debe desactivar.
+        var sold = await CreateProductAsync($"Vendido {suffix}", 400m, quantity: 2, cost: 150m, partnerId: partner);
+        var soldId = sold.GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller);
+        var soldVariant = sold.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        _ = await PostSaleAsync(seller, session, soldVariant, 1, 400m, null, 400m);
+
+        // Balance de la ficha: lo vendido de cada variante, con su costo de la entrada.
+        var summary = await GetAsync(fixture.Admin, $"/api/v1/products/{soldId}/sales-summary");
+        var row = Assert.Single(summary.EnumerateArray());
+        Assert.Equal(soldVariant, row.GetProperty("variantId").GetGuid());
+        Assert.Equal(1, row.GetProperty("soldUnits").GetInt32());
+        Assert.Equal(400m, row.GetProperty("soldRevenueNio").GetDecimal());
+        Assert.Equal(150m, row.GetProperty("soldCostNio").GetDecimal());
+        using var blocked = ApiTestHelpers.Build(HttpMethod.Delete, $"/api/v1/products/{soldId}", fixture.AdminCsrf);
+        using var refused = await fixture.Admin.SendAsync(blocked);
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("product_has_sales", await ApiTestHelpers.ReadProblemCodeAsync(refused));
+        _ = await GetAsync(fixture.Admin, $"/api/v1/products/{soldId}");
+    }
+
+    [PostgresFact]
+    public async Task EachColorCanHaveItsOwnFactoryCodeSharedBySizes()
+    {
+        var suffix = Interlocked.Increment(ref _counter);
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var blackCode = $"NEG-{unique}";
+        var blueCode = $"AZU-{unique}";
+        async Task<Guid[]> Ids(string kind)
+        {
+            var page = await GetAsync(fixture.Admin, $"/api/v1/catalog/{kind}?pageSize=100");
+            return page.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        }
+
+        var sizes = await Ids("sizes");
+        var colors = await Ids("colors");
+        var (black, blue) = (colors[0], colors[1]);
+        object Variant(Guid size, Guid color) => new { sizeId = size, colorId = color, barcode = (string?)null, priceOverride = (decimal?)null, cost = (decimal?)null, initialQuantity = 1, partnerId = (Guid?)null };
+        var created = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/products", new
+        {
+            name = $"Pantalón Zolo {suffix}",
+            categoryId = (await Ids("categories"))[0],
+            brandId = (await Ids("brands"))[0],
+            cutId = (Guid?)null,
+            basePrice = 850m,
+            variants = new[] { Variant(sizes[0], black), Variant(sizes[1], black), Variant(sizes[0], blue), Variant(sizes[1], blue) },
+            colorBarcodes = new[] { new { colorId = black, barcode = blackCode } },
+        }, HttpStatusCode.Created);
+        var productId = created.GetProperty("id").GetGuid();
+        Assert.Single(created.GetProperty("colorBarcodes").EnumerateArray());
+
+        // El código del Negro abre el producto en Negro.
+        var match = await GetAsync(fixture.Admin, $"/api/v1/products/by-barcode/{blackCode}");
+        Assert.Equal(productId, match.GetProperty("product").GetProperty("id").GetGuid());
+        Assert.Equal(black, match.GetProperty("colorId").GetGuid());
+
+        // Se agrega el del Azul después; no se puede repetir.
+        var csrf = fixture.AdminCsrf;
+        using (var set = ApiTestHelpers.Build(HttpMethod.Put, $"/api/v1/products/{productId}/color-barcodes/{blue}", csrf, new { barcode = blueCode }))
+        using (var setResponse = await fixture.Admin.SendAsync(set))
+        {
+            Assert.True(setResponse.IsSuccessStatusCode, await setResponse.Content.ReadAsStringAsync());
+        }
+
+        using (var repeat = ApiTestHelpers.Build(HttpMethod.Put, $"/api/v1/products/{productId}/color-barcodes/{blue}", csrf, new { barcode = blackCode }))
+        using (var repeated = await fixture.Admin.SendAsync(repeat))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, repeated.StatusCode);
+            Assert.Contains($"Pantalón Zolo {suffix}", await repeated.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        // La caja recibe el código del color en cada talla de ese color.
+        var snapshot = await GetAsync(fixture.Admin, "/api/v1/pos/snapshot");
+        var rows = snapshot.GetProperty("variants").EnumerateArray().Where(row => row.GetProperty("productId").GetGuid() == productId).ToList();
+        Assert.Equal(4, rows.Count);
+        Assert.Equal(2, rows.Count(row => row.GetProperty("colorBarcode").GetString() == blackCode));
+        Assert.Equal(2, rows.Count(row => row.GetProperty("colorBarcode").GetString() == blueCode));
+
+        // Vacío lo quita.
+        using var clear = ApiTestHelpers.Build(HttpMethod.Put, $"/api/v1/products/{productId}/color-barcodes/{blue}", csrf, new { barcode = string.Empty });
+        using var cleared = await fixture.Admin.SendAsync(clear);
+        var detail = await cleared.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Single(detail.GetProperty("colorBarcodes").EnumerateArray());
+    }
+
+    private async Task<object> ProductBodyAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId, DateOnly? receivedOn)
+    {
+        async Task<Guid[]> Ids(string kind)
+        {
+            var page = await GetAsync(fixture.Admin, $"/api/v1/catalog/{kind}?pageSize=100");
+            return page.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        }
+
+        return new
+        {
+            name,
+            categoryId = (await Ids("categories"))[0],
+            brandId = (await Ids("brands"))[0],
+            cutId = (Guid?)null,
+            basePrice = price,
+            receivedOn = receivedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            variants = new[] { new { sizeId = (await Ids("sizes"))[0], colorId = (await Ids("colors"))[0], barcode = (string?)null, priceOverride = (decimal?)null, cost, initialQuantity = quantity, partnerId } },
+        };
+    }
+
     private async Task<JsonElement> CreateProductAsync(string name, decimal price, int quantity, decimal? cost, Guid? partnerId)
     {
         async Task<Guid[]> Ids(string kind)

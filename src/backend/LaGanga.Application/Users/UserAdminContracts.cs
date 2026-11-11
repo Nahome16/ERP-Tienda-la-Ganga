@@ -68,6 +68,47 @@ public static class UserRules
     public const int PasswordMinLength = 12;
     public const int PasswordMaxLength = 256;
 
+    /// <summary>
+    /// Requisitos de una contraseña nueva (los mismos que muestra el panel con su check):
+    /// 12 o más caracteres, mayúscula, minúscula, número y símbolo. Devuelve lo que falta.
+    /// </summary>
+    public static IReadOnlyList<string> PasswordProblems(string? password)
+    {
+        var problems = new List<string>();
+        if (password is null || password.Length < PasswordMinLength)
+        {
+            problems.Add($"al menos {PasswordMinLength} caracteres");
+        }
+
+        if (password is not null && password.Length > PasswordMaxLength)
+        {
+            problems.Add($"como máximo {PasswordMaxLength} caracteres");
+        }
+
+        var text = password ?? string.Empty;
+        if (!text.Any(char.IsUpper))
+        {
+            problems.Add("una mayúscula");
+        }
+
+        if (!text.Any(char.IsLower))
+        {
+            problems.Add("una minúscula");
+        }
+
+        if (!text.Any(char.IsDigit))
+        {
+            problems.Add("un número");
+        }
+
+        if (!text.Any(character => !char.IsLetterOrDigit(character) && !char.IsWhiteSpace(character)))
+        {
+            problems.Add("un símbolo (por ejemplo - . @ ! #)");
+        }
+
+        return problems;
+    }
+
     /// <summary>Letras sin acentos, números, punto, guion y guion bajo.</summary>
     public static bool IsValidUsername(string username) =>
         username.Length is >= UsernameMinLength and <= UsernameMaxLength &&

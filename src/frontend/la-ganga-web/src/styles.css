@@ -312,3 +312,13 @@ td:last-child, th:last-child { text-align: right; font-weight: 800; }
 @media (max-width: 900px) {
   .team-layout { grid-template-columns: 1fr; }
 }
+
+/* Contraseñas: ver lo escrito y requisitos con check */
+.password-input { position: relative; display: flex; width: 100%; }
+.password-input > input { flex: 1; min-width: 0; padding-right: 44px; }
+.password-toggle { position: absolute; top: 50%; right: 4px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); transform: translateY(-50%); cursor: pointer; }
+.password-toggle:hover, .password-toggle[aria-pressed="true"] { color: var(--ink, inherit); background: rgba(0,0,0,.05); }
+.password-checklist { display: grid; gap: 3px; margin: 2px 0 6px; padding: 0; list-style: none; font-size: .82rem; }
+.password-checklist li { display: flex; align-items: center; gap: 6px; color: #b3412e; }
+.password-checklist li.is-ok { color: #1f7a4d; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

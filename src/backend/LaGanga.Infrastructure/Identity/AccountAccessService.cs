@@ -102,7 +102,7 @@ public sealed class AccountAccessService(
         string? newPassword,
         CancellationToken cancellationToken)
     {
-        if (newPassword is null || newPassword.Length is < UserRules.PasswordMinLength or > UserRules.PasswordMaxLength)
+        if (newPassword is null || UserRules.PasswordProblems(newPassword).Count > 0)
         {
             return PasswordChangeResult.Invalid(PasswordChangeFailure.InvalidRequest);
         }

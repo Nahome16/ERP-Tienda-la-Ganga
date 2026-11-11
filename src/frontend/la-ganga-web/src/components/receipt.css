@@ -21,3 +21,7 @@
   body.printing-receipt .receipt-logo { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 .receipt-print-root { display: none; }
+
+/* Código de barras del número del recibo: ancho y con margen para que el lector lo tome fácil. */
+.receipt-barcode-box { margin-top: 3mm; display: grid; justify-items: center; gap: 1mm; }
+.receipt-barcode { display: block; width: 60mm; max-width: 100%; height: 12mm; }

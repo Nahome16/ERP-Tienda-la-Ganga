@@ -4,7 +4,7 @@ import { ApiError } from '../lib/api'
 import { hasPermission } from '../lib/access'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
-import { getInventorySummary, getSettings, getVariantByBarcode, listInventory } from '../admin/adminApi'
+import { getInventorySummary, getProductByBarcode, getSettings, getVariantByBarcode, listInventory } from '../admin/adminApi'
 import { formatInt, messageFrom } from '../admin/format'
 import { useDebounced, useFetch } from '../admin/hooks'
 import { noPartnerFilter, partnerFilterParam, partnerUnitsLabel } from '../admin/partners'
@@ -35,7 +35,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
   const canReceive = hasPermission(user, 'inventory.adjust')
   const catalogs = useCatalogs()
   const [detailId, setDetailId] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState<{ barcode?: string } | null>(null)
   const [picking, setPicking] = useState(false)
   const [receiveId, setReceiveId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
@@ -81,9 +81,28 @@ export function InventoryView({ user }: { user: CurrentUser }) {
       })
       setScan('')
     } catch (caught) {
-      setScanNotice(caught instanceof ApiError && caught.status === 404
-        ? { tone: 'warn', text: `No existe ninguna variante con el código ${code}.` }
-        : { tone: 'error', text: messageFrom(caught) })
+      if (caught instanceof ApiError && caught.status === 404) {
+        setScan('')
+        // ¿Es el código de fábrica de un producto (igual en todas las tallas)? Se abre el producto.
+        try {
+          const match = await getProductByBarcode(code)
+          setDetailId(match.product.id)
+          return
+        } catch (productError) {
+          if (!(productError instanceof ApiError && productError.status === 404)) {
+            setScanNotice({ tone: 'error', text: messageFrom(productError) })
+            return
+          }
+        }
+        if (canCreate && catalogs.data) {
+          // Código nuevo: se abre el alta del producto con el código ya cargado.
+          setCreating({ barcode: code })
+        } else {
+          setScanNotice({ tone: 'warn', text: `No existe ninguna variante con el código ${code}.` })
+        }
+      } else {
+        setScanNotice({ tone: 'error', text: messageFrom(caught) })
+      }
     } finally {
       setScanning(false)
     }
@@ -100,7 +119,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
         <div>
           <p className="page-kicker">Inventario · <b className="live-data">Datos reales</b></p>
           <h1>Inventario</h1>
-          <p className="page-summary">Existencias por variante. Escaneá un código para abrir su ficha, ver el Kardex o registrar un movimiento.</p>
+          <p className="page-summary">Existencias por variante. Escaneá un código para abrir su ficha, ver el Kardex o registrar un movimiento. Si el código es nuevo, se abre el alta del producto con ese código.</p>
         </div>
         <div className="page-actions">
           {hasPermission(user, 'inventory.read') && <ExcelShortcut kind="inventory" />}
@@ -110,7 +129,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
             </button>
           )}
           {canCreate && (
-            <button type="button" className="secondary-button" onClick={() => setCreating(true)} disabled={!catalogs.data}>
+            <button type="button" className="secondary-button" onClick={() => setCreating({})} disabled={!catalogs.data}>
               <Plus size={16} strokeWidth={2} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />Nuevo producto
             </button>
           )}
@@ -255,7 +274,7 @@ export function InventoryView({ user }: { user: CurrentUser }) {
         <ProductPickerDialog
           onClose={() => setPicking(false)}
           onPick={(id) => { setPicking(false); setReceiveId(id) }}
-          onCreate={canCreate ? () => { setPicking(false); setCreating(true) } : undefined}
+          onCreate={canCreate ? () => { setPicking(false); setCreating({}) } : undefined}
         />
       )}
       {receiveId && catalogs.data && (
@@ -263,9 +282,11 @@ export function InventoryView({ user }: { user: CurrentUser }) {
       )}
       {creating && catalogs.data && (
         <CreateProductDialog
-          user={user} catalogs={catalogs.data} onClose={() => setCreating(false)}
+          user={user} catalogs={catalogs.data} onClose={() => setCreating(null)}
+          initialBarcode={creating.barcode}
+          onOpenExisting={(productId) => { setCreating(null); setDetailId(productId) }}
           onCreated={(product, images) => {
-            setCreating(false)
+            setCreating(null)
             const base = `Producto «${product.name}» creado con ${product.variants.length} variante${product.variants.length === 1 ? '' : 's'}.`
             setNotice(images && images.failed.length > 0
               ? { tone: 'warn', text: `${base} No se pudo subir: ${images.failed.map((item) => `«${item.name}»`).join(', ')}. Reintentá desde la ficha del producto.` }

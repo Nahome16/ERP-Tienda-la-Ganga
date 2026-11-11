@@ -1,4 +1,5 @@
 import { useEffect, useRef, type PropsWithChildren, type ReactNode } from 'react'
+import { swatchFor } from '../lib/colorPalette'
 import './admin.css'
 
 type DialogProps = PropsWithChildren<{
@@ -117,6 +118,7 @@ export function Row({ label, children, strong }: PropsWithChildren<{ label: stri
   return <div className={strong ? 'adm-row strong' : 'adm-row'}><span>{label}</span><b>{children}</b></div>
 }
 
-export function Swatch({ hex }: { hex: string | null }) {
-  return <i className="adm-swatch" style={{ background: hex ?? 'transparent' }} aria-hidden="true" />
+/** Círculo de color. Sin tono guardado usa el que corresponde al nombre («Café», «Azul oscuro»…). */
+export function Swatch({ hex, name }: { hex: string | null; name?: string }) {
+  return <i className="adm-swatch" style={{ background: swatchFor(hex, name, 'transparent') }} aria-hidden="true" />
 }

@@ -22,7 +22,7 @@ public sealed class UserApiTests(CatalogApiFixture fixture) : IClassFixture<Cata
     private static readonly string[] SellerRole = ["Vendedor"];
     private static readonly string[] AdministratorRole = ["Administrador"];
     private static readonly string[] InventoryRole = ["Encargado de inventario"];
-    private static readonly string[] ExpectedSellerPermissions = ["cash.operate", "catalog.read", "inventory.read", "product.read", "sale.create"];
+    private static readonly string[] ExpectedSellerPermissions = ["cash.operate", "catalog.read", "inventory.read", "product.read", "sale.create", "sale.exchange"];
 
     [PostgresFact]
     public async Task SystemRolesHaveTheirDocumentedPermissions()
@@ -146,6 +146,13 @@ public sealed class UserApiTests(CatalogApiFixture fixture) : IClassFixture<Cata
             password = "corta",
             roleIds = new[] { sellerId },
         });
+        using var weakPassword = await PostUserAsync(new
+        {
+            username = "clave.debil",
+            displayName = "Clave débil",
+            password = "solominusculas123456",
+            roleIds = new[] { sellerId },
+        });
         using var withoutRoles = await PostUserAsync(new
         {
             username = "sin.rol",
@@ -163,6 +170,8 @@ public sealed class UserApiTests(CatalogApiFixture fixture) : IClassFixture<Cata
 
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, shortPassword.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, weakPassword.StatusCode);
+        Assert.Contains("mayúscula", await weakPassword.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.BadRequest, withoutRoles.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, invalidUsername.StatusCode);
     }
