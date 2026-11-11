@@ -79,10 +79,13 @@ else
 fi
 LISTING="$(mktemp)"
 pgx pg_restore --list <"$FILE" >"$LISTING" 2>/dev/null || { rm -f "$LISTING"; fail "El archivo no es un respaldo válido de PostgreSQL."; }
-EXPECTED_TABLES="$(grep -cE '^[0-9]+; [0-9]+ [0-9]+ TABLE public ' "$LISTING" || true)"
+# Tablas de TODOS los esquemas (catalog, sales, inventory, identity, system, public…),
+# no solo «public»: los datos de La Ganga viven en esquemas propios.
+EXPECTED_TABLES="$(grep -E '^[0-9]+; [0-9]+ [0-9]+ TABLE ' "$LISTING" | grep -vc ' TABLE DATA ' || true)"
+EXPECTED_SCHEMAS="$(grep -E '^[0-9]+; [0-9]+ [0-9]+ TABLE ' "$LISTING" | grep -v ' TABLE DATA ' | awk '{print $5}' | sort -u | paste -sd ' ' -)"
 rm -f "$LISTING"
-(( EXPECTED_TABLES > 0 )) || fail "El respaldo no contiene tablas del esquema public."
-ok "El archivo es legible: $EXPECTED_TABLES tablas."
+(( EXPECTED_TABLES > 0 )) || fail "El respaldo no contiene ninguna tabla."
+ok "El archivo es legible: $EXPECTED_TABLES tablas (esquemas: $EXPECTED_SCHEMAS)."
 
 # --- 2) Confirmación ----------------------------------------------------
 if (( VERIFY_ONLY == 1 )); then
@@ -119,19 +122,25 @@ pgx pg_restore -U "$PG_USER" -d "$TMP_DB" --no-owner --no-privileges --exit-on-e
 
 # --- 4) Validar -----------------------------------------------------------
 ACTUAL_TABLES="$(pgx psql -U "$PG_USER" -d "$TMP_DB" -v ON_ERROR_STOP=1 -qtAX -c \
-  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")"
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_schema NOT LIKE 'pg\\_%' AND table_type='BASE TABLE'")"
 [[ "$ACTUAL_TABLES" == "$EXPECTED_TABLES" ]] \
   || fail "Validación fallida: se esperaban $EXPECTED_TABLES tablas y hay $ACTUAL_TABLES. La base real NO se tocó."
 
 COUNTS="$(pgx psql -U "$PG_USER" -d "$TMP_DB" -v ON_ERROR_STOP=1 -qtAX -F ' ' -c \
-  "SELECT table_name, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY 1")"
+  "SELECT table_schema || '.' || table_name, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_schema NOT LIKE 'pg\\_%' AND table_type='BASE TABLE' ORDER BY 1")"
 TOTAL_ROWS=0
-echo "Contenido de la base restaurada (tabla: filas):"
+EMPTY_TABLES=0
+echo "Contenido de la base restaurada (tablas con datos: filas):"
 while read -r tname tcount; do
   [[ -n "$tname" ]] || continue
-  printf '  %-40s %s\n' "$tname" "$tcount"
+  if (( tcount > 0 )); then
+    printf '  %-48s %s\n' "$tname" "$tcount"
+  else
+    EMPTY_TABLES=$((EMPTY_TABLES + 1))
+  fi
   TOTAL_ROWS=$((TOTAL_ROWS + tcount))
 done <<<"$COUNTS"
+(( EMPTY_TABLES == 0 )) || echo "  (+ $EMPTY_TABLES tablas todavía vacías)"
 (( TOTAL_ROWS > 0 )) || fail "La base restaurada no tiene ninguna fila. La base real NO se tocó."
 
 HAS_HISTORY="$(pgx psql -U "$PG_USER" -d "$TMP_DB" -qtAX -c "SELECT to_regclass('public.\"__EFMigrationsHistory\"') IS NOT NULL")"
