@@ -1551,7 +1551,7 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                             Banks = new string[0],
                             ExchangeWindowDays = 4,
                             LowStockThreshold = 2,
-                            ReceiptFooter = "Recibo interno — no es factura",
+                            ReceiptFooter = "Guarde este recibo para cualquier cambio.",
                             SellerDiscountLimitPercent = 10m,
                             StoreAddress = "",
                             StoreName = "Tienda La Ganga",
