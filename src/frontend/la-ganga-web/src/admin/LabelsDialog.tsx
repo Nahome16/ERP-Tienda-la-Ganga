@@ -23,7 +23,7 @@ function LabelItem({ variant, widthMm, heightMm, screen }: LabelItemProps) {
       <div className="label-name">{variant.productName}</div>
       <div className="label-variant">Talla {variant.sizeName} · {variant.colorName}</div>
       <div className="label-barcode"><Barcode code={variant.barcode} /></div>
-      <div className="label-price">{formatNio(variant.price)}</div>
+      <div className="label-price">{variant.price > 0 ? formatNio(variant.price) : 'C$ ________'}</div>
     </div>
   )
 }
@@ -165,6 +165,9 @@ export function LabelsDialog({ title, variants, onClose }: { title: string; vari
             </label>
           </div>
           <p className="adm-help">Medida de cada etiqueta: {widthMm} × {heightMm} mm. En el cuadro de impresión desactivá «Encabezados y pies de página» y elegí la impresora de etiquetas.</p>
+          {variants.some((variant) => selected[variant.variantId] && variant.price <= 0) && (
+            <Notice tone="warn">Algunas tallas todavía no tienen precio: su etiqueta sale con el precio en blanco para escribirlo a mano. Si preferís, poné el precio primero y después imprimí.</Notice>
+          )}
           {unreadable.length > 0 && (
             <Notice tone="warn">
               {unreadable.length} variante{unreadable.length === 1 ? '' : 's'} tiene{unreadable.length === 1 ? '' : 'n'} un código que no es EAN-13/EAN-8 válido; la etiqueta sale sin barras. Editá el código de la variante o dejalo vacío para que el sistema genere uno.

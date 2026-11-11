@@ -196,6 +196,10 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   }, [reloadRequest, index])
 
   function addVariant(variant: PosVariant) {
+    if (variant.price <= 0) {
+      announce('error', `${variantLabel(variant)} todavía no tiene precio de venta: pedí al administrador que lo complete.`)
+      return
+    }
     const current = cartQuantity(lines, variant.variantId)
     if (current === 0) {
       const available = availableStock(variant.stock, variant.variantId, pending)
@@ -404,7 +408,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 <h2>{activeProduct.productName}</h2>
                 <small>{[activeProduct.brandName, activeProduct.categoryName].filter(Boolean).join(' · ')}</small>
               </div>
-              <strong>{activeProduct.minPrice === activeProduct.maxPrice ? formatNio(activeProduct.minPrice) : `${formatNio(activeProduct.minPrice)} – ${formatNio(activeProduct.maxPrice)}`}</strong>
+              <strong>{activeProduct.maxPrice <= 0 ? 'Sin precio' : activeProduct.minPrice === activeProduct.maxPrice ? formatNio(activeProduct.minPrice) : `${formatNio(activeProduct.minPrice)} – ${formatNio(activeProduct.maxPrice)}`}</strong>
               <button type="button" className="pv-icon-button" aria-label="Cerrar variantes" title="Cerrar variantes" onClick={() => { setSelectedProductId(null); setFocusColor(null); setQuery(''); focusScanner() }}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
             </header>
             {/* Foto en la esquina: el cajero confirma que la prenda es la misma que tiene en la mano. */}
@@ -450,7 +454,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                                 : tone === 'low' ? <><TriangleAlert size={12} strokeWidth={2} aria-hidden="true" />Quedan {left}</>
                                   : `${left} disp.`}
                             </small>
-                            {variant.price !== activeProduct.minPrice && <small className="pv-size-price">{formatNio(variant.price)}</small>}
+                            {variant.price !== activeProduct.minPrice && <small className="pv-size-price">{variant.price > 0 ? formatNio(variant.price) : 'Sin precio'}</small>}
                           </button>
                         )
                       })}
@@ -487,7 +491,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 <PosThumb src={group.imageUrl} name={group.productName} size="card" />
                 <strong>{group.productName}</strong>
                 <span className="pv-product-brand">{[group.brandName, group.categoryName].filter(Boolean).join(' · ') || '\u00a0'}</span>
-                <b className="pv-price">{group.minPrice === group.maxPrice ? formatNio(group.minPrice) : `desde ${formatNio(group.minPrice)}`}</b>
+                <b className="pv-price">{group.maxPrice <= 0 ? 'Sin precio' : group.minPrice === group.maxPrice ? formatNio(group.minPrice) : `desde ${formatNio(group.minPrice)}`}</b>
                 <small className="pv-stock">
                   {stockTone === 'out' && <span className="pv-stock-state"><PackageX size={14} strokeWidth={1.75} aria-hidden="true" />Agotado</span>}
                   {stockTone === 'low' && <span className="pv-stock-state"><TriangleAlert size={14} strokeWidth={1.75} aria-hidden="true" />Quedan {total}</span>}

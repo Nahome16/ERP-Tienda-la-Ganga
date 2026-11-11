@@ -246,6 +246,8 @@ export type ProductListItem = {
   primaryImageUrl: string | null
   /** Código de fábrica, igual en todas las tallas (al escanearlo se elige la talla). */
   barcode?: string | null
+  /** Alguna talla no tiene precio de venta (precio pendiente). */
+  missingPrice?: boolean
 }
 
 export type Variant = {
