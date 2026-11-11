@@ -18,7 +18,9 @@ public sealed record ProductListItemDto(
     int TotalStock,
     long Version,
     string? PrimaryImageUrl,
-    string? Barcode = null);
+    string? Barcode = null,
+    // Alguna talla no tiene precio de venta (precio pendiente): no se puede vender.
+    bool MissingPrice = false);
 
 public sealed record VariantDto(
     Guid Id,

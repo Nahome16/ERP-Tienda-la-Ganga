@@ -104,6 +104,14 @@ public sealed class SalesService : ISalesService
         {
             var info = variantInfo[line.VariantId];
             var unitPrice = Money.Round(line.UnitPrice);
+            if (!request.IsOffline && info.CurrentPrice <= 0)
+            {
+                return Result.Fail<SaleResultDto>(
+                    ServiceErrorKind.Validation,
+                    "price_missing",
+                    $"{info.ProductName} todavía no tiene precio de venta. Pedí al administrador que lo complete antes de venderlo.");
+            }
+
             if (!request.IsOffline && unitPrice != info.CurrentPrice)
             {
                 return Result.Fail<SaleResultDto>(
@@ -119,6 +127,11 @@ public sealed class SalesService : ISalesService
             if (request.IsOffline && unitPrice != info.CurrentPrice)
             {
                 reviewNotes.Add($"Precio distinto del vigente en {info.ProductName} ({info.Barcode}): se cobró {unitPrice:0.00} y el sistema indica {info.CurrentPrice:0.00}.");
+            }
+
+            if (request.IsOffline && unitPrice <= 0)
+            {
+                reviewNotes.Add($"{info.ProductName} ({info.Barcode}) se vendió sin precio de venta.");
             }
 
             if (!info.IsActive)

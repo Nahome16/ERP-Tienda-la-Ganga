@@ -116,7 +116,8 @@ function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBra
         {!hidePrice && (
           <label className="adm-field">
             <span>Precio base (C$)</span>
-            <input type="number" min={0} step="0.01" required value={fields.basePrice} onChange={(event) => onChange({ ...fields, basePrice: event.target.value })} />
+            <input type="number" min={0} step="0.01" value={fields.basePrice} placeholder="Vacío = poner después" onChange={(event) => onChange({ ...fields, basePrice: event.target.value })} />
+            {Number(fields.basePrice || 0) === 0 && <small className="adm-warn-text">Sin precio no se puede vender en caja.</small>}
           </label>
         )}
       </div>
@@ -128,8 +129,9 @@ function validateFields(fields: ProductFields): { input: ProductInput | null; er
   if (!fields.name.trim()) return { input: null, error: 'Escribí el nombre del producto.' }
   if (!fields.categoryId) return { input: null, error: 'Elegí la categoría.' }
   if (!fields.brandId) return { input: null, error: 'Elegí la marca.' }
-  const basePrice = parseDecimal(fields.basePrice)
-  if (basePrice === null || basePrice <= 0) return { input: null, error: 'Escribí el precio de venta (mayor que cero).' }
+  // Vacío = precio pendiente (se guarda en 0 y no se puede vender hasta completarlo).
+  const basePrice = fields.basePrice.trim() === '' ? 0 : parseDecimal(fields.basePrice)
+  if (basePrice === null || basePrice < 0) return { input: null, error: 'El precio de venta no puede ser negativo (dejalo vacío si lo vas a poner después).' }
   return {
     input: { name: fields.name.trim(), categoryId: fields.categoryId, brandId: fields.brandId, cutId: fields.cutId || null, basePrice, barcode: fields.barcode.trim() },
     error: null,
@@ -466,7 +468,8 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
           )}
           <label className="adm-field">
             <span>Precio de venta (C$)</span>
-            <input type="number" min={0} step="0.01" inputMode="decimal" required value={fields.basePrice} onChange={(event) => setFields({ ...fields, basePrice: event.target.value })} />
+            <input type="number" min={0} step="0.01" inputMode="decimal" value={fields.basePrice} placeholder="Opcional: ponelo después" onChange={(event) => setFields({ ...fields, basePrice: event.target.value })} />
+            {fields.basePrice.trim() === '' && <small>Queda «precio pendiente»: no se vende hasta completarlo.</small>}
           </label>
         </div>
         {canPartners && <PartnersHint error={partnerList.error} empty={!partnerList.loading && !partnerList.error && partnerList.partners.length === 0} onRetry={partnerList.reload} />}
@@ -501,7 +504,7 @@ export function EditProductDialog({ product, catalogs, onClose, onSaved, onConfl
 }) {
   const [fields, setFields] = useState<ProductFields>({
     name: product.name, categoryId: product.categoryId, brandId: product.brandId,
-    cutId: product.cutId ?? '', basePrice: String(product.basePrice), barcode: product.barcode ?? '',
+    cutId: product.cutId ?? '', basePrice: product.basePrice > 0 ? String(product.basePrice) : '', barcode: product.barcode ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

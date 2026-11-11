@@ -513,3 +513,9 @@
 .adm-kpis.is-loading .adm-kpi > strong { color: var(--line, #d9cdb9); }
 .dash-split .adm-card { min-height: 232px; }
 @media (max-width: 900px) { .dash-split .adm-card { min-height: 0; } .dash-split > .adm-card:first-child { min-height: 200px; } .dash-split > .adm-card:last-child { min-height: 190px; } }
+.adm-warn-text { color: #9a5b00; font-weight: 600; }
+.adm-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+
+/* Ficha: aviso de datos pendientes (precio de venta, foto). */
+.adm-missing { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 12px; padding: 12px 14px; border: 1.5px solid #e8b860; border-radius: 12px; background: #fff4dc; color: #6b4300; }
+.adm-missing-actions { display: inline-flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }

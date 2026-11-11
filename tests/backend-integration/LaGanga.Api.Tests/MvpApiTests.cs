@@ -210,6 +210,28 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task ProductWithPendingPriceIsListedToCompleteAndCannotBeSold()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        // Se ingresa sin precio de venta (vacío = 0) para completarlo después.
+        var product = await CreateProductAsync(catalogs, "Blusa precio pendiente", 0m, [(2, null)]);
+        var productId = product.GetProperty("id").GetGuid();
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+
+        var pending = await GetAsync(fixture.Admin, "/api/v1/products?status=pending&search=precio%20pendiente");
+        var row = Assert.Single(pending.GetProperty("items").EnumerateArray());
+        Assert.Equal(productId, row.GetProperty("id").GetGuid());
+        Assert.True(row.GetProperty("missingPrice").GetBoolean());
+
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller, 0m, 0m);
+        var refused = await PostSaleRawAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 0m)], null, null, [Pay("Cash", "NIO", 100m)]);
+        Assert.Equal("price_missing", await ApiTestHelpers.ReadProblemCodeAsync(refused));
+
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 0m, countedCashUsd = 0m });
+    }
+
+    [PostgresFact]
     public async Task OnlineSaleRejectsAClientPriceDifferentFromTheOfficialPrice()
     {
         var catalogs = await LoadCatalogsAsync();

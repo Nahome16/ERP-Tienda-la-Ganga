@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { hasPermission } from '../lib/access'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
-import { listProducts } from '../admin/adminApi'
+import { getProductByBarcode, getVariantByBarcode, listProducts } from '../admin/adminApi'
 import { useDebounced, useFetch } from '../admin/hooks'
 import { Thumb } from '../admin/ImageManager'
 import { ImportDialog } from '../admin/ImportDialog'
@@ -26,6 +26,25 @@ export function ProductsView({ user }: { user: CurrentUser }) {
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
+  const [scanning, setScanning] = useState(false)
+
+  /** Enter en el buscador con un código escaneado: abre directo la ficha para completar datos. */
+  async function openByCode(event: FormEvent) {
+    event.preventDefault()
+    const code = searchInput.trim()
+    if (!/^[A-Za-z0-9-]{4,}$/.test(code) || scanning) return
+    setScanning(true)
+    try {
+      const found = await getProductByBarcode(code).then((result) => result.product.id)
+        .catch(() => getVariantByBarcode(code).then((variant) => variant.productId))
+      setSearchInput('')
+      setDetail({ id: found, labels: false })
+    } catch {
+      // No es un código conocido: se queda como búsqueda normal.
+    } finally {
+      setScanning(false)
+    }
+  }
 
   const catalogs = useCatalogs()
   const filter = { search, categoryId, brandId, status, page, pageSize }
@@ -58,13 +77,13 @@ export function ProductsView({ user }: { user: CurrentUser }) {
 
       <section className="panel-card adm-card">
         <div className="adm-toolbar">
-          <label className="catalog-search grow">
+          <form className="catalog-search grow" role="search" onSubmit={(event) => { void openByCode(event) }}>
             <Search size={18} strokeWidth={1.75} aria-hidden="true" />
             <input
-              type="search" placeholder="Buscar por nombre, marca o código de barras" aria-label="Buscar productos"
+              type="search" placeholder="Buscar o escanear el código para abrir la ficha" aria-label="Buscar productos"
               value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1) }}
             />
-          </label>
+          </form>
           <select aria-label="Filtrar por categoría" value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setPage(1) }}>
             <option value="">Todas las categorías</option>
             {categories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -75,6 +94,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
           </select>
           <select aria-label="Filtrar por estado" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}>
             <option value="active">Activos</option>
+            <option value="pending">Por completar (sin precio o sin foto)</option>
             <option value="inactive">Inactivos</option>
             <option value="all">Todos</option>
           </select>
@@ -103,10 +123,16 @@ export function ProductsView({ user }: { user: CurrentUser }) {
                   </td>
                   <td>{product.categoryName}</td>
                   <td>{product.brandName}</td>
-                  <td className="numeric">{formatNio(product.basePrice)}</td>
+                  <td className="numeric">{product.basePrice > 0 ? formatNio(product.basePrice) : <span className="adm-warn-text">Pendiente</span>}</td>
                   <td className="numeric">{product.variantCount}</td>
                   <td className={product.totalStock < 0 ? 'numeric adm-neg' : 'numeric'}>{product.totalStock}</td>
-                  <td><Tag tone={product.isActive ? 'ok' : 'neutral'}>{product.isActive ? 'Activo' : 'Inactivo'}</Tag></td>
+                  <td>
+                    <span className="adm-tags">
+                      <Tag tone={product.isActive ? 'ok' : 'neutral'}>{product.isActive ? 'Activo' : 'Inactivo'}</Tag>
+                      {product.missingPrice && <Tag tone="warn">Sin precio</Tag>}
+                      {!product.primaryImageUrl && <Tag tone="neutral">Sin foto</Tag>}
+                    </span>
+                  </td>
                   <td className="actions-col">
                     <button type="button" className="link-button" onClick={() => setDetail({ id: product.id, labels: false })}>Ver</button>
                     <button type="button" className="link-button" onClick={() => setDetail({ id: product.id, labels: true })}>Etiquetas</button>

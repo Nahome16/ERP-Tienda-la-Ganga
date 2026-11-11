@@ -122,14 +122,29 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
           <>
             <div className="adm-actions" style={{ marginBottom: 12 }}>
               <Tag tone={product.isActive ? 'ok' : 'neutral'}>{product.isActive ? 'Activo' : 'Inactivo'}</Tag>
-              <span>Precio base <strong>{formatNio(product.basePrice)}</strong></span>
+              <span>Precio base <strong>{product.basePrice > 0 ? formatNio(product.basePrice) : 'Pendiente'}</strong></span>
               {product.barcode && <span>Código de fábrica <strong>{product.barcode}</strong></span>}
               <span>Existencia total <strong className={product.totalStock < 0 ? 'adm-neg' : undefined}>{product.totalStock}</strong></span>
               <span>{product.variantCount} variante{product.variantCount === 1 ? '' : 's'}</span>
             </div>
+            {(() => {
+              const missingPrice = product.variants.length === 0 ? product.basePrice <= 0 : product.variants.some((variant) => variant.price <= 0)
+              const missingPhoto = (product.images ?? []).length === 0
+              if (!missingPrice && !missingPhoto) return null
+              return (
+                <div className="adm-missing" role="status">
+                  <strong>Falta completar:</strong>
+                  <span>{[missingPrice && 'precio de venta (no se puede vender en caja)', missingPhoto && 'foto'].filter(Boolean).join(' · ')}</span>
+                  <span className="adm-missing-actions">
+                    {missingPrice && canEdit && <button type="button" className="primary-button" onClick={() => setNested({ kind: 'edit-product' })}>Poner precio</button>}
+                    {missingPhoto && canImages && <button type="button" className="secondary-button" onClick={() => document.getElementById('product-images')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Agregar foto</button>}
+                  </span>
+                </div>
+              )
+            })()}
             <ProductBalancePanel product={product} canSeeCosts={canCost} />
             <FactoryCodes product={product} canEdit={canEdit} onChanged={(text) => changed(text)} />
-            <ImageManager key={product.id} productId={product.id} images={product.images ?? []} canManage={canImages} onChanged={onChanged} />
+            <div id="product-images"><ImageManager key={product.id} productId={product.id} images={product.images ?? []} canManage={canImages} onChanged={onChanged} /></div>
             <div className="table-scroll">
               <table className="adm-table">
                 <thead>

@@ -139,6 +139,13 @@ public sealed class ProductService : IProductService
             case "INACTIVE":
                 products = products.Where(product => !product.IsActive);
                 break;
+            case "PENDING":
+                // Por completar: activos sin precio de venta (en alguna talla) o sin foto.
+                products = products.Where(product => product.IsActive && (
+                    (product.BasePrice <= 0 && !dbContext.Variants.Any(variant => variant.ProductId == product.Id)) ||
+                    dbContext.Variants.Any(variant => variant.ProductId == product.Id && (variant.PriceOverride ?? product.BasePrice) <= 0) ||
+                    !dbContext.ProductImages.Any(image => image.ProductId == product.Id)));
+                break;
         }
 
         if (query.CategoryId is { } categoryId)
@@ -189,7 +196,9 @@ public sealed class ProductService : IProductService
                 product.Version,
                 dbContext.ProductImages.Where(image => image.ProductId == product.Id)
                     .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault(),
-                product.Barcode))
+                product.Barcode,
+                (product.BasePrice <= 0 && !dbContext.Variants.Any(variant => variant.ProductId == product.Id)) ||
+                    dbContext.Variants.Any(variant => variant.ProductId == product.Id && (variant.PriceOverride ?? product.BasePrice) <= 0)))
             .ToListAsync(cancellationToken);
         return Paging.Create(items, query.Page, query.PageSize, total);
     }
