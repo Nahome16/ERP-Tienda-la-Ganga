@@ -19,7 +19,7 @@ export function createMock(options = {}) {
   const user = options.user ?? adminUser
   const log = [] // { method, path, body }
   const s = {
-    settings: { usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000', receiptFooter: 'Recibo interno — no es factura', banks: ['BAC', 'Lafise'], sellerDiscountLimitPercent: 10, lowStockThreshold: 2 },
+    settings: { usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000', receiptFooter: 'Recibo interno — no es factura', banks: ['BAC', 'Lafise'], sellerDiscountLimitPercent: 10, lowStockThreshold: 2, exchangeWindowDays: 4 },
     categories: [cat('c1', 'Camisas'), cat('c2', 'Pantalones')],
     brands: [cat('b1', 'Bossini'), cat('b2', 'Levis')],
     cuts: [cat('k1', 'Regular'), cat('k2', 'Slim')],
@@ -182,6 +182,11 @@ export function createMock(options = {}) {
     if (path === '/api/v1/auth/me') return json(route, 200, user)
     if ((r = m(/^\/api\/v1\/catalog\/([a-z-]+)$/))) {
       const map = { categories: s.categories, brands: s.brands, cuts: s.cuts, 'size-groups': s.sizeGroups, sizes: s.sizes, colors: s.colors }
+      if (method === 'POST' && map[r[1]]) {
+        const item = cat(`${r[1]}-${map[r[1]].length + 1}-${Date.now()}`, body.name, { swatchHex: body.swatchHex ?? null, sortOrder: map[r[1]].length + 1 })
+        map[r[1]].push(item)
+        return json(route, 201, item)
+      }
       return json(route, 200, page(map[r[1]] ?? [], Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 25)))
     }
     if (path === '/api/v1/settings') {
@@ -228,6 +233,12 @@ export function createMock(options = {}) {
     if ((r = m(/^\/api\/v1\/products\/([^/]+)$/))) {
       const p = s.products.find((x) => x.id === r[1])
       if (!p) return problem(route, 404, 'No existe el producto.', 'not_found', {})
+      if (method === 'DELETE') {
+        if (s.soldProductIds?.has(p.id)) return problem(route, 409, 'Este producto ya tiene ventas registradas: no se puede eliminar. Desactivalo para que no aparezca en la caja.', 'product_has_sales', {})
+        s.products = s.products.filter((x) => x.id !== p.id)
+        s.variants = s.variants.filter((x) => x.productId !== p.id)
+        return route.fulfill({ status: 204, body: '' })
+      }
       if (method === 'PUT') {
         if (request.headers()['if-match'] !== `"${p.version}"`) return problem(route, 409, 'Otra persona modificó el producto.', 'version_conflict', {})
         Object.assign(p, body, { version: p.version + 1 })

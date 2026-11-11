@@ -184,4 +184,12 @@ public sealed class LotAllocation
     public Guid? SaleLineId { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
+
+    /// <summary>Descuenta unidades devueltas en un cambio de talla (vuelven a su entrada).</summary>
+    public void Reduce(int quantity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(quantity, Quantity);
+        Quantity -= quantity;
+    }
 }

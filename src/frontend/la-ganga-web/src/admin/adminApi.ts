@@ -55,9 +55,10 @@ export type VariantInput = {
   /** Socio que ingresó la existencia inicial (solo con investment.read). */
   partnerId?: string
 }
-export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number }
+/** `barcode`: código de fábrica del producto; vacío lo quita al editar. */
+export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number; barcode?: string }
 
-export const createProduct = (input: ProductInput & { variants: VariantInput[] }) =>
+export const createProduct = (input: ProductInput & { variants: VariantInput[]; receivedOn?: string; colorBarcodes?: { colorId: string; barcode: string }[] }) =>
   apiRequest<ProductDetail>(`${v1}/products`, { method: 'POST', body: input })
 export const updateProduct = (product: { id: string; version: number }, input: ProductInput & { isActive: boolean }) =>
   apiRequest<ProductListItem>(`${v1}/products/${product.id}`, { method: 'PUT', body: input, ifMatch: product.version })
@@ -80,6 +81,15 @@ export function flattenVariantLookup(response: VariantLookupResponse): VariantBy
 
 export const getVariantByBarcode = async (barcode: string, signal?: AbortSignal) =>
   flattenVariantLookup(await apiRequest<VariantLookupResponse>(`${v1}/variants/by-barcode/${encodeURIComponent(barcode)}`, { signal }))
+/** Solo productos sin ventas; con ventas responde 409 «product_has_sales». */
+export const deleteProduct = (productId: string) =>
+  apiRequest<void>(`${v1}/products/${productId}`, { method: 'DELETE' })
+/** Producto por código de fábrica; `colorId` si el código es de un color (no de todo el producto). */
+export const getProductByBarcode = (barcode: string, signal?: AbortSignal) =>
+  apiRequest<{ product: ProductDetail; colorId: string | null }>(`${v1}/products/by-barcode/${encodeURIComponent(barcode)}`, { signal })
+/** Pone, cambia o quita (vacío) el código de fábrica de un color del producto. */
+export const setColorBarcode = (productId: string, colorId: string, barcode: string) =>
+  apiRequest<ProductDetail>(`${v1}/products/${productId}/color-barcodes/${colorId}`, { method: 'PUT', body: { barcode } })
 
 export const importProducts = (body: { dryRun: boolean; createMissingCatalogs: boolean; createMissingPartners?: boolean; rows: ImportRow[] }) =>
   apiRequest<ImportResult>(`${v1}/products/import`, { method: 'POST', body })

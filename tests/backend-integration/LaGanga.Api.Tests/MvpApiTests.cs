@@ -445,6 +445,102 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         Assert.True(audit.GetProperty("totalCount").GetInt32() >= 1);
     }
 
+    [PostgresFact]
+    public async Task SizeExchangeMovesStockKeepsTheSaleAndBlocksVoid()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        var product = await CreateProductAsync(catalogs, "Jean cambio", 900m, [(3, 400m), (2, 400m)]);
+        var small = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var large = product.GetProperty("variants")[1].GetProperty("id").GetGuid();
+        var other = await CreateProductAsync(catalogs, "Blusa ajena", 900m, [(5, null)]);
+        var otherVariant = other.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller, 0m, 0m);
+
+        var sold = await PostSaleAsync(seller, session, Guid.NewGuid(), [(small, 2, 900m)], null, null, [Pay("Cash", "NIO", 1800m)]);
+        var saleNumber = sold.GetProperty("sale").GetProperty("number").GetString()!;
+        var saleId = sold.GetProperty("sale").GetProperty("id").GetGuid();
+
+        var lookup = await GetAsync(seller.Client, $"/api/v1/exchanges/lookup?number={saleNumber}");
+        Assert.True(lookup.GetProperty("canExchange").GetBoolean());
+        Assert.Equal(4, lookup.GetProperty("windowDays").GetInt32());
+        var line = lookup.GetProperty("lines")[0];
+        var saleLineId = line.GetProperty("saleLineId").GetGuid();
+        Assert.Equal(2, line.GetProperty("available").GetInt32());
+        var option = Assert.Single(line.GetProperty("options").EnumerateArray());
+        Assert.Equal(large, option.GetProperty("variantId").GetGuid());
+        Assert.Equal(2, option.GetProperty("stock").GetInt32());
+
+        object Body(Guid clientId, Guid newVariant, int quantity) => new
+        {
+            clientExchangeId = clientId,
+            saleId,
+            cashSessionId = session,
+            items = new[] { new { saleLineId, quantity, newVariantId = newVariant } },
+            note = "Le quedó pequeño",
+        };
+
+        var otherProduct = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", Body(Guid.NewGuid(), otherVariant, 1));
+        Assert.Equal("different_product", await ApiTestHelpers.ReadProblemCodeAsync(otherProduct));
+        var tooMany = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", Body(Guid.NewGuid(), large, 3));
+        Assert.Equal("exceeds_sold_quantity", await ApiTestHelpers.ReadProblemCodeAsync(tooMany));
+
+        var clientExchangeId = Guid.NewGuid();
+        var created = await PostAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", Body(clientExchangeId, large, 1), HttpStatusCode.Created);
+        var exchange = created.GetProperty("exchange");
+        Assert.StartsWith("CT-", exchange.GetProperty("number").GetString(), StringComparison.Ordinal);
+        Assert.Equal(saleNumber, exchange.GetProperty("saleNumber").GetString());
+        Assert.Equal(900m, exchange.GetProperty("lines")[0].GetProperty("unitPrice").GetDecimal());
+
+        // Reintento del mismo cambio (por ejemplo, doble clic): no se aplica dos veces.
+        var repeated = await PostAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", Body(clientExchangeId, large, 1));
+        Assert.True(repeated.GetProperty("alreadyProcessed").GetBoolean());
+
+        var detail = await GetAsync(fixture.Admin, $"/api/v1/products/{product.GetProperty("id").GetGuid()}");
+        var stock = detail.GetProperty("variants").EnumerateArray().ToDictionary(variant => variant.GetProperty("id").GetGuid(), variant => variant.GetProperty("stock").GetInt32());
+        Assert.Equal(2, stock[small]);
+        Assert.Equal(1, stock[large]);
+
+        var kardex = await GetAsync(fixture.Admin, $"/api/v1/inventory/variants/{large}/kardex");
+        Assert.Contains(kardex.GetProperty("items").EnumerateArray(), item => item.GetProperty("type").GetString() == "ExchangeOut");
+
+        var after = await GetAsync(seller.Client, $"/api/v1/exchanges/lookup?number={saleNumber}");
+        Assert.Equal(1, after.GetProperty("lines")[0].GetProperty("available").GetInt32());
+        Assert.Single(after.GetProperty("exchanges").EnumerateArray());
+
+        var voided = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/sales/{saleId}/void", new { reason = "Prueba de anulación" });
+        Assert.Equal("sale_has_exchanges", await ApiTestHelpers.ReadProblemCodeAsync(voided));
+
+        // Una venta de hace 10 días (hecha sin conexión) ya está fuera del plazo de 4 días.
+        using var oldSaleResponse = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/pos/sales", new
+        {
+            clientSaleId = Guid.NewGuid(),
+            cashSessionId = session,
+            channel = "Store",
+            createdAtUtc = DateTimeOffset.UtcNow.AddDays(-10),
+            isOffline = true,
+            lines = new[] { new { variantId = small, quantity = 1, unitPrice = 900m } },
+            discount = (object?)null,
+            discountApprovalId = (Guid?)null,
+            payments = new[] { Pay("Cash", "NIO", 900m) },
+            note = (string?)null,
+        });
+        var oldSale = (await ReadAsync(oldSaleResponse)).GetProperty("sale");
+        var expired = await GetAsync(seller.Client, $"/api/v1/exchanges/lookup?number={oldSale.GetProperty("number").GetString()}");
+        Assert.False(expired.GetProperty("canExchange").GetBoolean());
+        var expiredPost = await PostRawAsync(seller.Client, seller.Csrf, "/api/v1/exchanges", new
+        {
+            clientExchangeId = Guid.NewGuid(),
+            saleId = oldSale.GetProperty("id").GetGuid(),
+            cashSessionId = session,
+            items = new[] { new { saleLineId = expired.GetProperty("lines")[0].GetProperty("saleLineId").GetGuid(), quantity = 1, newVariantId = large } },
+            note = (string?)null,
+        });
+        Assert.Equal("exchange_window_expired", await ApiTestHelpers.ReadProblemCodeAsync(expiredPost));
+
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 2700m, countedCashUsd = 0m });
+    }
+
     // ---------------------------------------------------------------- ayudas
 
     private static object Pay(string method, string currency, decimal amount, decimal? rate = null, string? bank = null) =>

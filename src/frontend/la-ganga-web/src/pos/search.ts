@@ -7,6 +7,10 @@ export function normalize(text: string): string {
 export type VariantIndex = {
   variants: PosVariant[]
   byBarcode: Map<string, PosVariant>
+  /** Código de fábrica del producto → producto (compartido por todas sus tallas). */
+  byProductBarcode: Map<string, string>
+  /** Código de fábrica de un color → producto y color (lo comparten las tallas de ese color). */
+  byColorBarcode: Map<string, { productId: string; colorName: string }>
   byId: Map<string, PosVariant>
   haystacks: string[]
   categories: string[]
@@ -14,23 +18,37 @@ export type VariantIndex = {
 
 export function buildIndex(variants: PosVariant[]): VariantIndex {
   const byBarcode = new Map<string, PosVariant>()
+  const byProductBarcode = new Map<string, string>()
+  const byColorBarcode = new Map<string, { productId: string; colorName: string }>()
   const byId = new Map<string, PosVariant>()
   const categories = new Set<string>()
   const haystacks = variants.map((variant) => {
     byBarcode.set(normalize(variant.barcode), variant)
+    if (variant.productBarcode) byProductBarcode.set(normalize(variant.productBarcode), variant.productId)
+    if (variant.colorBarcode) byColorBarcode.set(normalize(variant.colorBarcode), { productId: variant.productId, colorName: variant.colorName })
     byId.set(variant.variantId, variant)
     if (variant.categoryName) categories.add(variant.categoryName)
     return ` ${normalize([
       variant.productName, variant.brandName, variant.categoryName,
-      variant.sizeName, variant.colorName, variant.barcode,
+      variant.sizeName, variant.colorName, variant.barcode, variant.productBarcode ?? '', variant.colorBarcode ?? '',
     ].join(' '))}`
   })
-  return { variants, byBarcode, byId, haystacks, categories: [...categories].sort((a, b) => a.localeCompare(b, 'es')) }
+  return { variants, byBarcode, byProductBarcode, byColorBarcode, byId, haystacks, categories: [...categories].sort((a, b) => a.localeCompare(b, 'es')) }
 }
 
 /** Código exacto (sin distinguir mayúsculas ni espacios en los extremos). */
 export function findByBarcode(index: VariantIndex, code: string): PosVariant | null {
   return index.byBarcode.get(normalize(code)) ?? null
+}
+
+/** Producto y color cuyo código de fábrica de color es exactamente este (se elige la talla después). */
+export function findColorByBarcode(index: VariantIndex, code: string): { productId: string; colorName: string } | null {
+  return index.byColorBarcode.get(normalize(code)) ?? null
+}
+
+/** Producto cuyo código de fábrica es exactamente este (se elige la talla después). */
+export function findProductByBarcode(index: VariantIndex, code: string): string | null {
+  return index.byProductBarcode.get(normalize(code)) ?? null
 }
 
 /**

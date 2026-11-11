@@ -25,6 +25,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasMany(product => product.Variants).WithOne().HasForeignKey(variant => variant.ProductId).OnDelete(DeleteBehavior.Restrict);
         builder.Navigation(product => product.Variants).UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.HasIndex(product => product.Name);
+        builder.Property(product => product.Barcode).HasMaxLength(Product.BarcodeMaxLength);
+        builder.HasIndex(product => product.Barcode).IsUnique().HasFilter("\"Barcode\" IS NOT NULL");
     }
 }
 
@@ -75,6 +77,20 @@ public sealed class InventoryMovementConfiguration : IEntityTypeConfiguration<In
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(movement => movement.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(movement => new { movement.VariantId, movement.CreatedAtUtc });
         builder.HasIndex(movement => movement.SaleId);
+    }
+}
+
+public sealed class ProductColorBarcodeConfiguration : IEntityTypeConfiguration<ProductColorBarcode>
+{
+    public void Configure(EntityTypeBuilder<ProductColorBarcode> builder)
+    {
+        builder.ToTable("product_color_barcodes", "inventory");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Barcode).HasMaxLength(Product.BarcodeMaxLength).IsRequired();
+        builder.HasIndex(item => item.Barcode).IsUnique();
+        builder.HasIndex(item => new { item.ProductId, item.ColorId }).IsUnique();
+        builder.HasOne<Product>().WithMany().HasForeignKey(item => item.ProductId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Color>().WithMany().HasForeignKey(item => item.ColorId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

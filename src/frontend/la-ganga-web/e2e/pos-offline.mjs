@@ -39,7 +39,7 @@ const user = {
 const settings = {
   usdRate: 36.7, storeName: 'Tienda La Ganga', storeAddress: 'Managua', storePhone: '2222-0000',
   receiptFooter: 'Recibo interno — no es factura', banks: ['BAC', 'Banpro'],
-  sellerDiscountLimitPercent: 10, lowStockThreshold: 2,
+  sellerDiscountLimitPercent: 10, lowStockThreshold: 2, exchangeWindowDays: 4,
 }
 const variants = [
   { variantId: 'v-1', productId: 'p-1', productName: 'Camisa Oxford', categoryName: 'Camisas', brandName: 'Ganga', sizeName: 'M', colorName: 'Azul', colorHex: '#2a5db0', barcode: '7000000000011', price: 350, stock: 5 },

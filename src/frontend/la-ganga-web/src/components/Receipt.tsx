@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom'
 import { useEffect } from 'react'
-import type { CashSummary, Sale, StoreSettings } from '../lib/apiTypes'
+import type { CashSummary, Exchange, Sale, StoreSettings } from '../lib/apiTypes'
 import { formatNio, formatUsd } from '../lib/money'
 import { diffText, reconciliationRows, visibleRows } from '../pos/reconcile'
 import { ReceiptLogo } from './ReceiptLogo'
@@ -83,6 +83,46 @@ export function printReceipt() {
 export function PrintableReceipt({ sale, settings }: ReceiptProps) {
   useEffect(() => () => document.body.classList.remove('printing-receipt'), [])
   return createPortal(<div className="receipt-print-root"><Receipt sale={sale} settings={settings} /></div>, document.body)
+}
+
+type ExchangeSheetProps = { exchange: Exchange; settings: StoreSettings }
+
+/** Comprobante de cambio de talla o color (80 mm). No mueve dinero: la prenda nueva conserva el precio pagado. */
+export function ExchangeSheet({ exchange, settings }: ExchangeSheetProps) {
+  const units = exchange.lines.reduce((sum, line) => sum + line.quantity, 0)
+  return (
+    <div className="receipt-sheet">
+      <ReceiptLogo />
+      {settings.storeAddress && <div className="receipt-center">{settings.storeAddress}</div>}
+      {settings.storePhone && <div className="receipt-center">Tel. {settings.storePhone}</div>}
+      <hr className="receipt-rule" />
+      <div className="receipt-center receipt-title">COMPROBANTE DE CAMBIO</div>
+      <div className="receipt-row"><span>N.º</span><strong>{exchange.number}</strong></div>
+      <div className="receipt-row"><span>Recibo original</span><strong>{exchange.saleNumber}</strong></div>
+      <div className="receipt-row"><span>Fecha</span><span>{formatStamp(exchange.createdAtUtc)}</span></div>
+      <div className="receipt-row"><span>{exchange.registerName ?? 'Tienda'}</span><span>{exchange.userName}</span></div>
+      <hr className="receipt-rule" />
+      {exchange.lines.map((line, index) => (
+        <div className="receipt-line" key={`${line.returnedBarcode}-${line.newBarcode}-${index}`}>
+          <div className="receipt-line-name">{line.quantity} × {line.productName}</div>
+          <div className="receipt-row receipt-small"><span>Devuelve</span><span>{line.returnedSizeName} · {line.returnedColorName}</span></div>
+          <div className="receipt-row receipt-small"><span>Se lleva</span><span>{line.newSizeName} · {line.newColorName}</span></div>
+        </div>
+      ))}
+      <hr className="receipt-rule" />
+      <div className="receipt-row receipt-bold"><span>Prendas cambiadas</span><span>{units}</span></div>
+      <div className="receipt-row"><span>Diferencia a pagar</span><span>{formatNio(0)}</span></div>
+      {exchange.note && <div className="receipt-center receipt-small">{exchange.note}</div>}
+      <hr className="receipt-rule" />
+      <div className="receipt-center receipt-small">Conserve este comprobante junto con su recibo.</div>
+      <div className="receipt-center receipt-bold">¡Gracias por su compra!</div>
+    </div>
+  )
+}
+
+export function PrintableExchange({ exchange, settings }: ExchangeSheetProps) {
+  useEffect(() => () => document.body.classList.remove('printing-receipt'), [])
+  return createPortal(<div className="receipt-print-root"><ExchangeSheet exchange={exchange} settings={settings} /></div>, document.body)
 }
 
 type CashSummaryProps = { summary: CashSummary; storeName: string }

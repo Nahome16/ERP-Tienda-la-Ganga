@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PrintableCashSummary, PrintableReceipt, printReceipt } from '../components/Receipt'
+import { PrintableCashSummary, PrintableExchange, PrintableReceipt, printReceipt } from '../components/Receipt'
+import { hasPermission } from '../lib/access'
 import { ApiError } from '../lib/api'
 import { saveCachedUser } from '../lib/session'
-import type { CashSession, CashSummary, Sale } from '../lib/apiTypes'
+import type { CashSession, CashSummary, Exchange, Sale } from '../lib/apiTypes'
 import type { ApiState, AppView, CurrentUser } from '../types'
 import { CloseCashModal } from './CloseCashModal'
+import { ExchangeModal } from './ExchangeModal'
 import { countByStatus } from './outbox'
 import { readSoundPreference, saveSoundPreference } from './feedback'
 import { timeAgo } from './format'
@@ -17,7 +19,7 @@ import { SellScreen } from './SellScreen'
 import { clearCartDraft, clearCashSession, loadCashSession, saveCashSession } from './storage'
 import './pos.css'
 import {
-  Bell, BellOff, CircleAlert, CircleCheck, CloudOff, CloudUpload, LayoutDashboard, LogOut, Lock, ReceiptText, RefreshCw, TriangleAlert, Wifi, WifiOff,
+  Bell, BellOff, CircleAlert, CircleCheck, CloudOff, CloudUpload, LayoutDashboard, LogOut, Lock, ReceiptText, RefreshCw, Repeat, TriangleAlert, Wifi, WifiOff,
 } from 'lucide-react'
 
 export type PosAppProps = {
@@ -40,8 +42,8 @@ type Phase =
   | { kind: 'ready' }
 
 type Toast = { id: number; text: string; tone: 'ok' | 'warn' | 'error' }
-type PanelModal = 'sales' | 'close' | 'logout' | null
-type PrintJob = { nonce: number; sale: Sale } | { nonce: number; summary: CashSummary }
+type PanelModal = 'sales' | 'exchange' | 'close' | 'logout' | null
+type PrintJob = { nonce: number; sale: Sale } | { nonce: number; exchange: Exchange } | { nonce: number; summary: CashSummary }
 
 function isNotFound(error: unknown) {
   return error instanceof ApiError && error.status === 404
@@ -199,6 +201,8 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
   const snapshotAge = state.snapshot ? now - Date.parse(state.snapshot.fetchedAtUtc) : 0
   const staleCatalog = snapshotAge > 12 * 60 * 60 * 1000
 
+  const canExchange = hasPermission(user, 'sale.exchange')
+
   const connectionLabel = connection === 'offline' ? 'Sin conexión' : state.syncing ? 'Sincronizando…' : 'En línea'
   const connectionTone = connection === 'offline' ? 'offline' : state.syncing ? 'syncing' : 'online'
 
@@ -234,7 +238,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           </span>
         </div>
 
-        <nav className={`pv-actions${canReturnToAdmin && session ? ' is-dense' : ''}`} aria-label="Acciones de la caja">
+        <nav className={`pv-actions${(canReturnToAdmin || canExchange) && session ? ' is-dense' : ''}`} aria-label="Acciones de la caja">
           {canReturnToAdmin && (
             <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => onNavigate('panel')} aria-label="Volver al panel" title="Volver al panel">
               <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Panel</span>
@@ -246,6 +250,15 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           {session && (
             <button type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('sales')} aria-label="Ventas de esta caja" title="Ventas de esta caja">
               <ReceiptText size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Ventas de esta caja</span>
+            </button>
+          )}
+          {session && canExchange && (
+            <button
+              type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('exchange')}
+              aria-label="Cambio de talla" title={connection === 'online' ? 'Cambio de talla con recibo' : 'Cambio de talla (necesita conexión)'}
+              data-testid="exchange-button"
+            >
+              <Repeat size={18} strokeWidth={1.75} aria-hidden="true" /><span className="pv-btn-label">Cambio de talla</span>
             </button>
           )}
           {session && (
@@ -349,6 +362,20 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
         />
       )}
 
+      {panel === 'exchange' && session && (
+        <ExchangeModal
+          session={session}
+          online={connection === 'online'}
+          onPrint={(exchange) => setPrintJob({ nonce: Date.now(), exchange })}
+          onDone={(exchange) => {
+            notify(`Cambio ${exchange.number} registrado.`, 'ok')
+            // Las existencias cambiaron en el servidor: se actualiza el catálogo de la caja.
+            void engine.refreshSnapshot()
+          }}
+          onClose={() => setPanel(null)}
+        />
+      )}
+
       {panel === 'close' && session && (
         <CloseCashModal
           session={session}
@@ -393,7 +420,9 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
 
       {printJob && settings && ('sale' in printJob
         ? <PrintableReceipt key={printJob.nonce} sale={printJob.sale} settings={settings} />
-        : <PrintableCashSummary key={printJob.nonce} summary={printJob.summary} storeName={settings.storeName} />)}
+        : 'exchange' in printJob
+          ? <PrintableExchange key={printJob.nonce} exchange={printJob.exchange} settings={settings} />
+          : <PrintableCashSummary key={printJob.nonce} summary={printJob.summary} storeName={settings.storeName} />)}
 
       <div className="pv-toasts" aria-live="polite">
         {toasts.map((toast) => (

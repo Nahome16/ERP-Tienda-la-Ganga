@@ -10,6 +10,7 @@ public static class SalesSchema
 {
     public const string Name = "sales";
     public const string SaleNumberSequence = "sale_number_seq";
+    public const string ExchangeNumberSequence = "exchange_number_seq";
 
     public static readonly Guid Register1Id = new("0f6c1b52-8d4e-4d0b-9a77-1b8f6c2a0001");
     public static readonly Guid Register2Id = new("0f6c1b52-8d4e-4d0b-9a77-1b8f6c2a0002");
@@ -146,5 +147,50 @@ public sealed class DiscountApprovalConfiguration : IEntityTypeConfiguration<Dis
         builder.Property(approval => approval.Id).ValueGeneratedNever();
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(approval => approval.ApproverUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(approval => approval.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class SaleExchangeConfiguration : IEntityTypeConfiguration<SaleExchange>
+{
+    public void Configure(EntityTypeBuilder<SaleExchange> builder)
+    {
+        builder.ToTable("sale_exchanges", SalesSchema.Name);
+        builder.HasKey(exchange => exchange.Id);
+        builder.Property(exchange => exchange.Id).ValueGeneratedNever();
+        builder.Property(exchange => exchange.Number)
+            .HasDefaultValueSql($"nextval('{SalesSchema.Name}.{SalesSchema.ExchangeNumberSequence}')")
+            .ValueGeneratedOnAdd();
+        builder.Property(exchange => exchange.Note).HasMaxLength(SaleExchange.NoteMaxLength);
+        builder.HasOne<Sale>().WithMany().HasForeignKey(exchange => exchange.SaleId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CashSession>().WithMany().HasForeignKey(exchange => exchange.CashSessionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(exchange => exchange.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(exchange => exchange.Lines).WithOne().HasForeignKey(line => line.ExchangeId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(exchange => exchange.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.HasIndex(exchange => exchange.ClientExchangeId).IsUnique();
+        builder.HasIndex(exchange => exchange.Number).IsUnique();
+        builder.HasIndex(exchange => exchange.SaleId);
+    }
+}
+
+public sealed class SaleExchangeLineConfiguration : IEntityTypeConfiguration<SaleExchangeLine>
+{
+    public void Configure(EntityTypeBuilder<SaleExchangeLine> builder)
+    {
+        builder.ToTable("sale_exchange_lines", SalesSchema.Name, table =>
+            table.HasCheckConstraint("CK_sale_exchange_lines_quantity", "\"Quantity\" > 0"));
+        builder.HasKey(line => line.Id);
+        builder.Property(line => line.Id).ValueGeneratedNever();
+        builder.Property(line => line.ProductName).HasMaxLength(Product.NameMaxLength).IsRequired();
+        builder.Property(line => line.UnitPrice).HasPrecision(18, 2);
+        builder.Property(line => line.ReturnedSizeName).HasMaxLength(60).IsRequired();
+        builder.Property(line => line.ReturnedColorName).HasMaxLength(60).IsRequired();
+        builder.Property(line => line.ReturnedBarcode).HasMaxLength(ProductVariant.BarcodeMaxLength).IsRequired();
+        builder.Property(line => line.NewSizeName).HasMaxLength(60).IsRequired();
+        builder.Property(line => line.NewColorName).HasMaxLength(60).IsRequired();
+        builder.Property(line => line.NewBarcode).HasMaxLength(ProductVariant.BarcodeMaxLength).IsRequired();
+        builder.HasOne<SaleLine>().WithMany().HasForeignKey(line => line.SaleLineId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ProductVariant>().WithMany().HasForeignKey(line => line.ReturnedVariantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ProductVariant>().WithMany().HasForeignKey(line => line.NewVariantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(line => line.SaleLineId);
     }
 }

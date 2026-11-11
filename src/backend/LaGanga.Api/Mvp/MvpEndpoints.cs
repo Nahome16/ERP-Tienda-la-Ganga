@@ -26,6 +26,7 @@ public static class MvpEndpoints
         MapPos(endpoints);
         MapCash(endpoints);
         MapSales(endpoints);
+        MapExchanges(endpoints);
         MapProducts(endpoints);
         MapImages(endpoints);
         MapReports(endpoints);
@@ -191,6 +192,29 @@ public static class MvpEndpoints
             .RequireCsrf();
     }
 
+    private static void MapExchanges(IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/exchanges").WithTags("Exchanges").RequireAuthorization(PermissionNames.SaleExchange);
+
+        group.MapGet("/lookup", async ([FromQuery] string? number, IExchangeService service, CancellationToken ct) =>
+            (await service.LookupAsync(number, ct)).ToHttp());
+
+        group.MapPost("/", async (ExchangeRequest request, IExchangeService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                if (actor is null)
+                {
+                    return ApiHelpers.Unauthorized401();
+                }
+
+                var result = await service.RegisterAsync(request, actor, ct);
+                return result.ToHttp(value => value.AlreadyProcessed
+                    ? Results.Ok(value)
+                    : Results.Created($"/api/v1/exchanges/{value.Exchange.Id}", value));
+            })
+            .RequireCsrf();
+    }
+
     private static void MapProducts(IEndpointRouteBuilder endpoints)
     {
         var products = endpoints.MapGroup("/api/v1/products").WithTags("Products");
@@ -257,6 +281,31 @@ public static class MvpEndpoints
             })
             .RequireAuthorization(PermissionNames.ProductEdit)
             .RequireCsrf();
+
+        products.MapDelete("/{id:guid}", async (Guid id, IProductService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null
+                    ? ApiHelpers.Unauthorized401()
+                    : (await service.DeleteAsync(id, actor, ct)).ToHttp(_ => Results.NoContent());
+            })
+            .RequireAuthorization(PermissionNames.ProductArchive)
+            .RequireCsrf();
+
+        products.MapPut("/{id:guid}/color-barcodes/{colorId:guid}", async (Guid id, Guid colorId, SetColorBarcodeInput input, IProductService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.SetColorBarcodeAsync(id, colorId, input, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.ProductEdit)
+            .RequireCsrf();
+
+        products.MapGet("/by-barcode/{barcode}", async (string barcode, IProductService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.FindProductByBarcodeAsync(barcode, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.ProductRead);
 
         products.MapPost("/import", async (ImportRequest request, IProductService service, HttpContext http, CancellationToken ct) =>
             {

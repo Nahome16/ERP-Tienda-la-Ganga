@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
+import type { CatalogItem } from '../lib/catalogApi'
+import { NewColorPanel } from './ColorPicker'
 import type { Catalogs } from './useCatalogs'
 import { PartnerSelect, PartnersHint } from './PartnerSelect'
 import { Swatch } from './ui'
 import { usePartners } from './usePartners'
 import {
-  combosOf, comboKey, draftNoPartner, draftOf, draftSamePartner, setDraft, toggleId, totalInitialUnits, type BuilderState,
+  cellUnits, combosOf, comboKey, draftNoPartner, draftOf, draftSamePartner, setDraft, toggleId, totalInitialUnits, type BuilderState,
 } from './variantBuilderLogic'
 
 type Props = {
@@ -16,10 +18,15 @@ type Props = {
   canPartners?: boolean
   /** Combinaciones talla|color que el producto ya tiene (no se pueden repetir). */
   existing?: Set<string>
+  /** El socio y el costo general se piden fuera (sección «Ingreso» del alta). */
+  externalEntry?: boolean
+  /** Con permiso de catálogos: crea un color nuevo y lo marca (el padre lo suma a la lista). */
+  onColorCreated?: (color: CatalogItem) => void
 }
 
 /** Elige tallas y colores y arma la matriz talla × color con cantidades iniciales. */
-export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners = false, existing }: Props) {
+export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners = false, existing, externalEntry = false, onColorCreated }: Props) {
+  const [creatingColor, setCreatingColor] = useState(false)
   const [groupId, setGroupId] = useState('')
   const [colorFilter, setColorFilter] = useState('')
   const [bulkQty, setBulkQty] = useState('')
@@ -43,8 +50,9 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
   const unitsToLoad = totalInitialUnits(state, combos, taken)
   const hasPartners = partnerList.partners.length > 0
   // El socio solo importa si hay existencia inicial; con la lista vacía o con error se avisa pero no se bloquea.
-  const askPartner = canPartners && unitsToLoad > 0
+  const askPartner = canPartners && unitsToLoad > 0 && !externalEntry
   const showPartnerSelect = askPartner && hasPartners
+  const partnerColumn = canPartners && unitsToLoad > 0 && hasPartners
   const allVisibleSizesOn = visibleSizes.length > 0 && visibleSizes.every((size) => state.sizeIds.includes(size.id))
 
   function applyBulk(field: 'qty' | 'cost', value: string) {
@@ -55,6 +63,35 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
 
   return (
     <div className="adm-form">
+      <fieldset className="adm-section">
+        <legend>Colores</legend>
+        <div className="adm-toolbar" style={{ marginBottom: 8 }}>
+          <input type="search" className="grow" placeholder="Buscar color" aria-label="Buscar color" value={colorFilter} onChange={(event) => setColorFilter(event.target.value)} />
+          {onColorCreated && !creatingColor && <button type="button" className="secondary-button" onClick={() => setCreatingColor(true)}>+ Nuevo color</button>}
+        </div>
+        {onColorCreated && creatingColor && (
+          <NewColorPanel
+            existing={catalogs.colors}
+            onCancel={() => setCreatingColor(false)}
+            onCreated={(color) => {
+              onColorCreated(color)
+              onChange({ ...state, colorIds: toggleId(state.colorIds, color.id, true) })
+              setColorFilter('')
+            }}
+          />
+        )}
+        {catalogs.colors.length === 0 && <p className="adm-muted">No hay colores activos. Creá colores en Catálogos.</p>}
+        <div className="adm-chips">
+          {visibleColors.map((color) => (
+            <label key={color.id} className={state.colorIds.includes(color.id) ? 'adm-chip on' : 'adm-chip'}>
+              <input type="checkbox" checked={state.colorIds.includes(color.id)} onChange={(event) => onChange({ ...state, colorIds: toggleId(state.colorIds, color.id, event.target.checked) })} />
+              <Swatch hex={color.swatchHex} name={color.name} />
+              {color.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
       <fieldset className="adm-section">
         <legend>Tallas</legend>
         <div className="adm-toolbar" style={{ marginBottom: 8 }}>
@@ -84,33 +121,16 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
         </div>
       </fieldset>
 
-      <fieldset className="adm-section">
-        <legend>Colores</legend>
-        <div className="adm-toolbar" style={{ marginBottom: 8 }}>
-          <input type="search" className="grow" placeholder="Buscar color" aria-label="Buscar color" value={colorFilter} onChange={(event) => setColorFilter(event.target.value)} />
-        </div>
-        {catalogs.colors.length === 0 && <p className="adm-muted">No hay colores activos. Creá colores en Catálogos.</p>}
-        <div className="adm-chips">
-          {visibleColors.map((color) => (
-            <label key={color.id} className={state.colorIds.includes(color.id) ? 'adm-chip on' : 'adm-chip'}>
-              <input type="checkbox" checked={state.colorIds.includes(color.id)} onChange={(event) => onChange({ ...state, colorIds: toggleId(state.colorIds, color.id, event.target.checked) })} />
-              {color.swatchHex && <Swatch hex={color.swatchHex} />}
-              {color.name}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
       {chosenSizes.length > 0 && chosenColors.length > 0 ? (
         <fieldset className="adm-section">
-          <legend>Cantidad inicial por talla y color ({newCombos.length} variante{newCombos.length === 1 ? '' : 's'})</legend>
+          <legend>Cantidades por color y talla ({newCombos.length} variante{newCombos.length === 1 ? '' : 's'} · {unitsToLoad} u.)</legend>
           <div className="adm-toolbar" style={{ marginBottom: 8 }}>
             <label className="adm-field-inline">
-              <span>Cantidad a todas</span>
+              <span>Misma cantidad en todas</span>
               <input type="number" min={0} step={1} value={bulkQty} onChange={(event) => setBulkQty(event.target.value)} style={{ width: 110 }} />
             </label>
             <button type="button" className="secondary-button" onClick={() => applyBulk('qty', bulkQty)}>Aplicar</button>
-            {canCost && (
+            {canCost && !externalEntry && (
               <>
                 <label className="adm-field-inline">
                   <span>Costo a todas</span>
@@ -133,58 +153,69 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
             </div>
           )}
           <div className="adm-matrix">
-            <table aria-label="Matriz de tallas y colores">
+            <table aria-label="Matriz de colores y tallas">
               <thead>
                 <tr>
-                  <th className="row-head" scope="col"><span className="visually-hidden">Talla</span></th>
-                  {chosenColors.map((color) => <th key={color.id} scope="col">{color.swatchHex && <Swatch hex={color.swatchHex} />} {color.name}</th>)}
+                  <th className="row-head" scope="col">Color \ Talla</th>
+                  {chosenSizes.map((size) => <th key={size.id} scope="col">{size.name}</th>)}
+                  <th scope="col" className="adm-matrix-total">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {chosenSizes.map((size) => (
-                  <tr key={size.id}>
-                    <th scope="row" className="row-head">{size.name}</th>
-                    {chosenColors.map((color) => {
+                {chosenColors.map((color) => (
+                  <tr key={color.id}>
+                    <th scope="row" className="row-head"><Swatch hex={color.swatchHex} name={color.name} /> {color.name}</th>
+                    {chosenSizes.map((size) => {
                       const key = comboKey(size.id, color.id)
                       const draft = draftOf(state, key)
                       const exists = taken.has(key)
                       return (
-                        <td key={color.id}>
+                        <td key={size.id}>
                           <input
-                            type="number" min={0} step={1}
+                            type="number" min={0} step={1} inputMode="numeric"
                             className={draft.qty && Number(draft.qty) > 0 ? 'filled' : undefined}
                             value={exists ? '' : draft.qty}
                             disabled={exists}
                             placeholder={exists ? 'ya existe' : '0'}
-                            aria-label={`Cantidad talla ${size.name} color ${color.name}`}
+                            aria-label={`Cantidad color ${color.name} talla ${size.name}`}
                             onChange={(event) => onChange(setDraft(state, key, { qty: event.target.value }))}
                           />
                         </td>
                       )
                     })}
+                    <td className="adm-matrix-total">{chosenSizes.reduce((sum, size) => sum + (taken.has(comboKey(size.id, color.id)) ? 0 : cellUnits(state, comboKey(size.id, color.id))), 0)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row" className="row-head">Total</th>
+                  {chosenSizes.map((size) => (
+                    <td key={size.id} className="adm-matrix-total">{chosenColors.reduce((sum, color) => sum + (taken.has(comboKey(size.id, color.id)) ? 0 : cellUnits(state, comboKey(size.id, color.id))), 0)}</td>
+                  ))}
+                  <td className="adm-matrix-total adm-matrix-grand">{unitsToLoad}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
           <details style={{ marginTop: 10 }}>
-            <summary style={{ cursor: 'pointer', fontSize: '.82rem', fontWeight: 800 }}>Precio especial{canCost ? ', costo' : ''}{showPartnerSelect ? ', socio' : ''} y código de barras por variante (opcional)</summary>
+            <summary style={{ cursor: 'pointer', fontSize: '.82rem', fontWeight: 800 }}>Precio especial{canCost ? ', costo' : ''}{partnerColumn ? ', socio' : ''} y código de barras por variante (opcional)</summary>
             <p className="adm-help">Dejá el precio especial vacío para usar el precio base. Si dejás el código vacío, el sistema genera uno (EAN-13 interno que empieza en 20).</p>
             <div className="table-scroll">
               <table className="adm-table">
-                <thead><tr><th>Talla</th><th>Color</th><th>Precio especial</th>{canCost && <th>Costo</th>}{showPartnerSelect && <th>Socio</th>}<th>Código de barras</th></tr></thead>
+                <thead><tr><th>Color</th><th>Talla</th><th>Precio especial</th>{canCost && <th>Costo</th>}{partnerColumn && <th>Socio</th>}<th>Código de barras</th></tr></thead>
                 <tbody>
                   {newCombos.map((combo) => {
                     const draft = draftOf(state, combo.key)
                     const label = `${combo.size.name} ${combo.color.name}`
                     return (
                       <tr key={combo.key}>
-                        <td>{combo.size.name}</td>
                         <td>{combo.color.name}</td>
+                        <td>{combo.size.name}</td>
                         <td><input type="number" min={0} step="0.01" value={draft.price} aria-label={`Precio especial ${label}`} onChange={(event) => onChange(setDraft(state, combo.key, { price: event.target.value }))} /></td>
                         {canCost && <td><input type="number" min={0} step="0.01" value={draft.cost} aria-label={`Costo ${label}`} onChange={(event) => onChange(setDraft(state, combo.key, { cost: event.target.value }))} /></td>}
-                        {showPartnerSelect && (
+                        {partnerColumn && (
                           <td>
                             <PartnerSelect
                               compact noneOption={false} partners={partnerList.partners} value={draft.partnerId} ariaLabel={`Socio ${label}`}
@@ -205,7 +236,7 @@ export function VariantBuilder({ catalogs, state, onChange, canCost, canPartners
           </details>
         </fieldset>
       ) : (
-        <p className="adm-muted">Elegí al menos una talla y un color para armar la matriz de variantes.</p>
+        <p className="adm-muted">Elegí al menos un color y una talla para armar la matriz de cantidades.</p>
       )}
     </div>
   )

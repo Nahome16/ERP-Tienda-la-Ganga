@@ -61,6 +61,8 @@ export const kardexLabels: Record<string, string> = {
   Loss: 'Pérdida',
   Sale: 'Venta',
   SaleVoid: 'Anulación de venta',
+  ExchangeIn: 'Cambio de talla (entra)',
+  ExchangeOut: 'Cambio de talla (sale)',
 }
 
 /** Primeros caracteres de un identificador para mostrarlo en tablas. */

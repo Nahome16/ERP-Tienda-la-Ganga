@@ -17,7 +17,8 @@ public sealed record ProductListItemDto(
     int VariantCount,
     int TotalStock,
     long Version,
-    string? PrimaryImageUrl);
+    string? PrimaryImageUrl,
+    string? Barcode = null);
 
 public sealed record VariantDto(
     Guid Id,
@@ -51,7 +52,19 @@ public sealed record ProductDetailDto(
     long Version,
     string? PrimaryImageUrl,
     IReadOnlyList<VariantDto> Variants,
-    IReadOnlyList<ProductImageDto> Images);
+    IReadOnlyList<ProductImageDto> Images,
+    string? Barcode = null,
+    IReadOnlyList<ColorBarcodeDto>? ColorBarcodes = null);
+
+/// <summary>Código de fábrica de un color: lo comparten todas las tallas de ese color.</summary>
+public sealed record ColorBarcodeDto(Guid ColorId, string ColorName, string Barcode);
+
+public sealed record ColorBarcodeInput(Guid ColorId, string? Barcode);
+
+public sealed record SetColorBarcodeInput(string? Barcode);
+
+/// <summary>Producto encontrado por un código de fábrica; <c>ColorId</c> si el código es de un color.</summary>
+public sealed record ProductBarcodeMatchDto(ProductDetailDto Product, Guid? ColorId);
 
 public sealed record VariantLookupDto(string ProductName, VariantDto Variant);
 
@@ -78,7 +91,10 @@ public sealed record CreateProductInput(
     Guid BrandId,
     Guid? CutId,
     decimal? BasePrice,
-    IReadOnlyList<NewVariantInput>? Variants);
+    IReadOnlyList<NewVariantInput>? Variants,
+    DateOnly? ReceivedOn = null,
+    string? Barcode = null,
+    IReadOnlyList<ColorBarcodeInput>? ColorBarcodes = null);
 
 public sealed record UpdateProductInput(
     string? Name,
@@ -86,7 +102,8 @@ public sealed record UpdateProductInput(
     Guid BrandId,
     Guid? CutId,
     decimal? BasePrice,
-    bool? IsActive);
+    bool? IsActive,
+    string? Barcode = null);
 
 public sealed record UpdateVariantInput(string? Barcode, decimal? PriceOverride, decimal? Cost, bool? IsActive);
 
@@ -147,6 +164,23 @@ public interface IProductService
         CancellationToken cancellationToken);
 
     Task<ServiceResult<VariantLookupDto>> FindByBarcodeAsync(
+        string barcode,
+        Actor actor,
+        CancellationToken cancellationToken);
+
+    /// <summary>Elimina un producto sin ventas, con todo lo suyo. Con ventas: conflicto «product_has_sales».</summary>
+    Task<ServiceResult<bool>> DeleteAsync(Guid id, Actor actor, CancellationToken cancellationToken);
+
+    /// <summary>Pone, cambia o quita (vacío) el código de fábrica de un color del producto.</summary>
+    Task<ServiceResult<ProductDetailDto>> SetColorBarcodeAsync(
+        Guid productId,
+        Guid colorId,
+        SetColorBarcodeInput input,
+        Actor actor,
+        CancellationToken cancellationToken);
+
+    /// <summary>Producto por su código de fábrica: el del producto (todas las tallas) o el de un color.</summary>
+    Task<ServiceResult<ProductBarcodeMatchDto>> FindProductByBarcodeAsync(
         string barcode,
         Actor actor,
         CancellationToken cancellationToken);
