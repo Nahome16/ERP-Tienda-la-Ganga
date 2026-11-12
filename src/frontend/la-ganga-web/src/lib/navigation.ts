@@ -1,4 +1,5 @@
 import {
+  Barcode,
   Boxes,
   ChartColumn,
   Handshake,
@@ -51,6 +52,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { view: 'productos', label: 'Productos', icon: Shirt },
       { view: 'inventario', label: 'Existencias', icon: Boxes },
+      { view: 'etiquetas', label: 'Etiquetas', icon: Barcode },
       { view: 'catalogos', label: 'Catálogos', icon: Tags },
     ],
   },

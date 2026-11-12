@@ -5,6 +5,7 @@ export type AppView =
   | 'ventas'
   | 'reportes'
   | 'inventario'
+  | 'etiquetas'
   | 'socios'
   | 'productos'
   | 'equipo'

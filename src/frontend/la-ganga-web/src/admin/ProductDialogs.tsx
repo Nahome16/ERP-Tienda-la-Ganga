@@ -27,12 +27,14 @@ type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: st
 
 
 
-export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false, onCatalogCreated }: {
+export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false, hideBarcode = false, onCatalogCreated }: {
   fields: ProductFields
   /** Con permiso de catálogos: crear marca, categoría o corte al momento. */
   onCatalogCreated?: (list: 'brands' | 'cuts' | 'categories', item: CatalogItem) => void
   /** El alta pide el precio de venta al final, en «Ingreso». */
   hidePrice?: boolean
+  /** El sistema genera el código: no se pide el de fábrica. */
+  hideBarcode?: boolean
   onChange: (fields: ProductFields) => void
   catalogs: Catalogs
   extraCategory?: { id: string; name: string }
@@ -80,14 +82,14 @@ export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, e
           </select>
           {onCatalogCreated && <QuickCreate kind="cuts" label="corte" masculine onCreated={(item) => { onCatalogCreated('cuts', item); onChange({ ...fields, cutId: item.id }) }} />}
         </div>
-        <label className="adm-field">
+        {!hideBarcode && <label className="adm-field">
           <span>Código de fábrica (opcional)</span>
           <input
             value={fields.barcode} maxLength={64} inputMode="text" autoComplete="off" placeholder="Igual para todas las tallas"
             onChange={(event) => onChange({ ...fields, barcode: event.target.value })}
           />
           <small>Al escanearlo en caja se abre el producto y se elige la talla.</small>
-        </label>
+        </label>}
         <label className="adm-field">
           <span>Cód. ref. del proveedor (opcional)</span>
           <input
@@ -146,7 +148,10 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
   const canPartners = hasPermission(user, 'investment.read')
   const [fields, setFields] = useState<ProductFields>({ name: '', categoryId: '', brandId: '', cutId: '', basePrice: '', barcode: initialBarcode?.trim() ?? '', referenceCode: '' })
   // Cómo vienen los códigos de fábrica: uno para todo el producto (lo más común), uno por color o uno por talla.
-  const [codeMode, setCodeMode] = useState<'product' | 'color' | 'size'>('product')
+  const [codeMode, setCodeMode] = useState<'product' | 'color' | 'size' | 'generate'>('product')
+  // Sin código de fábrica: generar uno por talla y color (recomendado) o uno para todo el producto.
+  const [generateScope, setGenerateScope] = useState<'variant' | 'product'>('variant')
+  const generating = codeMode === 'generate'
   const codePerSize = codeMode === 'size'
   // Códigos por color: colorId → código. Los escaneados sin color elegido esperan en `pendingColorCodes`.
   const [colorCodes, setColorCodes] = useState<Record<string, string>>({})
@@ -179,8 +184,19 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
    * ejemplo, al abrir el alta desde Inventario) pasa al primer color o a la primera talla,
    * para que no quede repetido en dos lugares.
    */
-  function switchCodeMode(mode: 'product' | 'color' | 'size') {
+  function switchCodeMode(mode: 'product' | 'color' | 'size' | 'generate') {
     const productCode = fields.barcode.trim()
+    if (mode === 'generate') {
+      if (productCode || pendingCodes.length > 0 || Object.values(colorCodes).some((code) => code.trim())) {
+        setScanMessage({ tone: 'warn', text: 'Se quitaron los códigos escaneados: al guardar, el sistema genera los códigos nuevos.' })
+      }
+      setFields({ ...fields, barcode: '' })
+      setColorCodes({})
+      setPendingColorCodes([])
+      setPendingCodes([])
+      setCodeMode(mode)
+      return
+    }
     if (mode !== 'product' && productCode) {
       setFields({ ...fields, barcode: '' })
       if (mode === 'color') {
@@ -306,10 +322,16 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
       const colorBarcodes = builder.colorIds
         .map((colorId) => ({ colorId, barcode: colorCodes[colorId]?.trim() ?? '' }))
         .filter((item) => item.barcode)
-      created = await createProduct({
-        ...input, variants: built.inputs, ...(built.totalUnits > 0 ? { receivedOn } : {}),
-        ...(colorBarcodes.length > 0 ? { colorBarcodes } : {}),
-      })
+      created = await createProduct(generating
+        // Códigos generados por el sistema: no se manda ningún código de fábrica.
+        ? {
+            ...input, barcode: '', variants: built.inputs.map((variant) => ({ ...variant, barcode: null })),
+            ...(built.totalUnits > 0 ? { receivedOn } : {}), generateProductBarcode: generateScope === 'product',
+          }
+        : {
+            ...input, variants: built.inputs, ...(built.totalUnits > 0 ? { receivedOn } : {}),
+            ...(colorBarcodes.length > 0 ? { colorBarcodes } : {}),
+          })
     } catch (caught) {
       setError(describeError(caught))
       setSaving(false)
@@ -340,7 +362,7 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
       )}
     >
       <h3 className="adm-step"><span>1</span>Producto</h3>
-      <form className="adm-scanzone" onSubmit={(event) => { void submitScan(event) }} role="search" onClick={() => scanRef.current?.focus()}>
+      {!generating && <form className="adm-scanzone" onSubmit={(event) => { void submitScan(event) }} role="search" onClick={() => scanRef.current?.focus()}>
         <div className="adm-scanzone-head">
           <span className="adm-scanzone-icon" aria-hidden="true"><ScanBarcode size={20} strokeWidth={1.75} /></span>
           <div>
@@ -359,7 +381,7 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
           />
           <button type="submit" className="primary-button" disabled={scanning || !scan.trim()}>{scanning ? 'Buscando…' : 'Agregar código'}</button>
         </div>
-      </form>
+      </form>}
       {scanMessage && (
         <ScanResult
           message={scanMessage}
@@ -382,7 +404,22 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
         <label><input type="radio" name="code-mode" checked={codeMode === 'product'} onChange={() => switchCodeMode('product')} /> Uno para todo el producto</label>
         <label><input type="radio" name="code-mode" checked={codeMode === 'color'} onChange={() => switchCodeMode('color')} /> Uno por color</label>
         <label><input type="radio" name="code-mode" checked={codeMode === 'size'} onChange={() => switchCodeMode('size')} /> Uno por talla</label>
+        <label><input type="radio" name="code-mode" checked={generating} onChange={() => switchCodeMode('generate')} /> No tiene código: generar</label>
       </fieldset>
+      {generating && (
+        <fieldset className="adm-generate">
+          <legend>¿Qué código genero?</legend>
+          <label className={generateScope === 'variant' ? 'is-on' : undefined}>
+            <input type="radio" name="generate-scope" checked={generateScope === 'variant'} onChange={() => setGenerateScope('variant')} />
+            <span><b>Uno por talla y color</b> <em>(recomendado)</em><small>Al escanearlo en caja entra directo la talla y el color correctos.</small></span>
+          </label>
+          <label className={generateScope === 'product' ? 'is-on' : undefined}>
+            <input type="radio" name="generate-scope" checked={generateScope === 'product'} onChange={() => setGenerateScope('product')} />
+            <span><b>Uno para todo el producto</b><small>Una sola etiqueta para todas las prendas; en caja se elige la talla y el color.</small></span>
+          </label>
+          <p className="adm-help">Los códigos se crean al guardar y quedan en <b>Inventario → Etiquetas</b> para imprimirlos.</p>
+        </fieldset>
+      )}
       {pendingColorCodes.length > 0 && (
         <p className="adm-scan-pending">
           Códigos de color por asignar: {pendingColorCodes.map((code) => (
@@ -394,7 +431,7 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
         </p>
       )}
       <form id="create-product-form" className="adm-form" onKeyDown={blockEnterSubmit} onSubmit={(event) => { void submit(event) }}>
-        <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice onCatalogCreated={canCreateColors ? addCatalog : undefined} />
+        <ProductFieldsForm fields={fields} onChange={setFields} catalogs={catalogs} hidePrice hideBarcode={generating} onCatalogCreated={canCreateColors ? addCatalog : undefined} />
 
         <h3 className="adm-step"><span>2</span>Colores, tallas y cantidades</h3>
         <VariantBuilder

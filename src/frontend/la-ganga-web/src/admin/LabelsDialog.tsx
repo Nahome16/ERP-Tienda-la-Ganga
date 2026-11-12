@@ -21,7 +21,7 @@ function LabelItem({ variant, widthMm, heightMm, screen }: LabelItemProps) {
   return (
     <div className={screen ? 'label-item screen' : 'label-item'} style={{ width: `${widthMm}mm`, height: `${heightMm}mm` }}>
       <div className="label-name">{variant.productName}</div>
-      <div className="label-variant">Talla {variant.sizeName} · {variant.colorName}</div>
+      <div className="label-variant">{variant.sizeName ? `Talla ${variant.sizeName} · ${variant.colorName}` : variant.colorName}</div>
       <div className="label-barcode"><Barcode code={variant.barcode} /></div>
       <div className="label-price">{variant.price > 0 ? formatNio(variant.price) : 'C$ ________'}</div>
     </div>
@@ -43,9 +43,17 @@ function storeValue(key: string, value: number) {
 }
 
 /** Imprime etiquetas de código de barras de las variantes elegidas con el cuadro de impresión del navegador. */
-export function LabelsDialog({ title, variants, onClose }: { title: string; variants: LabelVariant[]; onClose: () => void }) {
+export function LabelsDialog({ title, variants, onClose, initialCopies = 'one', onPrinted }: {
+  title: string
+  variants: LabelVariant[]
+  onClose: () => void
+  /** Copias al abrir: 1 por variante o tantas como unidades en existencia. */
+  initialCopies?: 'one' | 'stock'
+  /** Se avisa qué se mandó a imprimir (para marcar las etiquetas como impresas). */
+  onPrinted?: (printed: { variantId: string; copies: number }[]) => void
+}) {
   const [selected, setSelected] = useState<Record<string, boolean>>(() => Object.fromEntries(variants.map((variant) => [variant.variantId, true])))
-  const [copies, setCopies] = useState<Record<string, string>>(() => Object.fromEntries(variants.map((variant) => [variant.variantId, '1'])))
+  const [copies, setCopies] = useState<Record<string, string>>(() => Object.fromEntries(variants.map((variant) => [variant.variantId, initialCopies === 'stock' ? String(Math.max(variant.stock, 1)) : '1'])))
   const [widthMm, setWidthMm] = useState(() => readStored('la-ganga-label-w', 50))
   const [heightMm, setHeightMm] = useState(() => readStored('la-ganga-label-h', 30))
   const [layout, setLayout] = useState<Layout>('roll')
@@ -83,6 +91,10 @@ export function LabelsDialog({ title, variants, onClose }: { title: string; vari
     }
     window.addEventListener('afterprint', cleanup)
     window.print()
+    onPrinted?.(variants
+      .filter((variant) => selected[variant.variantId])
+      .map((variant) => ({ variantId: variant.variantId, copies: Math.max(0, Math.min(Math.floor(Number(copies[variant.variantId]) || 0), maxLabels)) }))
+      .filter((item) => item.copies > 0))
   }
 
   function setAllCopies(mode: 'one' | 'stock') {

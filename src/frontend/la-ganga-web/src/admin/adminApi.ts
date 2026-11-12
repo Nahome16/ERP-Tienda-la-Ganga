@@ -58,7 +58,7 @@ export type VariantInput = {
 /** `barcode`: código de fábrica del producto; vacío lo quita al editar. */
 export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number; barcode?: string; referenceCode?: string }
 
-export const createProduct = (input: ProductInput & { variants: VariantInput[]; receivedOn?: string; colorBarcodes?: { colorId: string; barcode: string }[] }) =>
+export const createProduct = (input: ProductInput & { variants: VariantInput[]; receivedOn?: string; colorBarcodes?: { colorId: string; barcode: string }[]; generateProductBarcode?: boolean }) =>
   apiRequest<ProductDetail>(`${v1}/products`, { method: 'POST', body: input })
 export const updateProduct = (product: { id: string; version: number }, input: ProductInput & { isActive: boolean }) =>
   apiRequest<ProductListItem>(`${v1}/products/${product.id}`, { method: 'PUT', body: input, ifMatch: product.version })
