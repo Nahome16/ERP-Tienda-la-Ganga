@@ -725,6 +725,10 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("ReferenceCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -750,6 +754,8 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.HasIndex("CutId");
 
                     b.HasIndex("Name");
+
+                    b.HasIndex("ReferenceCode");
 
                     b.HasIndex("UpdatedBy");
 

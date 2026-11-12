@@ -20,7 +20,8 @@ public sealed record ProductListItemDto(
     string? PrimaryImageUrl,
     string? Barcode = null,
     // Alguna talla no tiene precio de venta (precio pendiente): no se puede vender.
-    bool MissingPrice = false);
+    bool MissingPrice = false,
+    string? ReferenceCode = null);
 
 public sealed record VariantDto(
     Guid Id,
@@ -56,7 +57,8 @@ public sealed record ProductDetailDto(
     IReadOnlyList<VariantDto> Variants,
     IReadOnlyList<ProductImageDto> Images,
     string? Barcode = null,
-    IReadOnlyList<ColorBarcodeDto>? ColorBarcodes = null);
+    IReadOnlyList<ColorBarcodeDto>? ColorBarcodes = null,
+    string? ReferenceCode = null);
 
 /// <summary>Lo vendido de una variante (ventas confirmadas): unidades, ingresos y costo (si se puede ver).</summary>
 public sealed record VariantSalesDto(Guid VariantId, int SoldUnits, decimal SoldRevenueNio, decimal? SoldCostNio);
@@ -99,7 +101,8 @@ public sealed record CreateProductInput(
     IReadOnlyList<NewVariantInput>? Variants,
     DateOnly? ReceivedOn = null,
     string? Barcode = null,
-    IReadOnlyList<ColorBarcodeInput>? ColorBarcodes = null);
+    IReadOnlyList<ColorBarcodeInput>? ColorBarcodes = null,
+    string? ReferenceCode = null);
 
 public sealed record UpdateProductInput(
     string? Name,
@@ -108,7 +111,8 @@ public sealed record UpdateProductInput(
     Guid? CutId,
     decimal? BasePrice,
     bool? IsActive,
-    string? Barcode = null);
+    string? Barcode = null,
+    string? ReferenceCode = null);
 
 public sealed record UpdateVariantInput(string? Barcode, decimal? PriceOverride, decimal? Cost, bool? IsActive);
 
@@ -220,7 +224,33 @@ public sealed record InventoryRowDto(
     decimal? StockValue,
     int? PartnerStock = null,
     IReadOnlyList<PartnerUnitsDto>? Partners = null,
-    string? ImageUrl = null);
+    string? ImageUrl = null,
+    int SoldUnits = 0,
+    string? ProductBarcode = null,
+    string? ReferenceCode = null);
+
+/// <summary>
+/// Existencias agrupadas por producto madre: la suma de sus tallas y colores, el rango de precio
+/// y de costo, el valor al costo y lo vendido (ventas confirmadas).
+/// </summary>
+public sealed record InventoryProductRowDto(
+    Guid ProductId,
+    string ProductName,
+    string CategoryName,
+    string BrandName,
+    string? Barcode,
+    string? ReferenceCode,
+    string? ImageUrl,
+    int Variants,
+    int Stock,
+    decimal MinPrice,
+    decimal MaxPrice,
+    decimal? MinCost,
+    decimal? MaxCost,
+    decimal? StockValue,
+    int SoldUnits,
+    decimal SoldRevenue,
+    bool MissingPrice);
 
 public sealed record PartnerUnitsDto(Guid? PartnerId, string Name, int Units);
 
@@ -258,6 +288,8 @@ public interface IInventoryService
     Task<InventorySummaryDto> GetSummaryAsync(CancellationToken cancellationToken);
 
     Task<PageResult<InventoryRowDto>> ListAsync(InventoryQuery query, Actor actor, CancellationToken cancellationToken);
+
+    Task<PageResult<InventoryProductRowDto>> ListProductsAsync(InventoryQuery query, Actor actor, CancellationToken cancellationToken);
 
     Task<ServiceResult<PageResult<KardexRowDto>>> GetKardexAsync(
         Guid variantId,

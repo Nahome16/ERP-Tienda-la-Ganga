@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { QuickCreate } from './QuickCreate'
 import type { CatalogItem } from '../lib/catalogApi'
 import { ScanBarcode } from 'lucide-react'
@@ -8,10 +8,10 @@ import type { CurrentUser } from '../types'
 import { hasPermission } from '../lib/access'
 import type { ProductDetail, ProductListItem, Variant } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
-import { addVariant, createProduct, getProductByBarcode, getVariantByBarcode, updateProduct, updateVariant, type ProductInput } from './adminApi'
+import { addVariant, createProduct, getProductByBarcode, getVariantByBarcode, updateProduct, updateVariant } from './adminApi'
 import { parseDecimal } from './csv'
 import { blockEnterSubmit } from './forms'
-import { addDays, managuaToday, messageFrom } from './format'
+import { addDays, managuaToday } from './format'
 import { PendingImages } from './ImageManager'
 import { uploadPendingImages, type UploadReport } from './imageApi'
 import { Dialog, Notice, Swatch } from './ui'
@@ -21,38 +21,13 @@ import { VariantBuilder } from './VariantBuilder'
 import { assignScannedBarcodes, builderToInputs, combosOf, draftBarcodes, emptyBuilder, withDefaultCost, type BuilderState } from './variantBuilderLogic'
 import { PartnerSelect, PartnersHint } from './PartnerSelect'
 import { usePartners } from './usePartners'
-
-function describeError(error: unknown): string {
-  if (error instanceof ApiError) {
-    // Los detalles por campo a veces repiten el mismo texto del mensaje principal.
-    const details = [...new Set(Object.values(error.fieldErrors).flat())].filter((detail) => detail !== error.message)
-    return details.length > 0 ? `${error.message} ${details.join(' ')}` : error.message
-  }
-  return messageFrom(error)
-}
-
-/** Colores creados desde el diálogo: se suman a los del catálogo hasta que la lista se recargue. */
-type CatalogList = keyof Catalogs
-
-/** Catálogos creados desde el diálogo (colores, tallas, marcas…): se suman hasta que la lista se recargue. */
-function useCatalogsWithNewColors(base: Catalogs) {
-  const [extra, setExtra] = useState<{ list: CatalogList; item: CatalogItem }[]>([])
-  const catalogs = useMemo(() => {
-    const merged = { ...base }
-    for (const { list, item } of extra) {
-      if (!merged[list].some((existing) => existing.id === item.id)) merged[list] = [...merged[list], item]
-    }
-    return merged
-  }, [base, extra])
-  const add = (list: CatalogList, item: CatalogItem) => setExtra((current) => [...current, { list, item }])
-  return { catalogs, add, addColor: (color: CatalogItem) => add('colors', color) }
-}
+import { describeError, useCatalogsWithNewColors, validateFields, type ProductFields } from './productForm'
 
 type ScanMessage = { tone: 'ok' | 'warn' | 'error'; text: string; productId?: string; code?: string }
 
-type ProductFields = { name: string; categoryId: string; brandId: string; cutId: string; basePrice: string; barcode: string }
 
-function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false, onCatalogCreated }: {
+
+export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBrand, hidePrice = false, onCatalogCreated }: {
   fields: ProductFields
   /** Con permiso de catálogos: crear marca, categoría o corte al momento. */
   onCatalogCreated?: (list: 'brands' | 'cuts' | 'categories', item: CatalogItem) => void
@@ -113,6 +88,14 @@ function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBra
           />
           <small>Al escanearlo en caja se abre el producto y se elige la talla.</small>
         </label>
+        <label className="adm-field">
+          <span>Cód. ref. del proveedor (opcional)</span>
+          <input
+            value={fields.referenceCode} maxLength={64} autoComplete="off" placeholder="El código con el que te factura"
+            onChange={(event) => onChange({ ...fields, referenceCode: event.target.value })}
+          />
+          <small>Queda ligado a este producto: sirve para buscarlo y cuadrar con la factura.</small>
+        </label>
         {!hidePrice && (
           <label className="adm-field">
             <span>Precio base (C$)</span>
@@ -123,19 +106,6 @@ function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, extraBra
       </div>
     </>
   )
-}
-
-function validateFields(fields: ProductFields): { input: ProductInput | null; error: string | null } {
-  if (!fields.name.trim()) return { input: null, error: 'Escribí el nombre del producto.' }
-  if (!fields.categoryId) return { input: null, error: 'Elegí la categoría.' }
-  if (!fields.brandId) return { input: null, error: 'Elegí la marca.' }
-  // Vacío = precio pendiente (se guarda en 0 y no se puede vender hasta completarlo).
-  const basePrice = fields.basePrice.trim() === '' ? 0 : parseDecimal(fields.basePrice)
-  if (basePrice === null || basePrice < 0) return { input: null, error: 'El precio de venta no puede ser negativo (dejalo vacío si lo vas a poner después).' }
-  return {
-    input: { name: fields.name.trim(), categoryId: fields.categoryId, brandId: fields.brandId, cutId: fields.cutId || null, basePrice, barcode: fields.barcode.trim() },
-    error: null,
-  }
 }
 
 /** ¿A quién pertenece un código? A una talla de un producto, a un producto entero o a nadie (null). */
@@ -174,7 +144,7 @@ export function CreateProductDialog({ user, catalogs: baseCatalogs, onClose, onC
   const canCost = hasPermission(user, 'inventory.cost.read')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
   const canPartners = hasPermission(user, 'investment.read')
-  const [fields, setFields] = useState<ProductFields>({ name: '', categoryId: '', brandId: '', cutId: '', basePrice: '', barcode: initialBarcode?.trim() ?? '' })
+  const [fields, setFields] = useState<ProductFields>({ name: '', categoryId: '', brandId: '', cutId: '', basePrice: '', barcode: initialBarcode?.trim() ?? '', referenceCode: '' })
   // Cómo vienen los códigos de fábrica: uno para todo el producto (lo más común), uno por color o uno por talla.
   const [codeMode, setCodeMode] = useState<'product' | 'color' | 'size'>('product')
   const codePerSize = codeMode === 'size'
@@ -505,6 +475,7 @@ export function EditProductDialog({ product, catalogs, onClose, onSaved, onConfl
   const [fields, setFields] = useState<ProductFields>({
     name: product.name, categoryId: product.categoryId, brandId: product.brandId,
     cutId: product.cutId ?? '', basePrice: product.basePrice > 0 ? String(product.basePrice) : '', barcode: product.barcode ?? '',
+    referenceCode: product.referenceCode ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

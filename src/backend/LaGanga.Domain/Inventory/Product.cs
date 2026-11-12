@@ -7,6 +7,9 @@ public sealed class Product
     /// <summary>Largo máximo del código de fábrica del producto (igual que el de una variante).</summary>
     public const int BarcodeMaxLength = 64;
 
+    /// <summary>Largo máximo del código de referencia del proveedor.</summary>
+    public const int ReferenceCodeMaxLength = 64;
+
     private readonly List<ProductVariant> _variants = [];
 
     private Product()
@@ -55,6 +58,12 @@ public sealed class Product
     /// </summary>
     public string? Barcode { get; private set; }
 
+    /// <summary>
+    /// Código de referencia (cód. ref.) con el que el proveedor factura el producto. No tiene que
+    /// ser único (dos proveedores pueden repetir); sirve para buscar y para cuadrar con la factura.
+    /// </summary>
+    public string? ReferenceCode { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -92,6 +101,11 @@ public sealed class Product
     public void SetBarcode(string? barcode)
     {
         Barcode = string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
+    }
+
+    public void SetReferenceCode(string? referenceCode)
+    {
+        ReferenceCode = string.IsNullOrWhiteSpace(referenceCode) ? null : referenceCode.Trim();
     }
 
     public ProductVariant AddVariant(

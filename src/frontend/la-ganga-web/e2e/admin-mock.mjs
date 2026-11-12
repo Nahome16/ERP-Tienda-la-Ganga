@@ -272,6 +272,24 @@ export function createMock(options = {}) {
       if (term) rows = rows.filter((x) => `${x.productName} ${x.sizeName} ${x.colorName} ${x.barcode}`.toLowerCase().includes(term))
       return json(route, 200, page(rows, Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 25)))
     }
+    if (path === '/api/v1/inventory/products') {
+      const canCost = user.permissions.includes('inventory.cost.read')
+      const term = (q.get('search') ?? '').toLowerCase()
+      const rows = s.products.filter((p) => !term || `${p.name} ${p.barcode ?? ''} ${p.referenceCode ?? ''}`.toLowerCase().includes(term)).map((p) => {
+        const vs = s.variants.filter((v) => v.productId === p.id)
+        const prices = vs.length ? vs.map((v) => v.priceOverride ?? p.basePrice) : [p.basePrice]
+        const costs = vs.map((v) => v.cost).filter((c) => c != null)
+        return {
+          productId: p.id, productName: p.name, categoryName: s.categories.find((c) => c.id === p.categoryId)?.name, brandName: s.brands.find((c) => c.id === p.brandId)?.name,
+          barcode: p.barcode ?? null, referenceCode: p.referenceCode ?? null, imageUrl: null, variants: vs.length, stock: vs.reduce((a, v) => a + v.stock, 0),
+          minPrice: Math.min(...prices), maxPrice: Math.max(...prices),
+          minCost: canCost && costs.length ? Math.min(...costs) : null, maxCost: canCost && costs.length ? Math.max(...costs) : null,
+          stockValue: canCost && costs.length === vs.length && vs.length ? vs.reduce((a, v) => a + Math.max(v.stock, 0) * v.cost, 0) : null,
+          soldUnits: 0, soldRevenue: 0, missingPrice: prices.some((x) => x <= 0),
+        }
+      })
+      return json(route, 200, page(rows, Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 25)))
+    }
     if ((r = m(/^\/api\/v1\/inventory\/variants\/([^/]+)\/kardex$/))) {
       const v = s.variants.find((x) => x.id === r[1])
       return json(route, 200, page([...v.movements].reverse(), Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 10)))

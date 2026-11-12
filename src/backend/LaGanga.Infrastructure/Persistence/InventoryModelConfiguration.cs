@@ -27,6 +27,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(product => product.Name);
         builder.Property(product => product.Barcode).HasMaxLength(Product.BarcodeMaxLength);
         builder.HasIndex(product => product.Barcode).IsUnique().HasFilter("\"Barcode\" IS NOT NULL");
+        builder.Property(product => product.ReferenceCode).HasMaxLength(Product.ReferenceCodeMaxLength);
+        builder.HasIndex(product => product.ReferenceCode);
     }
 }
 

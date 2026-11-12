@@ -232,6 +232,44 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task ReferenceCodeFindsTheProductAndStockByProductShowsWhatWasSold()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        var reference = string.Create(CultureInfo.InvariantCulture, $"REF-{Interlocked.Increment(ref _counter)}-ZX");
+        var product = await CreateProductAsync(catalogs, "Jeans con referencia", 800m, [(3, 500m), (2, 500m)], $"  {reference} ");
+        var productId = product.GetProperty("id").GetGuid();
+        Assert.Equal(reference, product.GetProperty("referenceCode").GetString());
+
+        // El cód. ref. del proveedor abre el producto (si lo tiene uno solo) y sirve para buscar.
+        var match = await GetAsync(fixture.Admin, $"/api/v1/products/by-barcode/{reference}");
+        Assert.Equal(productId, match.GetProperty("product").GetProperty("id").GetGuid());
+        var listed = await GetAsync(fixture.Admin, $"/api/v1/products?search={reference}");
+        Assert.Equal(reference, Assert.Single(listed.GetProperty("items").EnumerateArray()).GetProperty("referenceCode").GetString());
+
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var seller = await CreateSellerAsync();
+        var session = await OpenCashAsync(seller, 0m, 0m);
+        _ = await PostSaleAsync(seller, session, Guid.NewGuid(), [(variantId, 1, 800m)], null, null, [Pay("Cash", "NIO", 800m)]);
+
+        var byProduct = await GetAsync(fixture.Admin, $"/api/v1/inventory/products?search={reference}");
+        var row = Assert.Single(byProduct.GetProperty("items").EnumerateArray());
+        Assert.Equal(productId, row.GetProperty("productId").GetGuid());
+        Assert.Equal(reference, row.GetProperty("referenceCode").GetString());
+        Assert.Equal(2, row.GetProperty("variants").GetInt32());
+        Assert.Equal(4, row.GetProperty("stock").GetInt32());
+        Assert.Equal(1, row.GetProperty("soldUnits").GetInt32());
+        Assert.Equal(800m, row.GetProperty("soldRevenue").GetDecimal());
+        Assert.Equal(500m, row.GetProperty("minCost").GetDecimal());
+        Assert.Equal(2000m, row.GetProperty("stockValue").GetDecimal());
+
+        var byVariant = await GetAsync(fixture.Admin, $"/api/v1/inventory?search={reference}");
+        var sold = byVariant.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("variantId").GetGuid() == variantId);
+        Assert.Equal(1, sold.GetProperty("soldUnits").GetInt32());
+
+        _ = await PostAsync(seller.Client, seller.Csrf, $"/api/v1/cash/sessions/{session}/close", new { countedCashNio = 800m, countedCashUsd = 0m });
+    }
+
+    [PostgresFact]
     public async Task OnlineSaleRejectsAClientPriceDifferentFromTheOfficialPrice()
     {
         var catalogs = await LoadCatalogsAsync();
@@ -608,7 +646,7 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         return new Catalogs(categories[0], brands[0], sizes, colors);
     }
 
-    private async Task<JsonElement> CreateProductAsync(Catalogs catalogs, string name, decimal price, (int Quantity, decimal? Cost)[] variants)
+    private async Task<JsonElement> CreateProductAsync(Catalogs catalogs, string name, decimal price, (int Quantity, decimal? Cost)[] variants, string? referenceCode = null)
     {
         var suffix = Interlocked.Increment(ref _counter);
         var body = new
@@ -618,6 +656,7 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
             brandId = catalogs.Brand,
             cutId = (Guid?)null,
             basePrice = price,
+            referenceCode,
             variants = variants.Select((variant, index) => new
             {
                 sizeId = catalogs.Sizes[index],

@@ -32,7 +32,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
   async function openByCode(event: FormEvent) {
     event.preventDefault()
     const code = searchInput.trim()
-    if (!/^[A-Za-z0-9-]{4,}$/.test(code) || scanning) return
+    if (!/^[A-Za-z0-9._/-]{3,64}$/.test(code) || scanning) return
     setScanning(true)
     try {
       const found = await getProductByBarcode(code).then((result) => result.product.id)
@@ -80,7 +80,7 @@ export function ProductsView({ user }: { user: CurrentUser }) {
           <form className="catalog-search grow" role="search" onSubmit={(event) => { void openByCode(event) }}>
             <Search size={18} strokeWidth={1.75} aria-hidden="true" />
             <input
-              type="search" placeholder="Buscar o escanear el código para abrir la ficha" aria-label="Buscar productos"
+              type="search" placeholder="Buscar o escanear el código (o cód. ref.) para abrir la ficha" aria-label="Buscar productos"
               value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1) }}
             />
           </form>
@@ -119,7 +119,11 @@ export function ProductsView({ user }: { user: CurrentUser }) {
                   <td className="thumb-col"><Thumb src={product.primaryImageUrl} name={product.name} size={44} /></td>
                   <td>
                     <button type="button" className="link-button" style={{ padding: 0, textAlign: 'left' }} onClick={() => setDetail({ id: product.id, labels: false })}>{product.name}</button>
-                    {product.cutName && <small className="row-sub">Corte {product.cutName}</small>}
+                    {(product.cutName || product.barcode || product.referenceCode) && (
+                      <small className="row-sub">
+                        {[product.cutName && `Corte ${product.cutName}`, product.barcode && `Cód. ${product.barcode}`, product.referenceCode && `Ref. ${product.referenceCode}`].filter(Boolean).join(' · ')}
+                      </small>
+                    )}
                   </td>
                   <td>{product.categoryName}</td>
                   <td>{product.brandName}</td>

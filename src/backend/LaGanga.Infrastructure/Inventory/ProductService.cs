@@ -165,6 +165,7 @@ public sealed class ProductService : IProductService
                 EF.Functions.ILike(product.Name, pattern) ||
                 dbContext.Brands.Any(brand => brand.Id == product.BrandId && EF.Functions.ILike(brand.Name, pattern)) ||
                 (product.Barcode != null && EF.Functions.ILike(product.Barcode, pattern)) ||
+                (product.ReferenceCode != null && EF.Functions.ILike(product.ReferenceCode, pattern)) ||
                 dbContext.ProductColorBarcodes.Any(code => code.ProductId == product.Id && EF.Functions.ILike(code.Barcode, pattern)) ||
                 dbContext.Variants.Any(variant => variant.ProductId == product.Id && EF.Functions.ILike(variant.Barcode, pattern)));
         }
@@ -198,7 +199,8 @@ public sealed class ProductService : IProductService
                     .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault(),
                 product.Barcode,
                 (product.BasePrice <= 0 && !dbContext.Variants.Any(variant => variant.ProductId == product.Id)) ||
-                    dbContext.Variants.Any(variant => variant.ProductId == product.Id && (variant.PriceOverride ?? product.BasePrice) <= 0)))
+                    dbContext.Variants.Any(variant => variant.ProductId == product.Id && (variant.PriceOverride ?? product.BasePrice) <= 0),
+                product.ReferenceCode))
             .ToListAsync(cancellationToken);
         return Paging.Create(items, query.Page, query.PageSize, total);
     }
@@ -247,6 +249,11 @@ public sealed class ProductService : IProductService
             return Result.Fail<ProductDetailDto>(variantError);
         }
 
+        if (input.ReferenceCode is { } createReference && createReference.Trim().Length > Product.ReferenceCodeMaxLength)
+        {
+            return Invalid("referenceCode", $"El código de referencia admite hasta {Product.ReferenceCodeMaxLength} caracteres.");
+        }
+
         var productBarcode = input.Barcode?.Trim();
         var barcodeError = await ValidateProductBarcodeAsync(productBarcode, null, cancellationToken);
         if (barcodeError is not null)
@@ -277,6 +284,7 @@ public sealed class ProductService : IProductService
         var product = new Product(
             Guid.NewGuid(), name, input.CategoryId, input.BrandId, input.CutId, input.BasePrice.Value, actor.UserId, now);
         product.SetBarcode(productBarcode);
+        product.SetReferenceCode(input.ReferenceCode);
         dbContext.Products.Add(product);
         foreach (var colorCode in input.ColorBarcodes ?? [])
         {
@@ -341,6 +349,17 @@ public sealed class ProductService : IProductService
         if (referenceError is not null)
         {
             return Result.Fail<ProductDetailDto>(referenceError);
+        }
+
+        // Igual que el código: sin «referenceCode» se conserva; una cadena vacía lo quita.
+        if (input.ReferenceCode is not null)
+        {
+            if (input.ReferenceCode.Trim().Length > Product.ReferenceCodeMaxLength)
+            {
+                return Invalid("referenceCode", $"El código de referencia admite hasta {Product.ReferenceCodeMaxLength} caracteres.");
+            }
+
+            product.SetReferenceCode(input.ReferenceCode);
         }
 
         // Sin «barcode» en la solicitud se conserva el código; una cadena vacía lo quita.
@@ -781,7 +800,8 @@ public sealed class ProductService : IProductService
             variants,
             images,
             product.Barcode,
-            colorBarcodes);
+            colorBarcodes,
+            product.ReferenceCode);
     }
 
     public async Task<ServiceResult<ProductBarcodeMatchDto>> FindProductByBarcodeAsync(
@@ -802,6 +822,20 @@ public sealed class ProductService : IProductService
             var colorCode = await dbContext.ProductColorBarcodes.AsNoTracking().SingleOrDefaultAsync(item => item.Barcode == code, cancellationToken);
             productId = colorCode?.ProductId;
             colorId = colorCode?.ColorId;
+        }
+
+        if (productId is null && code.Length > 0)
+        {
+            // Último intento: el código de referencia del proveedor, si lo tiene un solo producto.
+            var byReference = await dbContext.Products.AsNoTracking()
+                .Where(product => product.ReferenceCode == code)
+                .Select(product => product.Id)
+                .Take(2)
+                .ToListAsync(cancellationToken);
+            if (byReference.Count == 1)
+            {
+                productId = byReference[0];
+            }
         }
 
         if (productId is null)

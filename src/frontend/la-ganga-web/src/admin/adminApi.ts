@@ -1,7 +1,7 @@
 // Llamadas tipadas de las pantallas administrativas. Contrato: docs/30-mvp-contrato-api.md
 import { apiRequest } from '../lib/api'
 import type {
-  AuditRow, CashConsolidated, CashSummary, CloseSessionRequest, ImportResult, ImportRow, InventoryRow, InventorySummary,
+  AuditRow, CashConsolidated, CashSummary, CloseSessionRequest, ImportResult, ImportRow, InventoryProductRow, InventoryRow, InventorySummary,
   KardexRow, PageResult, Partner, ProductDetail, ProductListItem, Sale, StoreSettings, Variant,
 } from '../lib/apiTypes'
 
@@ -56,7 +56,7 @@ export type VariantInput = {
   partnerId?: string
 }
 /** `barcode`: código de fábrica del producto; vacío lo quita al editar. */
-export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number; barcode?: string }
+export type ProductInput = { name: string; categoryId: string; brandId: string; cutId: string | null; basePrice: number; barcode?: string; referenceCode?: string }
 
 export const createProduct = (input: ProductInput & { variants: VariantInput[]; receivedOn?: string; colorBarcodes?: { colorId: string; barcode: string }[] }) =>
   apiRequest<ProductDetail>(`${v1}/products`, { method: 'POST', body: input })
@@ -100,6 +100,8 @@ export const getInventorySummary = (signal?: AbortSignal) => apiRequest<Inventor
 export type InventoryFilter = { search: string; filter: string; page: number; pageSize: number; partnerId?: string }
 export const listInventory = (filter: InventoryFilter, signal?: AbortSignal) =>
   apiRequest<PageResult<InventoryRow>>(`${v1}/inventory${query({ ...filter, search: filter.search.trim() })}`, { signal })
+export const listInventoryProducts = (filter: InventoryFilter, signal?: AbortSignal) =>
+  apiRequest<PageResult<InventoryProductRow>>(`${v1}/inventory/products${query({ ...filter, search: filter.search.trim() })}`, { signal })
 export const getKardex = (variantId: string, page: number, pageSize: number, signal?: AbortSignal) =>
   apiRequest<PageResult<KardexRow>>(`${v1}/inventory/variants/${variantId}/kardex${query({ page, pageSize })}`, { signal })
 export type AdjustmentInput = {

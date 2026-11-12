@@ -589,6 +589,27 @@ public static class MvpEndpoints
             })
             .RequireAuthorization(PermissionNames.InventoryRead);
 
+        group.MapGet("/products", async (
+                [FromQuery] string? search,
+                [FromQuery] string? filter,
+                [FromQuery] string? partnerId,
+                [FromQuery] int? page,
+                [FromQuery] int? pageSize,
+                IInventoryService service,
+                HttpContext http,
+                CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                if (actor is null)
+                {
+                    return ApiHelpers.Unauthorized401();
+                }
+
+                var (p, size) = Paging.Normalize(page, pageSize);
+                return Results.Ok(await service.ListProductsAsync(new InventoryQuery(search, filter, p, size, partnerId), actor, ct));
+            })
+            .RequireAuthorization(PermissionNames.InventoryRead);
+
         group.MapGet("/variants/{id:guid}/kardex", async (
                 Guid id,
                 [FromQuery] int? page,

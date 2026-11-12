@@ -4,6 +4,7 @@ using LaGanga.Application.Inventory;
 using LaGanga.Application.Settings;
 using LaGanga.Domain.Identity;
 using LaGanga.Domain.Inventory;
+using LaGanga.Domain.Sales;
 using LaGanga.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,6 +67,8 @@ public sealed class InventoryService : IInventoryService
                 SizeOrder = size.SortOrder,
                 ColorName = color.Name,
                 variant.Barcode,
+                ProductBarcode = product.Barcode,
+                product.ReferenceCode,
                 Price = variant.PriceOverride ?? product.BasePrice,
                 Stock = balance == null ? 0 : balance.Quantity,
                 variant.Cost,
@@ -105,7 +108,9 @@ public sealed class InventoryService : IInventoryService
                 EF.Functions.ILike(row.BrandName, pattern) ||
                 EF.Functions.ILike(row.SizeName, pattern) ||
                 EF.Functions.ILike(row.ColorName, pattern) ||
-                EF.Functions.ILike(row.Barcode, pattern));
+                EF.Functions.ILike(row.Barcode, pattern) ||
+                (row.ProductBarcode != null && EF.Functions.ILike(row.ProductBarcode, pattern)) ||
+                (row.ReferenceCode != null && EF.Functions.ILike(row.ReferenceCode, pattern)));
         }
 
         switch (query.Filter?.Trim().ToUpperInvariant())
@@ -147,6 +152,7 @@ public sealed class InventoryService : IInventoryService
             }
         }
 
+        var sold = await SoldUnitsAsync(pageVariantIds, cancellationToken);
         var items = page.Select(row => new InventoryRowDto(
             row.VariantId,
             row.ProductId,
@@ -163,8 +169,145 @@ public sealed class InventoryService : IInventoryService
                 ? partnerUnits.GetValueOrDefault(row.VariantId)?.Where(unit => unit.PartnerId == partnerFilter).Sum(unit => unit.Units) ?? 0
                 : null,
             canSeePartners ? partnerUnits.GetValueOrDefault(row.VariantId) ?? [] : null,
-            row.ImageUrl)).ToArray();
+            row.ImageUrl,
+            sold.GetValueOrDefault(row.VariantId).Units,
+            row.ProductBarcode,
+            row.ReferenceCode)).ToArray();
         return Paging.Create(items, query.Page, query.PageSize, total);
+    }
+
+    /// <summary>Existencias por producto madre (suma de sus tallas y colores) con lo vendido.</summary>
+    public async Task<PageResult<InventoryProductRowDto>> ListProductsAsync(
+        InventoryQuery query,
+        Actor actor,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var threshold = await dbContext.Settings.AsNoTracking().Select(settings => settings.LowStockThreshold).SingleAsync(cancellationToken);
+        var variants =
+            from variant in dbContext.Variants.AsNoTracking()
+            join balance in dbContext.StockBalances on variant.Id equals balance.VariantId into balances
+            from balance in balances.DefaultIfEmpty()
+            select new { variant.Id, variant.ProductId, variant.Barcode, Stock = balance == null ? 0 : balance.Quantity };
+
+        var products = dbContext.Products.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var pattern = $"%{query.Search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal)}%";
+            products = products.Where(product =>
+                EF.Functions.ILike(product.Name, pattern) ||
+                dbContext.Brands.Any(brand => brand.Id == product.BrandId && EF.Functions.ILike(brand.Name, pattern)) ||
+                (product.Barcode != null && EF.Functions.ILike(product.Barcode, pattern)) ||
+                (product.ReferenceCode != null && EF.Functions.ILike(product.ReferenceCode, pattern)) ||
+                dbContext.ProductColorBarcodes.Any(code => code.ProductId == product.Id && EF.Functions.ILike(code.Barcode, pattern)) ||
+                variants.Any(variant => variant.ProductId == product.Id && EF.Functions.ILike(variant.Barcode, pattern)));
+        }
+
+        if (actor.Has(PermissionNames.InvestmentRead) && !string.IsNullOrWhiteSpace(query.PartnerId))
+        {
+            if (string.Equals(query.PartnerId.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+            {
+                products = products.Where(product => dbContext.StockLots.Any(lot => lot.PartnerId == null && lot.QuantityRemaining > 0 &&
+                    dbContext.Variants.Any(variant => variant.Id == lot.VariantId && variant.ProductId == product.Id)));
+            }
+            else if (Guid.TryParse(query.PartnerId, out var partnerId))
+            {
+                products = products.Where(product => dbContext.StockLots.Any(lot => lot.PartnerId == partnerId && lot.QuantityRemaining > 0 &&
+                    dbContext.Variants.Any(variant => variant.Id == lot.VariantId && variant.ProductId == product.Id)));
+            }
+        }
+
+        // Los filtros de existencia se miran talla por talla: «algo bajo», «algo agotado», «algo negativo».
+        switch (query.Filter?.Trim().ToUpperInvariant())
+        {
+            case "LOW":
+                products = products.Where(product => variants.Any(variant => variant.ProductId == product.Id && variant.Stock > 0 && variant.Stock <= threshold));
+                break;
+            case "OUT":
+                products = products.Where(product => variants.Any(variant => variant.ProductId == product.Id && variant.Stock == 0));
+                break;
+            case "NEGATIVE":
+                products = products.Where(product => variants.Any(variant => variant.ProductId == product.Id && variant.Stock < 0));
+                break;
+        }
+
+        var total = await products.CountAsync(cancellationToken);
+        var page = await (
+            from product in products.OrderBy(product => product.Name).ThenBy(product => product.Id)
+                .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            join category in dbContext.Categories on product.CategoryId equals category.Id
+            join brand in dbContext.Brands on product.BrandId equals brand.Id
+            orderby product.Name, product.Id
+            select new
+            {
+                product.Id,
+                product.Name,
+                CategoryName = category.Name,
+                BrandName = brand.Name,
+                product.Barcode,
+                product.ReferenceCode,
+                product.BasePrice,
+                ImageUrl = dbContext.ProductImages.Where(image => image.ProductId == product.Id)
+                    .OrderBy(image => image.SortOrder).Select(image => MediaUrls.Prefix + image.ThumbFileName).FirstOrDefault(),
+            }).ToListAsync(cancellationToken);
+
+        var productIds = page.Select(product => product.Id).ToArray();
+        var variantRows = await (
+            from variant in dbContext.Variants.AsNoTracking()
+            where productIds.Contains(variant.ProductId)
+            join balance in dbContext.StockBalances on variant.Id equals balance.VariantId into balances
+            from balance in balances.DefaultIfEmpty()
+            select new { variant.Id, variant.ProductId, variant.PriceOverride, variant.Cost, Stock = balance == null ? 0 : balance.Quantity })
+            .ToListAsync(cancellationToken);
+        var sold = await SoldUnitsAsync(variantRows.Select(variant => variant.Id).ToArray(), cancellationToken);
+        var includeCost = actor.CanSeeCosts;
+
+        var items = page.Select(product =>
+        {
+            var own = variantRows.Where(variant => variant.ProductId == product.Id).ToList();
+            var prices = own.Count == 0 ? new List<decimal> { product.BasePrice } : own.Select(variant => variant.PriceOverride ?? product.BasePrice).ToList();
+            var costs = own.Where(variant => variant.Cost is not null).Select(variant => variant.Cost!.Value).ToList();
+            var allCosts = own.Count > 0 && costs.Count == own.Count;
+            return new InventoryProductRowDto(
+                product.Id,
+                product.Name,
+                product.CategoryName,
+                product.BrandName,
+                product.Barcode,
+                product.ReferenceCode,
+                product.ImageUrl,
+                own.Count,
+                own.Sum(variant => variant.Stock),
+                prices.Min(),
+                prices.Max(),
+                includeCost && costs.Count > 0 ? costs.Min() : null,
+                includeCost && costs.Count > 0 ? costs.Max() : null,
+                includeCost && allCosts ? Math.Round(own.Sum(variant => Math.Max(variant.Stock, 0) * variant.Cost!.Value), 2) : null,
+                own.Sum(variant => sold.GetValueOrDefault(variant.Id).Units),
+                own.Sum(variant => sold.GetValueOrDefault(variant.Id).Revenue),
+                prices.Any(price => price <= 0));
+        }).ToArray();
+        return Paging.Create(items, query.Page, query.PageSize, total);
+    }
+
+    /// <summary>Unidades e ingresos vendidos por variante (solo ventas confirmadas).</summary>
+    private async Task<Dictionary<Guid, (int Units, decimal Revenue)>> SoldUnitsAsync(Guid[] variantIds, CancellationToken cancellationToken)
+    {
+        if (variantIds.Length == 0)
+        {
+            return [];
+        }
+
+        var rows = await (
+            from line in dbContext.SaleLines.AsNoTracking()
+            join sale in dbContext.Sales on line.SaleId equals sale.Id
+            where variantIds.Contains(line.VariantId) && sale.Status == SaleStatus.Confirmed
+            group line by line.VariantId into lines
+            select new { VariantId = lines.Key, Units = lines.Sum(line => line.Quantity), Revenue = lines.Sum(line => line.LineTotalNio) })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(row => row.VariantId, row => (row.Units, row.Revenue));
     }
 
     public async Task<ServiceResult<PageResult<KardexRowDto>>> GetKardexAsync(
