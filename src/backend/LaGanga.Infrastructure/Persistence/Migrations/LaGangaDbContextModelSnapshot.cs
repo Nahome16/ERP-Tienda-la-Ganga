@@ -601,6 +601,38 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LaGanga.Domain.Inventory.LabelPrint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Copies")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("PrintedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("VariantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VariantId");
+
+                    b.HasIndex("ProductId", "PrintedAtUtc");
+
+                    b.ToTable("label_prints", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_label_prints_copies", "\"Copies\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("LaGanga.Domain.Inventory.LotAllocation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1720,6 +1752,20 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                         .HasForeignKey("VariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("LaGanga.Domain.Inventory.LabelPrint", b =>
+                {
+                    b.HasOne("LaGanga.Domain.Inventory.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LaGanga.Domain.Inventory.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("VariantId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("LaGanga.Domain.Inventory.LotAllocation", b =>

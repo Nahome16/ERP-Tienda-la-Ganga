@@ -283,6 +283,12 @@ public sealed class ProductService : IProductService
         var received = ReceivedMoment(input.ReceivedOn, today, now);
         var product = new Product(
             Guid.NewGuid(), name, input.CategoryId, input.BrandId, input.CutId, input.BasePrice.Value, actor.UserId, now);
+        if (input.GenerateProductBarcode && string.IsNullOrEmpty(productBarcode))
+        {
+            // Sin código de fábrica: el sistema genera uno para todo el producto (en caja se elige la talla).
+            productBarcode = await InventoryHelpers.NextBarcodeAsync(dbContext, cancellationToken);
+        }
+
         product.SetBarcode(productBarcode);
         product.SetReferenceCode(input.ReferenceCode);
         dbContext.Products.Add(product);

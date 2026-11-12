@@ -270,6 +270,41 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task GeneratedBarcodesAppearAsLabelsToPrintUntilPrinted()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        // Sin código de fábrica: el sistema genera uno por talla y color.
+        var perSize = await CreateProductAsync(catalogs, "Etiqueta por talla", 300m, [(2, null), (1, null)]);
+        var perSizeName = perSize.GetProperty("name").GetString()!;
+        var variantIds = perSize.GetProperty("variants").EnumerateArray().Select(variant => variant.GetProperty("id").GetGuid()).ToArray();
+        Assert.All(perSize.GetProperty("variants").EnumerateArray(), variant => Assert.StartsWith("20", variant.GetProperty("barcode").GetString(), StringComparison.Ordinal));
+
+        var pending = await GetAsync(fixture.Admin, $"/api/v1/labels?status=pending&search={Uri.EscapeDataString(perSizeName)}");
+        var rows = pending.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.All(rows, row => Assert.True(row.GetProperty("pending").GetBoolean()));
+
+        _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/labels/printed", new
+        {
+            items = variantIds.Select(id => new { productId = perSize.GetProperty("id").GetGuid(), variantId = (Guid?)id, copies = 2 }).ToArray(),
+        });
+        var afterPrint = await GetAsync(fixture.Admin, $"/api/v1/labels?status=pending&search={Uri.EscapeDataString(perSizeName)}");
+        Assert.Empty(afterPrint.GetProperty("items").EnumerateArray());
+        var printed = await GetAsync(fixture.Admin, $"/api/v1/labels?status=printed&search={Uri.EscapeDataString(perSizeName)}");
+        Assert.Equal(2, printed.GetProperty("items").GetArrayLength());
+
+        // Un solo código para todo el producto: una fila con el código del producto y la existencia total.
+        var whole = await CreateProductAsync(catalogs, "Etiqueta producto entero", 300m, [(2, null), (3, null)], generateProductBarcode: true);
+        var productCode = whole.GetProperty("barcode").GetString();
+        Assert.StartsWith("20", productCode, StringComparison.Ordinal);
+        var wholeRows = await GetAsync(fixture.Admin, $"/api/v1/labels?status=all&search={Uri.EscapeDataString(whole.GetProperty("name").GetString()!)}");
+        var row = Assert.Single(wholeRows.GetProperty("items").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("variantId").ValueKind);
+        Assert.Equal(productCode, row.GetProperty("barcode").GetString());
+        Assert.Equal(5, row.GetProperty("stock").GetInt32());
+    }
+
+    [PostgresFact]
     public async Task OnlineSaleRejectsAClientPriceDifferentFromTheOfficialPrice()
     {
         var catalogs = await LoadCatalogsAsync();
@@ -646,7 +681,7 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
         return new Catalogs(categories[0], brands[0], sizes, colors);
     }
 
-    private async Task<JsonElement> CreateProductAsync(Catalogs catalogs, string name, decimal price, (int Quantity, decimal? Cost)[] variants, string? referenceCode = null)
+    private async Task<JsonElement> CreateProductAsync(Catalogs catalogs, string name, decimal price, (int Quantity, decimal? Cost)[] variants, string? referenceCode = null, bool generateProductBarcode = false)
     {
         var suffix = Interlocked.Increment(ref _counter);
         var body = new
@@ -657,6 +692,7 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
             cutId = (Guid?)null,
             basePrice = price,
             referenceCode,
+            generateProductBarcode,
             variants = variants.Select((variant, index) => new
             {
                 sizeId = catalogs.Sizes[index],

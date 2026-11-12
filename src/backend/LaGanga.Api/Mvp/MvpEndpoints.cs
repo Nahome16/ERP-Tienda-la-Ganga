@@ -629,6 +629,29 @@ public static class MvpEndpoints
             })
             .RequireAuthorization(PermissionNames.InventoryAdjust)
             .RequireCsrf();
+
+        // Etiquetas de códigos generados por el sistema: qué falta imprimir y registro de impresión.
+        var labels = endpoints.MapGroup("/api/v1/labels").WithTags("Labels");
+        labels.MapGet("/", async (
+                [FromQuery] string? search,
+                [FromQuery] string? status,
+                [FromQuery] int? page,
+                [FromQuery] int? pageSize,
+                ILabelService service,
+                CancellationToken ct) =>
+            {
+                var (p, size) = Paging.Normalize(page, pageSize);
+                return Results.Ok(await service.ListAsync(new LabelQuery(search, status, p, size), ct));
+            })
+            .RequireAuthorization(PermissionNames.InventoryRead);
+
+        labels.MapPost("/printed", async (LabelPrintedInput input, ILabelService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.MarkPrintedAsync(input, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.InventoryRead)
+            .RequireCsrf();
     }
 
     private static void MapAudit(IEndpointRouteBuilder endpoints)

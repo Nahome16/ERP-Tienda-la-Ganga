@@ -52,6 +52,8 @@ public sealed class LaGangaDbContext(DbContextOptions<LaGangaDbContext> options)
 
     public DbSet<InventoryMovement> Movements => Set<InventoryMovement>();
 
+    public DbSet<LabelPrint> LabelPrints => Set<LabelPrint>();
+
     public DbSet<CashRegister> CashRegisters => Set<CashRegister>();
 
     public DbSet<CashSession> CashSessions => Set<CashSession>();

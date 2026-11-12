@@ -28,7 +28,9 @@ internal static class InventoryHelpers
                 .SqlQueryRaw<long>("SELECT nextval('inventory.barcode_seq') AS \"Value\"")
                 .SingleAsync(cancellationToken);
             var barcode = Ean13.FromSequence(sequence);
-            if (!await dbContext.Variants.AnyAsync(variant => variant.Barcode == barcode, cancellationToken))
+            if (!await dbContext.Variants.AnyAsync(variant => variant.Barcode == barcode, cancellationToken) &&
+                !await dbContext.Products.AnyAsync(product => product.Barcode == barcode, cancellationToken) &&
+                !await dbContext.ProductColorBarcodes.AnyAsync(code => code.Barcode == barcode, cancellationToken))
             {
                 return barcode;
             }

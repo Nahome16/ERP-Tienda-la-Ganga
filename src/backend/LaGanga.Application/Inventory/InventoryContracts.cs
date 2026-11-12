@@ -102,7 +102,8 @@ public sealed record CreateProductInput(
     DateOnly? ReceivedOn = null,
     string? Barcode = null,
     IReadOnlyList<ColorBarcodeInput>? ColorBarcodes = null,
-    string? ReferenceCode = null);
+    string? ReferenceCode = null,
+    bool GenerateProductBarcode = false);
 
 public sealed record UpdateProductInput(
     string? Name,

@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IInvestmentService, InvestmentService>();
         services.AddScoped<IInventoryService, InventoryService>();
+        services.AddScoped<ILabelService, LabelService>();
         services.AddSingleton<IImageStorage, LocalImageStorage>();
         services.AddScoped<IProductImageService, ProductImageService>();
         services.AddScoped<IPosService, PosService>();
