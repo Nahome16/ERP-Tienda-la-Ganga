@@ -248,6 +248,8 @@ export type ProductListItem = {
   barcode?: string | null
   /** Alguna talla no tiene precio de venta (precio pendiente). */
   missingPrice?: boolean
+  /** Código de referencia del proveedor (con el que factura). */
+  referenceCode?: string | null
 }
 
 export type Variant = {
@@ -331,6 +333,31 @@ export type InventoryRow = {
   partnerStock?: number
   /** Miniatura de la foto principal del producto. */
   imageUrl?: string | null
+  /** Unidades vendidas (ventas confirmadas). */
+  soldUnits?: number
+  productBarcode?: string | null
+  referenceCode?: string | null
+}
+
+/** Existencias por producto madre (suma de sus tallas y colores). */
+export type InventoryProductRow = {
+  productId: string
+  productName: string
+  categoryName: string
+  brandName: string
+  barcode: string | null
+  referenceCode: string | null
+  imageUrl: string | null
+  variants: number
+  stock: number
+  minPrice: number
+  maxPrice: number
+  minCost: number | null
+  maxCost: number | null
+  stockValue: number | null
+  soldUnits: number
+  soldRevenue: number
+  missingPrice: boolean
 }
 
 export type KardexType = 'InitialStock' | 'Entry' | 'Adjustment' | 'Loss' | 'Sale' | 'SaleVoid' | 'ExchangeIn' | 'ExchangeOut'

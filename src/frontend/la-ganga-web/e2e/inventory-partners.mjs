@@ -119,6 +119,8 @@ async function open(hash, { user = partnerUser, viewport = { width: 1366, height
   const mock = createMock({ user })
   mock.user = user
   const context = await browser.newContext({ viewport, acceptDownloads: true })
+  // Estas pruebas revisan la vista por talla y color.
+  await context.addInitScript(() => { try { window.localStorage.setItem('la-ganga-inv-view', 'variant') } catch { /* sin almacenamiento */ } })
   const page = await context.newPage()
   page.on('pageerror', (error) => consoleProblems.push(`pageerror ${hash}: ${error.message}`))
   await mock.install(page)

@@ -6,6 +6,7 @@ import type { ApiState, AppView, AuthState, CurrentUser, HealthStatus } from './
 import { CatalogsView } from './views/CatalogsView'
 import { DashboardView } from './views/DashboardView'
 import { InventoryView } from './views/InventoryView'
+import { LabelsView } from './views/LabelsView'
 import { InvestmentView } from './views/InvestmentView'
 import { LoginView } from './views/LoginView'
 import { PasswordChangeView } from './views/PasswordChangeView'
@@ -343,6 +344,7 @@ function App() {
       {view === 'reportes' && <ReportsView user={user} />}
       {view === 'productos' && <ProductsView user={user} />}
       {view === 'inventario' && <InventoryView user={user} />}
+      {view === 'etiquetas' && <LabelsView />}
       {view === 'socios' && <InvestmentView user={user} />}
       {view === 'catalogos' && <CatalogsView user={user} isPreview={false} />}
       {view === 'equipo' && <TeamView currentUser={user} isPreview={false} />}

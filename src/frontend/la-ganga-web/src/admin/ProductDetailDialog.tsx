@@ -12,7 +12,8 @@ import { messageFrom } from './format'
 import { ImageManager } from './ImageManager'
 import { useFetch } from './hooks'
 import { LabelsDialog, type LabelVariant } from './LabelsDialog'
-import { AddVariantsDialog, EditProductDialog, EditVariantDialog } from './ProductDialogs'
+import { AddVariantsDialog, EditVariantDialog } from './ProductDialogs'
+import { ProductFullEditDialog } from './ProductFullEdit'
 import { ReceiveStockDialog } from './ReceiveStockDialog'
 import { Dialog, LoadError, Notice, Spinner, Swatch, Tag } from './ui'
 import type { Catalogs } from './useCatalogs'
@@ -124,6 +125,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
               <Tag tone={product.isActive ? 'ok' : 'neutral'}>{product.isActive ? 'Activo' : 'Inactivo'}</Tag>
               <span>Precio base <strong>{product.basePrice > 0 ? formatNio(product.basePrice) : 'Pendiente'}</strong></span>
               {product.barcode && <span>Código de fábrica <strong>{product.barcode}</strong></span>}
+              {product.referenceCode && <span>Cód. ref. <strong>{product.referenceCode}</strong></span>}
               <span>Existencia total <strong className={product.totalStock < 0 ? 'adm-neg' : undefined}>{product.totalStock}</strong></span>
               <span>{product.variantCount} variante{product.variantCount === 1 ? '' : 's'}</span>
             </div>
@@ -182,10 +184,10 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
       </Dialog>
 
       {product && nested?.kind === 'edit-product' && (
-        <EditProductDialog
-          product={product} catalogs={catalogs}
-          onClose={() => setNested(null)} onConflict={reload}
-          onSaved={() => { setNested(null); changed('Se guardaron los cambios del producto.') }}
+        <ProductFullEditDialog
+          product={product} catalogs={catalogs} user={user}
+          onClose={() => setNested(null)} onPartial={() => changed()}
+          onSaved={(text) => { setNested(null); changed(text) }}
         />
       )}
       {product && nested?.kind === 'edit-variant' && (

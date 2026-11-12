@@ -27,6 +27,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(product => product.Name);
         builder.Property(product => product.Barcode).HasMaxLength(Product.BarcodeMaxLength);
         builder.HasIndex(product => product.Barcode).IsUnique().HasFilter("\"Barcode\" IS NOT NULL");
+        builder.Property(product => product.ReferenceCode).HasMaxLength(Product.ReferenceCodeMaxLength);
+        builder.HasIndex(product => product.ReferenceCode);
     }
 }
 
@@ -163,5 +165,20 @@ public sealed class LotAllocationConfiguration : IEntityTypeConfiguration<LotAll
         builder.HasOne<ProductVariant>().WithMany().HasForeignKey(allocation => allocation.VariantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(allocation => allocation.LotId);
         builder.HasIndex(allocation => allocation.SaleId);
+    }
+}
+
+public sealed class LabelPrintConfiguration : IEntityTypeConfiguration<LabelPrint>
+{
+    public void Configure(EntityTypeBuilder<LabelPrint> builder)
+    {
+        builder.ToTable("label_prints", "inventory", table =>
+            table.HasCheckConstraint("CK_label_prints_copies", "\"Copies\" >= 0"));
+        builder.HasKey(print => print.Id);
+        builder.Property(print => print.Id).ValueGeneratedNever();
+        builder.HasOne<Product>().WithMany().HasForeignKey(print => print.ProductId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<ProductVariant>().WithMany().HasForeignKey(print => print.VariantId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(print => new { print.ProductId, print.PrintedAtUtc });
+        builder.HasIndex(print => print.VariantId);
     }
 }

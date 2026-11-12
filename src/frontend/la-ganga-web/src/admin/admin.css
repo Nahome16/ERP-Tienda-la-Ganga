@@ -519,3 +519,20 @@
 /* Ficha: aviso de datos pendientes (precio de venta, foto). */
 .adm-missing { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 12px; padding: 12px 14px; border: 1.5px solid #e8b860; border-radius: 12px; background: #fff4dc; color: #6b4300; }
 .adm-missing-actions { display: inline-flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+
+/* Existencias por producto madre y ficha completa de edición. */
+.inv-by-product td.numeric { white-space: nowrap; }
+.inv-view-tabs { margin-right: 12px; }
+.adm-edit-grid input:not([type="checkbox"]) { width: 100%; min-width: 96px; padding: 6px 8px; }
+.adm-edit-grid input.adm-mono { min-width: 150px; }
+.adm-edit-grid tr.is-dirty td { background: #fff7e6; }
+
+/* Alta: generar código (por talla y color o para todo el producto). */
+.adm-generate { display: grid; gap: 8px; margin: 0 0 12px; padding: 12px; border: 1.5px solid var(--teal); border-radius: 12px; background: var(--teal-soft); }
+.adm-generate legend { padding: 0 6px; font-weight: 800; color: var(--teal-dark); }
+.adm-generate label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #d8e4e2; border-radius: 10px; background: var(--paper, #fff); cursor: pointer; }
+.adm-generate label.is-on { border-color: var(--teal); box-shadow: 0 0 0 2px color-mix(in srgb, var(--teal) 25%, transparent); }
+.adm-generate label span { display: grid; gap: 2px; }
+.adm-generate label small { color: var(--muted, #6d6860); }
+.adm-generate em { font-style: normal; color: #1d7a3e; font-size: .85rem; }
+.adm-generate .adm-help { margin: 0; }

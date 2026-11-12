@@ -5,7 +5,7 @@
 #   ./reset-inventario.sh            muestra qué se borra, pide confirmación y lo hace
 #   ./reset-inventario.sh --contar   solo muestra qué se borraría (no cambia nada)
 #
-# BORRA: productos, tallas/colores (variantes), códigos de fábrica, fotos,
+# BORRA: productos, tallas/colores (variantes), códigos de fábrica, fotos, registro de etiquetas,
 #        existencias, lotes por socio, Kardex, y además las ventas, pagos,
 #        cambios, autorizaciones de descuento y turnos de caja (todo eso está
 #        ligado a los productos). Los recibos vuelven a empezar en V-000001 y
@@ -51,7 +51,7 @@ WIPE_TABLES=(
   sales.sales sales.discount_approvals sales.cash_sessions
   inventory.lot_allocations inventory.inventory_movements inventory.stock_lots
   inventory.stock_balances inventory.product_color_barcodes inventory.product_images
-  inventory.product_variants inventory.products
+  inventory.label_prints inventory.product_variants inventory.products
 )
 
 sql() { pgx psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -qtAX -c "$1"; }

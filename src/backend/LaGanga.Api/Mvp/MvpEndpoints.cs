@@ -589,6 +589,27 @@ public static class MvpEndpoints
             })
             .RequireAuthorization(PermissionNames.InventoryRead);
 
+        group.MapGet("/products", async (
+                [FromQuery] string? search,
+                [FromQuery] string? filter,
+                [FromQuery] string? partnerId,
+                [FromQuery] int? page,
+                [FromQuery] int? pageSize,
+                IInventoryService service,
+                HttpContext http,
+                CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                if (actor is null)
+                {
+                    return ApiHelpers.Unauthorized401();
+                }
+
+                var (p, size) = Paging.Normalize(page, pageSize);
+                return Results.Ok(await service.ListProductsAsync(new InventoryQuery(search, filter, p, size, partnerId), actor, ct));
+            })
+            .RequireAuthorization(PermissionNames.InventoryRead);
+
         group.MapGet("/variants/{id:guid}/kardex", async (
                 Guid id,
                 [FromQuery] int? page,
@@ -607,6 +628,29 @@ public static class MvpEndpoints
                 return actor is null ? ApiHelpers.Unauthorized401() : (await service.AdjustAsync(input, actor, ct)).ToHttp();
             })
             .RequireAuthorization(PermissionNames.InventoryAdjust)
+            .RequireCsrf();
+
+        // Etiquetas de códigos generados por el sistema: qué falta imprimir y registro de impresión.
+        var labels = endpoints.MapGroup("/api/v1/labels").WithTags("Labels");
+        labels.MapGet("/", async (
+                [FromQuery] string? search,
+                [FromQuery] string? status,
+                [FromQuery] int? page,
+                [FromQuery] int? pageSize,
+                ILabelService service,
+                CancellationToken ct) =>
+            {
+                var (p, size) = Paging.Normalize(page, pageSize);
+                return Results.Ok(await service.ListAsync(new LabelQuery(search, status, p, size), ct));
+            })
+            .RequireAuthorization(PermissionNames.InventoryRead);
+
+        labels.MapPost("/printed", async (LabelPrintedInput input, ILabelService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.MarkPrintedAsync(input, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.InventoryRead)
             .RequireCsrf();
     }
 
