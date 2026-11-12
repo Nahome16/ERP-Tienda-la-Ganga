@@ -272,6 +272,30 @@ export function createMock(options = {}) {
       if (term) rows = rows.filter((x) => `${x.productName} ${x.sizeName} ${x.colorName} ${x.barcode}`.toLowerCase().includes(term))
       return json(route, 200, page(rows, Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 25)))
     }
+    if (path === '/api/v1/labels') {
+      s.labelPrints ??= {}
+      const status = q.get('status') ?? 'pending'
+      const term = (q.get('search') ?? '').toLowerCase()
+      let rows = s.variants.filter((v) => /^20\d{11}$/.test(v.barcode)).map((v) => {
+        const p = s.products.find((x) => x.id === v.productId)
+        const color = colorOf(v.colorId)
+        const last = s.labelPrints[v.id] ?? null
+        return {
+          productId: p.id, variantId: v.id, productName: p.name, sizeName: sizeName(v.sizeId), colorName: color?.name ?? null, colorHex: color?.swatchHex ?? null,
+          barcode: v.barcode, price: v.priceOverride ?? p.basePrice, stock: v.stock, imageUrl: null,
+          lastPrintedAtUtc: last?.at ?? null, lastCopies: last?.copies ?? 0, pending: v.stock > 0 && !last,
+        }
+      })
+      if (term) rows = rows.filter((x) => `${x.productName} ${x.sizeName} ${x.colorName} ${x.barcode}`.toLowerCase().includes(term))
+      if (status === 'pending') rows = rows.filter((x) => x.pending)
+      if (status === 'printed') rows = rows.filter((x) => !x.pending && x.lastPrintedAtUtc)
+      return json(route, 200, page(rows, Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 25)))
+    }
+    if (path === '/api/v1/labels/printed') {
+      s.labelPrints ??= {}
+      for (const item of body?.items ?? []) s.labelPrints[item.variantId ?? `p:${item.productId}`] = { at: now(), copies: item.copies }
+      return json(route, 200, (body?.items ?? []).length)
+    }
     if (path === '/api/v1/inventory/products') {
       const canCost = user.permissions.includes('inventory.cost.read')
       const term = (q.get('search') ?? '').toLowerCase()
