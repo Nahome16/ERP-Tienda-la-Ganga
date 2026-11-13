@@ -147,7 +147,7 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
     }
 
     [PostgresFact]
-    public async Task OnlyTheAdministratorCanSeeOrAssignPartners()
+    public async Task SellersCannotSeePartnersButTheInventoryManagerCanEnterStockWithThem()
     {
         var suffix = Interlocked.Increment(ref _counter);
         var partner = await CreatePartnerAsync($"Socia privada {suffix}");
@@ -155,43 +155,43 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
         var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
 
         var roles = await GetAsync(fixture.Admin, "/api/v1/users/roles");
-        foreach (var roleName in new[] { "Encargado de inventario", "Vendedor" })
+        async Task<(HttpClient Client, string Csrf)> LoginAsRoleAsync(string roleName)
         {
             var roleId = roles.EnumerateArray().Single(role => role.GetProperty("name").GetString() == roleName).GetProperty("id").GetGuid();
             var username = string.Create(CultureInfo.InvariantCulture, $"usuario.inv{Interlocked.Increment(ref _counter)}");
             _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/users",
                 new { username, displayName = $"Usuario {roleName}", password = CatalogApiFixture.DefaultPassword, roleIds = new[] { roleId } }, HttpStatusCode.Created);
-            using var client = fixture.CreateClient();
-            var csrf = await ApiTestHelpers.LoginAsync(client, username, CatalogApiFixture.DefaultPassword);
-
-            foreach (var url in new[] { "/api/v1/investment/partners", "/api/v1/investment/summary", "/api/v1/investment/lots", "/api/v1/reports/investment" })
-            {
-                Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(new Uri(url, UriKind.Relative))).StatusCode);
-            }
-
-            Assert.Equal(HttpStatusCode.Forbidden, (await PostRawAsync(client, csrf, "/api/v1/investment/partners", new { name = "Intruso" })).StatusCode);
-
-            if (roleName == "Encargado de inventario")
-            {
-                // Puede ingresar mercadería, pero sin socio, costo ni precio de entrada.
-                var denied = await PostRawAsync(client, csrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Entry", delta = 1, reason = "Entrada", partnerId = partner });
-                Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
-                Assert.Equal("partner_not_allowed", await ApiTestHelpers.ReadProblemCodeAsync(denied));
-                var plain = await PostAsync(client, csrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Entry", delta = 1, reason = "Entrada sin socio" });
-                Assert.Equal(3, plain.GetProperty("newStock").GetInt32());
-
-                var inventory = await GetAsync(client, "/api/v1/inventory?pageSize=100");
-                var row = inventory.GetProperty("items").EnumerateArray().First(item => item.GetProperty("variantId").GetGuid() == variantId);
-                Assert.False(row.TryGetProperty("partners", out var partners) && partners.ValueKind == JsonValueKind.Array);
-            }
+            var client = fixture.CreateClient();
+            return (client, await ApiTestHelpers.LoginAsync(client, username, CatalogApiFixture.DefaultPassword));
         }
 
-        // La entrada sin socio quedó asignable después por el administrador.
-        var unassigned = await GetAsync(fixture.Admin, "/api/v1/investment/lots?partnerId=none&pageSize=100");
-        var lot = unassigned.GetProperty("items").EnumerateArray().First(item => item.GetProperty("variantId").GetGuid() == variantId);
-        var assigned = await PutAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/investment/lots/{lot.GetProperty("id").GetGuid()}",
-            new { partnerId = partner, unitCost = 150m, unitPrice = 400m, note = "Asignada después" });
-        Assert.Equal(partner, assigned.GetProperty("partnerId").GetGuid());
+        // El vendedor no ve socios ni puede crearlos.
+        var (seller, sellerCsrf) = await LoginAsRoleAsync("Vendedor");
+        using (seller)
+        {
+            foreach (var url in new[] { "/api/v1/investment/partners", "/api/v1/investment/summary", "/api/v1/investment/lots", "/api/v1/reports/investment" })
+            {
+                Assert.Equal(HttpStatusCode.Forbidden, (await seller.GetAsync(new Uri(url, UriKind.Relative))).StatusCode);
+            }
+
+            Assert.Equal(HttpStatusCode.Forbidden, (await PostRawAsync(seller, sellerCsrf, "/api/v1/investment/partners", new { name = "Intruso" })).StatusCode);
+        }
+
+        // El encargado de inventario ingresa mercadería con su socio y ve el costo, pero no las ventas.
+        var (manager, managerCsrf) = await LoginAsRoleAsync("Encargado de inventario");
+        using (manager)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync(new Uri("/api/v1/investment/partners", UriKind.Relative))).StatusCode);
+            var entry = await PostAsync(manager, managerCsrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Entry", delta = 1, reason = "Entrada con socio", partnerId = partner, unitCost = 150m });
+            Assert.Equal(3, entry.GetProperty("newStock").GetInt32());
+            var inventory = await GetAsync(manager, "/api/v1/inventory?pageSize=100");
+            var row = inventory.GetProperty("items").EnumerateArray().First(item => item.GetProperty("variantId").GetGuid() == variantId);
+            Assert.Equal(150m, row.GetProperty("cost").GetDecimal());
+            Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(new Uri("/api/v1/sales", UriKind.Relative))).StatusCode);
+        }
+
+        var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?partnerId={partner}&pageSize=100");
+        Assert.Contains(lots.GetProperty("items").EnumerateArray(), item => item.GetProperty("variantId").GetGuid() == variantId && item.GetProperty("quantityIn").GetInt32() == 1);
     }
 
     [PostgresFact]

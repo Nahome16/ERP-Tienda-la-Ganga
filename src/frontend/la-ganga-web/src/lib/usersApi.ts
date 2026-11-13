@@ -35,7 +35,7 @@ export const permissionLabels: Record<string, string> = {
 export const roleDescriptions: Record<string, string> = {
   Administrador: 'Acceso total: panel, punto de venta, costos y cuentas.',
   Vendedor: 'Solo punto de venta. Consulta productos y existencias, sin costos.',
-  'Encargado de inventario': 'Productos, catálogos e inventario. Sin costos ni cuentas.',
+  'Encargado de inventario': 'Productos, mercadería con costo y socio, fotos y etiquetas. Sin ventas, caja ni cuentas.',
 }
 
 export const passwordMinLength = 12
