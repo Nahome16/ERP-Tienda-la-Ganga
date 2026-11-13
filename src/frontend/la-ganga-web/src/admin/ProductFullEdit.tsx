@@ -5,7 +5,7 @@ import { hasPermission } from '../lib/access'
 import { formatNio } from '../lib/money'
 import { parseDecimal } from './csv'
 import type { CurrentUser } from '../types'
-import { addVariant, applyProductCost, updateProduct, updateVariant } from './adminApi'
+import { addVariant, adjustInventory, applyProductCost, updateProduct, updateVariant } from './adminApi'
 import { blockEnterSubmit } from './forms'
 import { listLots, listPartners, lotWithPartner, updateLot } from './investmentApi'
 import { ProductFieldsForm } from './ProductDialogs'
@@ -43,6 +43,7 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
   onPartial: () => void
 }) {
   const canCost = hasPermission(user, 'inventory.cost.read')
+  const canAdjust = hasPermission(user, 'inventory.adjust')
   const canInitial = hasPermission(user, 'inventory.initial.confirm')
   const canPartnersRead = hasPermission(user, 'investment.read')
   const canPartnersManage = hasPermission(user, 'investment.manage')
@@ -56,6 +57,9 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
   const [fields, setFields] = useState<ProductFields>(initialFields)
   const initialDrafts = Object.fromEntries(product.variants.map((variant) => [variant.id, draftOfVariant(variant)]))
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>(initialDrafts)
+  // Existencia corregida por talla y color (vacío = sin cambio) y el motivo, que queda en el Kardex.
+  const [stockEdits, setStockEdits] = useState<Record<string, string>>({})
+  const [stockReason, setStockReason] = useState('Corrección de ingreso: se ingresó de más')
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
   // Costo para todas las tallas y colores (y su existencia). Vacío = no cambiar.
   const [allCost, setAllCost] = useState('')
@@ -98,7 +102,10 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
   const changedVariants = product.variants.filter((variant) => drafts[variant.id] && !sameDraft(comparable(drafts[variant.id]!, initialDrafts[variant.id]!), initialDrafts[variant.id]!))
   const unassignedLots = lots?.filter((lot) => !lot.partnerId) ?? []
   const partnerTargets = !partnerId ? [] : partnerScope === 'unassigned' ? unassignedLots : lots ?? []
-  const pending = (fieldsChanged ? 1 : 0) + changedVariants.length + built.inputs.length + (partnerTargets.length > 0 ? 1 : 0) + (applyingCost ? 1 : 0)
+  const stockChanges = product.variants
+    .map((variant) => ({ variant, target: stockEdits[variant.id] }))
+    .filter((item): item is { variant: Variant; target: string } => item.target !== undefined && item.target.trim() !== '' && Number(item.target) !== item.variant.stock)
+  const pending = (fieldsChanged ? 1 : 0) + changedVariants.length + built.inputs.length + (partnerTargets.length > 0 ? 1 : 0) + (applyingCost ? 1 : 0) + stockChanges.length
 
   function setDraft(id: string, patch: Partial<VariantDraft>) {
     setDrafts((current) => ({ ...current, [id]: { ...current[id]!, ...patch } }))
@@ -121,6 +128,11 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
       const cost = parseDecimal(allCost)
       if (cost === null || cost < 0) return 'El costo para todas las tallas no es válido.'
     }
+    for (const { variant, target } of stockChanges) {
+      const value = Number(target)
+      if (!Number.isInteger(value) || value < 0) return `${variant.sizeName} · ${variant.colorName}: la existencia debe ser un número entero (0 o más).`
+    }
+    if (stockChanges.length > 0 && stockReason.trim().length < 3) return 'Escribí el motivo del cambio de existencia (queda en el Kardex).'
     if (built.errors.length > 0) return built.errors[0]!
     if (built.totalUnits > 0 && !canInitial) return 'Tu cuenta no puede registrar existencia inicial: dejá vacías las cantidades de las tallas nuevas.'
     return null
@@ -159,6 +171,13 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
         await addVariant(product.id, input)
       }
       if (built.inputs.length > 0) done.push(`${built.inputs.length} variante(s) nueva(s)`)
+      for (const [index, { variant, target }] of stockChanges.entries()) {
+        setStep(`Corrigiendo existencias (${index + 1}/${stockChanges.length})…`)
+        const delta = Number(target) - variant.stock
+        // Bajar = corrección de ingreso (se descuenta de la entrada, no es pérdida); subir = ajuste.
+        await adjustInventory({ variantId: variant.id, kind: delta < 0 ? 'Correction' : 'Adjustment', delta, reason: stockReason.trim() })
+      }
+      if (stockChanges.length > 0) done.push(`existencia de ${stockChanges.length} talla(s)/color(es)`)
       if (applyingCost) {
         setStep('Poniendo el costo a todas las tallas y su existencia…')
         const result = await applyProductCost(product.id, parseDecimal(allCost)!, overwriteLots)
@@ -237,7 +256,7 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
             <tbody>
               {sortedVariants.map((variant) => {
                 const draft = drafts[variant.id]!
-                const dirty = !sameDraft(draft, initialDrafts[variant.id]!)
+                const dirty = !sameDraft(draft, initialDrafts[variant.id]!) || stockChanges.some((item) => item.variant.id === variant.id)
                 return (
                   <tr key={variant.id} className={dirty ? 'is-dirty' : undefined}>
                     <td><span className="adm-inline"><Swatch hex={variant.colorHex} /> {variant.colorName}</span></td>
@@ -245,7 +264,15 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
                     <td><input className="adm-mono" value={draft.barcode} aria-label={`Código ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { barcode: event.target.value })} /></td>
                     <td className="numeric"><input type="number" min={0} step="0.01" value={draft.price} placeholder={basePrice > 0 ? String(basePrice) : 'Base'} aria-label={`Precio especial ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { price: event.target.value })} /></td>
                     {canCost && <td className="numeric"><input type="number" min={0} step="0.01" value={applyingCost ? allCost : draft.cost} disabled={applyingCost} placeholder="—" aria-label={`Costo ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { cost: event.target.value })} /></td>}
-                    <td className="numeric">{variant.stock}</td>
+                    <td className="numeric">
+                      {canAdjust
+                        ? <input
+                            type="number" step={1} inputMode="numeric" className="adm-stock-input" value={stockEdits[variant.id] ?? String(variant.stock)}
+                            aria-label={`Existencia ${variant.sizeName} ${variant.colorName}`}
+                            onChange={(event) => setStockEdits((current) => ({ ...current, [variant.id]: event.target.value }))}
+                          />
+                        : variant.stock}
+                    </td>
                     <td><input type="checkbox" checked={draft.isActive} aria-label={`Activa ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { isActive: event.target.checked })} /></td>
                   </tr>
                 )
@@ -253,6 +280,22 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
             </tbody>
           </table>
         </div>
+
+        {stockChanges.length > 0 && (
+          <div className="adm-stock-change" role="status">
+            <ul>
+              {stockChanges.map(({ variant, target }) => {
+                const delta = Number(target) - variant.stock
+                return <li key={variant.id}><b>{variant.sizeName} · {variant.colorName}</b>: {variant.stock} → {target} ({delta > 0 ? `+${delta}` : delta}){delta < 0 ? ' · corrección de ingreso' : ' · ajuste'}</li>
+              })}
+            </ul>
+            <label className="adm-field">
+              <span>Motivo del cambio de existencia</span>
+              <input value={stockReason} maxLength={500} onChange={(event) => setStockReason(event.target.value)} />
+              <small>Queda en el Kardex. Bajar la existencia descuenta de la última entrada (no cuenta como pérdida).</small>
+            </label>
+          </div>
+        )}
 
         <h3 className="adm-step"><span>3</span>Agregar tallas o colores</h3>
         {!showAdd
@@ -290,7 +333,7 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
           </>
         )}
 
-        {pending > 0 && !error && <p className="adm-help">Cambios por guardar: {[fieldsChanged && 'datos del producto', applyingCost && 'costo para todas las tallas', changedVariants.length > 0 && `${changedVariants.length} talla(s)/color(es)`, built.inputs.length > 0 && `${built.inputs.length} variante(s) nueva(s)`, partnerTargets.length > 0 && `socio en ${partnerTargets.length} entrada(s)`].filter(Boolean).join(', ')}.</p>}
+        {pending > 0 && !error && <p className="adm-help">Cambios por guardar: {[fieldsChanged && 'datos del producto', applyingCost && 'costo para todas las tallas', stockChanges.length > 0 && `existencia de ${stockChanges.length} talla(s)/color(es)`, changedVariants.length > 0 && `${changedVariants.length} talla(s)/color(es)`, built.inputs.length > 0 && `${built.inputs.length} variante(s) nueva(s)`, partnerTargets.length > 0 && `socio en ${partnerTargets.length} entrada(s)`].filter(Boolean).join(', ')}.</p>}
         {error && <Notice tone="error">{error}</Notice>}
       </form>
     </Dialog>

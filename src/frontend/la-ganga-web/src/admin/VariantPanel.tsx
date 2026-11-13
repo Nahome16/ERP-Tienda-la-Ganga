@@ -23,11 +23,12 @@ export type PanelVariant = {
   cost?: number | null
 }
 
-type Kind = 'Entry' | 'Adjustment' | 'Loss'
+type Kind = 'Entry' | 'Adjustment' | 'Loss' | 'Correction'
 const kindLabels: Record<Kind, string> = {
   Entry: 'Entrada (suma existencias)',
   Adjustment: 'Ajuste (corrección, con + o −)',
   Loss: 'Pérdida (resta existencias)',
+  Correction: 'Corrección de ingreso (se ingresó de más)',
 }
 
 const kardexPageSize = 10
@@ -66,7 +67,7 @@ export function VariantPanel({ user, variant, lowThreshold, onClose, onChanged, 
 
   const amount = Number(quantity.replace(',', '.'))
   const validAmount = quantity.trim() !== '' && Number.isInteger(amount) && amount !== 0 && (kind === 'Adjustment' || amount > 0)
-  const delta = !validAmount ? 0 : kind === 'Loss' ? -Math.abs(amount) : kind === 'Entry' ? Math.abs(amount) : amount
+  const delta = !validAmount ? 0 : kind === 'Loss' || kind === 'Correction' ? -Math.abs(amount) : kind === 'Entry' ? Math.abs(amount) : amount
   const resulting = stock + delta
   const negative = validAmount && resulting < 0
   // Socio, costo y precio solo aplican a las entradas (Entrada o ajuste con cantidad positiva).

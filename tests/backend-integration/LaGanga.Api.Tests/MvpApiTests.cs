@@ -331,6 +331,27 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task EntryCorrectionLowersWhatWasEnteredWithoutCountingALoss()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        // Se ingresaron 5 por error; llegaron 3.
+        var product = await CreateProductAsync(catalogs, "Corrección de ingreso", 500m, [(5, 200m)]);
+        var variantId = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+
+        var wrong = await PostRawAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Correction", delta = 2, reason = "Corrección de ingreso" });
+        Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+
+        var fixedStock = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments", new { variantId, kind = "Correction", delta = -2, reason = "Corrección de ingreso: se ingresó de más" });
+        Assert.Equal(3, fixedStock.GetProperty("newStock").GetInt32());
+
+        // La entrada queda con 3 ingresadas y 3 en existencia: no es una pérdida.
+        var lots = await GetAsync(fixture.Admin, "/api/v1/investment/lots?pageSize=100");
+        var lot = Assert.Single(lots.GetProperty("items").EnumerateArray(), item => item.GetProperty("variantId").GetGuid() == variantId);
+        Assert.Equal(3, lot.GetProperty("quantityIn").GetInt32());
+        Assert.Equal(3, lot.GetProperty("quantityRemaining").GetInt32());
+    }
+
+    [PostgresFact]
     public async Task OnlineSaleRejectsAClientPriceDifferentFromTheOfficialPrice()
     {
         var catalogs = await LoadCatalogsAsync();

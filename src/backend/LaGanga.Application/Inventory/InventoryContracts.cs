@@ -277,6 +277,12 @@ public enum AdjustmentKind
     Entry,
     Adjustment,
     Loss,
+
+    /// <summary>
+    /// Se ingresaron más unidades de las que llegaron: se descuentan de las entradas más recientes
+    /// (no cuenta como pérdida del socio).
+    /// </summary>
+    Correction,
 }
 
 public sealed record AdjustmentInput(

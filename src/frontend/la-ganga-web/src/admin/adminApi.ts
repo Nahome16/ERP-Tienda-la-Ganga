@@ -107,7 +107,7 @@ export const listInventoryProducts = (filter: InventoryFilter, signal?: AbortSig
 export const getKardex = (variantId: string, page: number, pageSize: number, signal?: AbortSignal) =>
   apiRequest<PageResult<KardexRow>>(`${v1}/inventory/variants/${variantId}/kardex${query({ page, pageSize })}`, { signal })
 export type AdjustmentInput = {
-  variantId: string; kind: 'Entry' | 'Adjustment' | 'Loss'; delta: number; reason: string
+  variantId: string; kind: 'Entry' | 'Adjustment' | 'Loss' | 'Correction'; delta: number; reason: string
   /** Solo en entradas (delta > 0) y con investment.read. */
   partnerId?: string; unitCost?: number; unitPrice?: number
 }

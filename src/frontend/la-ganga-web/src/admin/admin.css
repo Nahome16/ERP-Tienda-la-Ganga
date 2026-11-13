@@ -543,3 +543,8 @@
 .adm-check span { display: grid; gap: 2px; font-weight: 600; }
 .adm-check small { font-weight: 400; color: var(--muted, #6d6860); }
 @media (max-width: 700px) { .adm-allcost { grid-template-columns: 1fr; } }
+
+/* Editar producto: corrección de existencia. */
+.adm-edit-grid input.adm-stock-input { min-width: 72px; max-width: 90px; text-align: right; }
+.adm-stock-change { display: grid; gap: 8px; padding: 12px; border: 1.5px solid #e8b860; border-radius: 12px; background: #fff4dc; color: #6b4300; }
+.adm-stock-change ul { margin: 0; padding-left: 18px; }
