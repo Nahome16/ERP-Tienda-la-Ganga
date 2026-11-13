@@ -22,8 +22,8 @@ public static class SystemRoles
     ];
 
     /// <summary>
-    /// Mantiene productos e inventario. Costos y autorización de ajustes
-    /// quedan fuera hasta definir sus límites («Limitado» en la matriz).
+    /// Mantiene productos e inventario: crea y edita productos, ingresa mercadería con su costo y su
+    /// socio, sube fotos e imprime etiquetas. No ve ventas, caja, finanzas ni administra usuarios.
     /// </summary>
     public static IReadOnlyCollection<string> InventoryManagerPermissions { get; } =
     [
@@ -38,6 +38,9 @@ public static class SystemRoles
         PermissionNames.InventoryKardexRead,
         PermissionNames.InventoryInitialConfirm,
         PermissionNames.InventoryAdjust,
+        PermissionNames.InventoryCostRead,
+        PermissionNames.InvestmentRead,
+        PermissionNames.InvestmentManage,
     ];
 
     public static IReadOnlyDictionary<string, IReadOnlyCollection<string>> Defaults { get; } =
