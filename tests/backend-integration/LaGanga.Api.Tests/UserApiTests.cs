@@ -36,12 +36,17 @@ public sealed class UserApiTests(CatalogApiFixture fixture) : IClassFixture<Cata
         Assert.Contains("inventory.cost.read", administrator.Permissions);
         Assert.Equal(ExpectedSellerPermissions, seller.Permissions);
         Assert.Contains("inventory.adjust", inventory.Permissions);
-        // El encargado ingresa mercadería con costo y socio, pero no ve ventas, caja ni usuarios.
+        // El encargado: inventario con costo y socio, y punto de venta; sin historial, cierres,
+        // reporte de socios ni usuarios.
         Assert.Contains("inventory.cost.read", inventory.Permissions);
         Assert.Contains("investment.manage", inventory.Permissions);
+        Assert.Contains("sale.create", inventory.Permissions);
+        Assert.Contains("cash.operate", inventory.Permissions);
         Assert.DoesNotContain("user.manage", inventory.Permissions);
         Assert.DoesNotContain("sale.read", inventory.Permissions);
-        Assert.DoesNotContain("cash.operate", inventory.Permissions);
+        Assert.DoesNotContain("cash.report.read", inventory.Permissions);
+        Assert.DoesNotContain("investment.report.read", inventory.Permissions);
+        Assert.Contains("investment.report.read", administrator.Permissions);
     }
 
     [PostgresFact]
