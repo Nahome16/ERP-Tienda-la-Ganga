@@ -127,6 +127,18 @@ public sealed class StockLot
 
     public DateTimeOffset EnteredAtUtc { get; private set; }
 
+    /// <summary>Corrige una entrada que se registró con unidades de más (que todavía no se vendieron).</summary>
+    public void CorrectQuantityIn(int units)
+    {
+        if (units <= 0 || units > QuantityRemaining)
+        {
+            throw new ArgumentOutOfRangeException(nameof(units), "Solo se pueden corregir unidades que siguen en existencia.");
+        }
+
+        QuantityIn -= units;
+        QuantityRemaining -= units;
+    }
+
     public void Edit(Guid? partnerId, decimal? unitCost, decimal? unitPrice, string? note)
     {
         PartnerId = partnerId;

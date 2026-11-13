@@ -126,6 +126,30 @@ internal sealed class LotService(LaGangaDbContext dbContext)
         }
     }
 
+    /// <summary>
+    /// Corrección de ingreso: descuenta unidades de las entradas más recientes que todavía las
+    /// tienen, bajando lo ingresado (no es una pérdida del socio).
+    /// </summary>
+    public async Task CorrectEntriesAsync(Guid variantId, int units, CancellationToken cancellationToken)
+    {
+        var lots = await dbContext.StockLots
+            .Where(lot => lot.VariantId == variantId && lot.QuantityRemaining > 0)
+            .OrderByDescending(lot => lot.EnteredAtUtc).ThenByDescending(lot => lot.Id)
+            .ToListAsync(cancellationToken);
+        var pending = units;
+        foreach (var lot in lots)
+        {
+            if (pending == 0)
+            {
+                break;
+            }
+
+            var taken = Math.Min(pending, lot.QuantityRemaining);
+            lot.CorrectQuantityIn(taken);
+            pending -= taken;
+        }
+    }
+
     /// <summary>Cuadra las entradas con la existencia real de la variante (ver la invariante de la clase).</summary>
     public async Task ReconcileAsync(Guid variantId, int balance, DateTimeOffset now, CancellationToken cancellationToken)
     {

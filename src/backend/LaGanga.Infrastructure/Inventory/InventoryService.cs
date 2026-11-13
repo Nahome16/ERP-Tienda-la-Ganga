@@ -360,12 +360,13 @@ public sealed class InventoryService : IInventoryService
 
         if (input.Delta == 0 ||
             (input.Kind == AdjustmentKind.Entry && input.Delta < 0) ||
-            (input.Kind == AdjustmentKind.Loss && input.Delta > 0))
+            ((input.Kind is AdjustmentKind.Loss or AdjustmentKind.Correction) && input.Delta > 0))
         {
             return Invalid("delta", input.Kind switch
             {
                 AdjustmentKind.Entry => "Una entrada debe sumar unidades (cantidad positiva).",
                 AdjustmentKind.Loss => "Una pérdida debe restar unidades (cantidad negativa).",
+                AdjustmentKind.Correction => "Una corrección de ingreso debe restar unidades (cantidad negativa).",
                 _ => "La cantidad no puede ser cero.",
             });
         }
@@ -435,6 +436,10 @@ public sealed class InventoryService : IInventoryService
                 reason,
                 actor.UserId,
                 now);
+        }
+        else if (input.Kind == AdjustmentKind.Correction)
+        {
+            await lots.CorrectEntriesAsync(variant.Id, -input.Delta, cancellationToken);
         }
         else
         {
