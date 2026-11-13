@@ -30,12 +30,24 @@ export const permissionLabels: Record<string, string> = {
   'inventory.adjust': 'Registrar ajustes',
   'inventory.adjust.authorize': 'Autorizar ajustes',
   'user.manage': 'Administrar cuentas y roles',
+  'sale.create': 'Vender en el punto de venta',
+  'sale.read': 'Consultar el historial de ventas',
+  'sale.void': 'Anular ventas',
+  'sale.exchange': 'Cambios de talla',
+  'sale.discount.unlimited': 'Descuentos sin límite',
+  'cash.operate': 'Abrir y cerrar su caja',
+  'cash.report.read': 'Ver panel, caja y cierres',
+  'settings.manage': 'Administrar la configuración',
+  'audit.read': 'Consultar la auditoría',
+  'investment.read': 'Elegir el socio al ingresar mercadería',
+  'investment.manage': 'Asignar socios y editar entradas',
+  'investment.report.read': 'Ver socios e inversión',
 }
 
 export const roleDescriptions: Record<string, string> = {
   Administrador: 'Acceso total: panel, punto de venta, costos y cuentas.',
   Vendedor: 'Solo punto de venta. Consulta productos y existencias, sin costos.',
-  'Encargado de inventario': 'Productos, mercadería con costo y socio, fotos y etiquetas. Sin ventas, caja ni cuentas.',
+  'Encargado de inventario': 'Punto de venta e inventario: productos, mercadería con costo y socio, fotos y etiquetas. Sin historial de ventas, cierres, reportes, socios ni cuentas.',
 }
 
 export const passwordMinLength = 12

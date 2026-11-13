@@ -478,7 +478,7 @@ public static class MvpEndpoints
 
         group.MapGet("/summary", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IInvestmentService service, CancellationToken ct) =>
                 Results.Ok(await service.GetSummaryAsync(from, to, ct)))
-            .RequireAuthorization(PermissionNames.InvestmentRead);
+            .RequireAuthorization(PermissionNames.InvestmentReportRead);
 
         group.MapGet("/breakdown", async (
                 [FromQuery] string? partnerId,
@@ -487,7 +487,7 @@ public static class MvpEndpoints
                 IInvestmentService service,
                 CancellationToken ct) =>
                 Results.Ok(await service.GetBreakdownAsync(partnerId, from, to, ct)))
-            .RequireAuthorization(PermissionNames.InvestmentRead);
+            .RequireAuthorization(PermissionNames.InvestmentReportRead);
 
         group.MapGet("/lots", async (
                 [FromQuery] string? partnerId,
@@ -557,7 +557,7 @@ public static class MvpEndpoints
                 var (start, end) = Range(from, to);
                 return actor is null ? ApiHelpers.Unauthorized401() : File(await service.InvestmentAsync(start, end, actor, ct));
             })
-            .RequireAuthorization(PermissionNames.InvestmentRead);
+            .RequireAuthorization(PermissionNames.InvestmentReportRead);
 
         group.MapGet("/cash", async ([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, IReportService service, HttpContext http, CancellationToken ct) =>
             {

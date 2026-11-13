@@ -22,8 +22,9 @@ public static class SystemRoles
     ];
 
     /// <summary>
-    /// Mantiene productos e inventario: crea y edita productos, ingresa mercadería con su costo y su
-    /// socio, sube fotos e imprime etiquetas. No ve ventas, caja, finanzas ni administra usuarios.
+    /// Inventario y punto de venta: crea y edita productos, ingresa mercadería con su costo y su
+    /// socio, sube fotos, imprime etiquetas y vende en caja. No ve el historial de ventas, los
+    /// cierres, los reportes, el resumen de socios ni administra usuarios.
     /// </summary>
     public static IReadOnlyCollection<string> InventoryManagerPermissions { get; } =
     [
@@ -41,6 +42,9 @@ public static class SystemRoles
         PermissionNames.InventoryCostRead,
         PermissionNames.InvestmentRead,
         PermissionNames.InvestmentManage,
+        PermissionNames.SaleCreate,
+        PermissionNames.SaleExchange,
+        PermissionNames.CashOperate,
     ];
 
     public static IReadOnlyDictionary<string, IReadOnlyCollection<string>> Defaults { get; } =

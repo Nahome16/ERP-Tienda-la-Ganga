@@ -188,6 +188,9 @@ public sealed class InvestmentTests(CatalogApiFixture fixture) : IClassFixture<C
             var row = inventory.GetProperty("items").EnumerateArray().First(item => item.GetProperty("variantId").GetGuid() == variantId);
             Assert.Equal(150m, row.GetProperty("cost").GetDecimal());
             Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(new Uri("/api/v1/sales", UriKind.Relative))).StatusCode);
+            // Elige socio al ingresar, pero no ve el resumen de socios ni su reporte.
+            Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(new Uri("/api/v1/investment/summary", UriKind.Relative))).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(new Uri("/api/v1/reports/investment", UriKind.Relative))).StatusCode);
         }
 
         var lots = await GetAsync(fixture.Admin, $"/api/v1/investment/lots?partnerId={partner}&pageSize=100");

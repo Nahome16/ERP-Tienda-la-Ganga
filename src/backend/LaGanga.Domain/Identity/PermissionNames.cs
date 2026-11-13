@@ -29,6 +29,9 @@ public static class PermissionNames
     public const string InvestmentRead = "investment.read";
     public const string InvestmentManage = "investment.manage";
 
+    /// <summary>Ver el resumen de socios e inversión y su reporte (no hace falta para ingresar mercadería con socio).</summary>
+    public const string InvestmentReportRead = "investment.report.read";
+
     public static IReadOnlyCollection<string> All { get; } =
     [
         CatalogRead,
@@ -57,5 +60,6 @@ public static class PermissionNames
         AuditRead,
         InvestmentRead,
         InvestmentManage,
+        InvestmentReportRead,
     ];
 }
