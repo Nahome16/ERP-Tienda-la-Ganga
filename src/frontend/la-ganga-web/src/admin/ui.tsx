@@ -1,5 +1,6 @@
 import { useEffect, useRef, type PropsWithChildren, type ReactNode } from 'react'
 import { swatchFor } from '../lib/colorPalette'
+import { arrowNavigate } from './arrowNav'
 import './admin.css'
 
 type DialogProps = PropsWithChildren<{
@@ -49,7 +50,7 @@ export function Dialog({ title, subtitle, onClose, wide, footer, children }: Dia
 
   return (
     <div className="adm-backdrop" role="presentation">
-      <div ref={ref} className={wide ? 'adm-dialog wide' : 'adm-dialog'} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={ref} className={wide ? 'adm-dialog wide' : 'adm-dialog'} role="dialog" aria-modal="true" aria-label={title} onKeyDown={arrowNavigate}>
         <header className="adm-dialog-head">
           <div>
             <h2>{title}</h2>
