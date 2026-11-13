@@ -281,6 +281,14 @@ public static class MvpEndpoints
             .RequireAuthorization(PermissionNames.ProductEdit)
             .RequireCsrf();
 
+        products.MapPost("/{id:guid}/apply-cost", async (Guid id, ApplyCostInput input, IProductService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                return actor is null ? ApiHelpers.Unauthorized401() : (await service.ApplyCostAsync(id, input, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(PermissionNames.ProductEdit)
+            .RequireCsrf();
+
         products.MapPost("/{id:guid}/variants", async (Guid id, NewVariantInput input, IProductService service, HttpContext http, CancellationToken ct) =>
             {
                 var actor = http.User.GetActor();

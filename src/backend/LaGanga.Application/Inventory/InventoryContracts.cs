@@ -153,6 +153,12 @@ public interface IProductService
         Actor actor,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Pone el mismo costo a todas las tallas y colores del producto y a las entradas de mercadería
+    /// que todavía tienen existencia (solo a las que no tienen costo, salvo <c>Overwrite</c>).
+    /// </summary>
+    Task<ServiceResult<ApplyCostResultDto>> ApplyCostAsync(Guid id, ApplyCostInput input, Actor actor, CancellationToken cancellationToken);
+
     Task<ServiceResult<ProductDetailDto>> UpdateAsync(
         Guid id,
         long expectedVersion,
@@ -303,3 +309,9 @@ public interface IInventoryService
         Actor actor,
         CancellationToken cancellationToken);
 }
+
+/// <summary>Costo para todas las tallas y colores; <c>Overwrite</c> reemplaza también el de entradas que ya tenían.</summary>
+public sealed record ApplyCostInput(decimal? Cost, bool Overwrite = false);
+
+/// <summary>Cuántas tallas/colores y entradas (con cuántas unidades) recibieron el costo.</summary>
+public sealed record ApplyCostResultDto(int Variants, int Lots, int Units);

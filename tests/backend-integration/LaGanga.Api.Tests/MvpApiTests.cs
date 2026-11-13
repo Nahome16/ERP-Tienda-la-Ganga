@@ -305,6 +305,32 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task ApplyCostSetsTheCostOnEverySizeAndOnTheStockAlreadyInStore()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        // Se ingresó sin costo: dos tallas con existencia.
+        var product = await CreateProductAsync(catalogs, "Costo para todas", 600m, [(3, null), (2, null)]);
+        var productId = product.GetProperty("id").GetGuid();
+        var name = product.GetProperty("name").GetString()!;
+
+        var applied = await PostAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/products/{productId}/apply-cost", new { cost = 350m });
+        Assert.Equal(2, applied.GetProperty("variants").GetInt32());
+        Assert.Equal(2, applied.GetProperty("lots").GetInt32());
+        Assert.Equal(5, applied.GetProperty("units").GetInt32());
+
+        var detail = await GetAsync(fixture.Admin, $"/api/v1/products/{productId}");
+        Assert.All(detail.GetProperty("variants").EnumerateArray(), variant => Assert.Equal(350m, variant.GetProperty("cost").GetDecimal()));
+        var stock = await GetAsync(fixture.Admin, $"/api/v1/inventory/products?search={Uri.EscapeDataString(name)}");
+        Assert.Equal(1750m, Assert.Single(stock.GetProperty("items").EnumerateArray()).GetProperty("stockValue").GetDecimal());
+
+        // Sin «overwrite» no se tocan las entradas que ya tienen costo.
+        var again = await PostAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/products/{productId}/apply-cost", new { cost = 400m });
+        Assert.Equal(0, again.GetProperty("lots").GetInt32());
+        var replaced = await PostAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/products/{productId}/apply-cost", new { cost = 400m, overwrite = true });
+        Assert.Equal(2, replaced.GetProperty("lots").GetInt32());
+    }
+
+    [PostgresFact]
     public async Task OnlineSaleRejectsAClientPriceDifferentFromTheOfficialPrice()
     {
         var catalogs = await LoadCatalogsAsync();

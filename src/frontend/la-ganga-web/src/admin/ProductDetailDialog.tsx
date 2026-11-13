@@ -132,13 +132,18 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
             {(() => {
               const missingPrice = product.variants.length === 0 ? product.basePrice <= 0 : product.variants.some((variant) => variant.price <= 0)
               const missingPhoto = (product.images ?? []).length === 0
-              if (!missingPrice && !missingPhoto) return null
+              const missingCost = canCost && product.variants.some((variant) => variant.cost === null || variant.cost === undefined)
+              if (!missingPrice && !missingPhoto && !missingCost) return null
               return (
                 <div className="adm-missing" role="status">
                   <strong>Falta completar:</strong>
-                  <span>{[missingPrice && 'precio de venta (no se puede vender en caja)', missingPhoto && 'foto'].filter(Boolean).join(' · ')}</span>
+                  <span>{[missingPrice && 'precio de venta (no se puede vender en caja)', missingCost && 'costo', missingPhoto && 'foto'].filter(Boolean).join(' · ')}</span>
                   <span className="adm-missing-actions">
-                    {missingPrice && canEdit && <button type="button" className="primary-button" onClick={() => setNested({ kind: 'edit-product' })}>Poner precio</button>}
+                    {(missingPrice || missingCost) && canEdit && (
+                      <button type="button" className="primary-button" onClick={() => setNested({ kind: 'edit-product' })}>
+                        {missingPrice && missingCost ? 'Poner precio y costo' : missingPrice ? 'Poner precio' : 'Poner costo'}
+                      </button>
+                    )}
                     {missingPhoto && canImages && <button type="button" className="secondary-button" onClick={() => document.getElementById('product-images')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Agregar foto</button>}
                   </span>
                 </div>

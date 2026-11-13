@@ -272,6 +272,11 @@ export function createMock(options = {}) {
       if (term) rows = rows.filter((x) => `${x.productName} ${x.sizeName} ${x.colorName} ${x.barcode}`.toLowerCase().includes(term))
       return json(route, 200, page(rows, Number(q.get('page') ?? 1), Number(q.get('pageSize') ?? 25)))
     }
+    if ((r = m(/^\/api\/v1\/products\/([^/]+)\/apply-cost$/)) && method === 'POST') {
+      const own = s.variants.filter((v) => v.productId === r[1])
+      for (const v of own) { v.cost = body.cost; v.version += 1 }
+      return json(route, 200, { variants: own.length, lots: own.filter((v) => v.stock > 0).length, units: own.reduce((a, v) => a + Math.max(v.stock, 0), 0) })
+    }
     if (path === '/api/v1/labels') {
       s.labelPrints ??= {}
       const status = q.get('status') ?? 'pending'
