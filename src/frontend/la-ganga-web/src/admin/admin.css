@@ -536,3 +536,10 @@
 .adm-generate label small { color: var(--muted, #6d6860); }
 .adm-generate em { font-style: normal; color: #1d7a3e; font-size: .85rem; }
 .adm-generate .adm-help { margin: 0; }
+
+/* Editar producto: costo para todas las tallas. */
+.adm-allcost { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; align-items: center; padding: 12px; border: 1px dashed #d9cdb9; border-radius: 12px; background: #fffaf2; }
+.adm-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.adm-check span { display: grid; gap: 2px; font-weight: 600; }
+.adm-check small { font-weight: 400; color: var(--muted, #6d6860); }
+@media (max-width: 700px) { .adm-allcost { grid-template-columns: 1fr; } }

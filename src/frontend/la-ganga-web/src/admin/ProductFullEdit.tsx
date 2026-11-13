@@ -5,7 +5,7 @@ import { hasPermission } from '../lib/access'
 import { formatNio } from '../lib/money'
 import { parseDecimal } from './csv'
 import type { CurrentUser } from '../types'
-import { addVariant, updateProduct, updateVariant } from './adminApi'
+import { addVariant, applyProductCost, updateProduct, updateVariant } from './adminApi'
 import { blockEnterSubmit } from './forms'
 import { listLots, listPartners, lotWithPartner, updateLot } from './investmentApi'
 import { ProductFieldsForm } from './ProductDialogs'
@@ -57,6 +57,10 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
   const initialDrafts = Object.fromEntries(product.variants.map((variant) => [variant.id, draftOfVariant(variant)]))
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>(initialDrafts)
   const [builder, setBuilder] = useState<BuilderState>(emptyBuilder)
+  // Costo para todas las tallas y colores (y su existencia). Vacío = no cambiar.
+  const [allCost, setAllCost] = useState('')
+  const [overwriteLots, setOverwriteLots] = useState(false)
+  const applyingCost = canCost && allCost.trim() !== ''
   const [showAdd, setShowAdd] = useState(false)
 
   // Socio de las unidades (se guarda en cada entrada de mercadería).
@@ -89,10 +93,12 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
   const existing = new Set(product.variants.map((variant) => `${variant.sizeId}|${variant.colorId}`))
   const built = builderToInputs(builder, catalogs.sizes, catalogs.colors, existing, canCost, canPartnersRead)
   const fieldsChanged = JSON.stringify(fields) !== JSON.stringify(initialFields)
-  const changedVariants = product.variants.filter((variant) => drafts[variant.id] && !sameDraft(drafts[variant.id]!, initialDrafts[variant.id]!))
+  // Con «costo para todas», el costo de cada fila no se manda aparte: lo pone ese costo.
+  const comparable = (draft: VariantDraft, initial: VariantDraft) => applyingCost ? { ...draft, cost: initial.cost } : draft
+  const changedVariants = product.variants.filter((variant) => drafts[variant.id] && !sameDraft(comparable(drafts[variant.id]!, initialDrafts[variant.id]!), initialDrafts[variant.id]!))
   const unassignedLots = lots?.filter((lot) => !lot.partnerId) ?? []
   const partnerTargets = !partnerId ? [] : partnerScope === 'unassigned' ? unassignedLots : lots ?? []
-  const pending = (fieldsChanged ? 1 : 0) + changedVariants.length + built.inputs.length + (partnerTargets.length > 0 ? 1 : 0)
+  const pending = (fieldsChanged ? 1 : 0) + changedVariants.length + built.inputs.length + (partnerTargets.length > 0 ? 1 : 0) + (applyingCost ? 1 : 0)
 
   function setDraft(id: string, patch: Partial<VariantDraft>) {
     setDrafts((current) => ({ ...current, [id]: { ...current[id]!, ...patch } }))
@@ -110,6 +116,10 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
       if (draft.price.trim() !== '' && (price === null || price <= 0)) return `${label}: el precio especial debe ser mayor que cero (o dejalo vacío para usar el precio base).`
       const cost = draft.cost.trim() === '' ? null : parseDecimal(draft.cost)
       if (canCost && draft.cost.trim() !== '' && (cost === null || cost < 0)) return `${label}: el costo no es válido.`
+    }
+    if (applyingCost) {
+      const cost = parseDecimal(allCost)
+      if (cost === null || cost < 0) return 'El costo para todas las tallas no es válido.'
     }
     if (built.errors.length > 0) return built.errors[0]!
     if (built.totalUnits > 0 && !canInitial) return 'Tu cuenta no puede registrar existencia inicial: dejá vacías las cantidades de las tallas nuevas.'
@@ -140,7 +150,7 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
           barcode: draft.barcode.trim(),
           priceOverride: draft.price.trim() === '' ? null : parseDecimal(draft.price),
           isActive: draft.isActive,
-          ...(canCost ? { cost } : {}),
+          ...(canCost && !applyingCost ? { cost } : {}),
         })
       }
       if (changedVariants.length > 0) done.push(`${changedVariants.length} talla(s)/color(es)`)
@@ -149,6 +159,11 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
         await addVariant(product.id, input)
       }
       if (built.inputs.length > 0) done.push(`${built.inputs.length} variante(s) nueva(s)`)
+      if (applyingCost) {
+        setStep('Poniendo el costo a todas las tallas y su existencia…')
+        const result = await applyProductCost(product.id, parseDecimal(allCost)!, overwriteLots)
+        done.push(`costo en ${result.variants} talla(s)/color(es) y ${result.units} unidad(es) en existencia`)
+      }
       if (partnerTargets.length > 0) {
         setStep('Asignando el socio…')
         for (const lot of partnerTargets) await updateLot(lot.id, lotWithPartner(lot, partnerId))
@@ -194,6 +209,19 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
           extraBrand={{ id: product.brandId, name: product.brandName }}
           onCatalogCreated={canCreateCatalogs ? (list, item) => addCatalog(list, item) : undefined}
         />
+        {canCost && (
+          <div className="adm-allcost">
+            <label className="adm-field">
+              <span>Costo para todas las tallas (C$)</span>
+              <input type="number" min={0} step="0.01" inputMode="decimal" value={allCost} placeholder="Vacío = no cambiar" onChange={(event) => setAllCost(event.target.value)} />
+              <small>Se aplica a todas las tallas y colores y a la mercadería que ya está en existencia.</small>
+            </label>
+            <label className="adm-check">
+              <input type="checkbox" checked={overwriteLots} disabled={!applyingCost} onChange={(event) => setOverwriteLots(event.target.checked)} />
+              <span>Reemplazar también el costo de entradas que ya tenían costo<small>Si no lo marcás, solo se completa lo que no tenía costo.</small></span>
+            </label>
+          </div>
+        )}
 
         <h3 className="adm-step"><span>2</span>Tallas y colores que ya tiene</h3>
         <p className="adm-help">Precio especial vacío = usa el precio base{basePrice > 0 ? ` (${formatNio(basePrice)})` : ''}. Para cambiar un color, agregá el color nuevo abajo y desactivá el anterior.</p>
@@ -216,7 +244,7 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
                     <td>{variant.sizeName}</td>
                     <td><input className="adm-mono" value={draft.barcode} aria-label={`Código ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { barcode: event.target.value })} /></td>
                     <td className="numeric"><input type="number" min={0} step="0.01" value={draft.price} placeholder={basePrice > 0 ? String(basePrice) : 'Base'} aria-label={`Precio especial ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { price: event.target.value })} /></td>
-                    {canCost && <td className="numeric"><input type="number" min={0} step="0.01" value={draft.cost} placeholder="—" aria-label={`Costo ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { cost: event.target.value })} /></td>}
+                    {canCost && <td className="numeric"><input type="number" min={0} step="0.01" value={applyingCost ? allCost : draft.cost} disabled={applyingCost} placeholder="—" aria-label={`Costo ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { cost: event.target.value })} /></td>}
                     <td className="numeric">{variant.stock}</td>
                     <td><input type="checkbox" checked={draft.isActive} aria-label={`Activa ${variant.sizeName} ${variant.colorName}`} onChange={(event) => setDraft(variant.id, { isActive: event.target.checked })} /></td>
                   </tr>
@@ -262,7 +290,7 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
           </>
         )}
 
-        {pending > 0 && !error && <p className="adm-help">Cambios por guardar: {[fieldsChanged && 'datos del producto', changedVariants.length > 0 && `${changedVariants.length} talla(s)/color(es)`, built.inputs.length > 0 && `${built.inputs.length} variante(s) nueva(s)`, partnerTargets.length > 0 && `socio en ${partnerTargets.length} entrada(s)`].filter(Boolean).join(', ')}.</p>}
+        {pending > 0 && !error && <p className="adm-help">Cambios por guardar: {[fieldsChanged && 'datos del producto', applyingCost && 'costo para todas las tallas', changedVariants.length > 0 && `${changedVariants.length} talla(s)/color(es)`, built.inputs.length > 0 && `${built.inputs.length} variante(s) nueva(s)`, partnerTargets.length > 0 && `socio en ${partnerTargets.length} entrada(s)`].filter(Boolean).join(', ')}.</p>}
         {error && <Notice tone="error">{error}</Notice>}
       </form>
     </Dialog>

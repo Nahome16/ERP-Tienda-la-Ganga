@@ -100,7 +100,7 @@ export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, e
         </label>
         {!hidePrice && (
           <label className="adm-field">
-            <span>Precio base (C$)</span>
+            <span>Precio de venta (C$)</span>
             <input type="number" min={0} step="0.01" value={fields.basePrice} placeholder="Vacío = poner después" onChange={(event) => onChange({ ...fields, basePrice: event.target.value })} />
             {Number(fields.basePrice || 0) === 0 && <small className="adm-warn-text">Sin precio no se puede vender en caja.</small>}
           </label>

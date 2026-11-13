@@ -319,6 +319,52 @@ public sealed class ProductService : IProductService
         return Result.Ok(detail!);
     }
 
+    public async Task<ServiceResult<ApplyCostResultDto>> ApplyCostAsync(Guid id, ApplyCostInput input, Actor actor, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(actor);
+
+        if (!actor.CanSeeCosts)
+        {
+            return Result.Fail<ApplyCostResultDto>(ServiceErrorKind.Forbidden, "cost_not_allowed", "Tu cuenta no puede registrar costos.");
+        }
+
+        if (input.Cost is null or < 0 or > 99_999_999m)
+        {
+            return Result.Fail<ApplyCostResultDto>(ServiceErrorKind.Validation, "validation_failed", "Escribí un costo válido (cero o mayor).", "cost");
+        }
+
+        var cost = Math.Round(input.Cost.Value, 2, MidpointRounding.AwayFromZero);
+        var variants = await dbContext.Variants.Where(variant => variant.ProductId == id).ToListAsync(cancellationToken);
+        if (variants.Count == 0)
+        {
+            return await dbContext.Products.AnyAsync(product => product.Id == id, cancellationToken)
+                ? Result.Fail<ApplyCostResultDto>(ServiceErrorKind.Validation, "no_variants", "El producto todavía no tiene tallas ni colores.")
+                : Result.Fail<ApplyCostResultDto>(ServiceErrorKind.NotFound, "not_found", "Producto no encontrado.");
+        }
+
+        foreach (var variant in variants)
+        {
+            variant.Update(variant.Barcode, variant.PriceOverride, cost, variant.IsActive);
+        }
+
+        // La existencia que ya está en tienda: el costo de cada entrada se usa para la ganancia
+        // real (PEPS) y la inversión de cada socio.
+        var variantIds = variants.Select(variant => variant.Id).ToArray();
+        var lots = await dbContext.StockLots
+            .Where(lot => variantIds.Contains(lot.VariantId) && lot.QuantityRemaining > 0 && (input.Overwrite || lot.UnitCost == null))
+            .ToListAsync(cancellationToken);
+        foreach (var lot in lots)
+        {
+            lot.Edit(lot.PartnerId, cost, lot.UnitPrice, lot.Note);
+        }
+
+        var units = lots.Sum(lot => lot.QuantityRemaining);
+        audit.Add(actor.UserId, "product.cost_applied", "Product", id.ToString(), $"Costo C$ {cost:0.00} a {variants.Count} talla(s)/color(es) y {lots.Count} entrada(s) ({units} u.){(input.Overwrite ? ", reemplazando costos anteriores" : "")}.");
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result.Ok(new ApplyCostResultDto(variants.Count, lots.Count, units));
+    }
+
     public async Task<ServiceResult<ProductDetailDto>> UpdateAsync(
         Guid id,
         long expectedVersion,
