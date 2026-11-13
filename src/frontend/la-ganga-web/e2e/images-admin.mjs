@@ -319,7 +319,7 @@ try {
   await create.getByLabel('Nombre del producto').fill('Blusa Lino')
   await create.getByLabel('Categoría').selectOption({ label: 'Camisas' })
   await create.getByLabel('Marca').selectOption({ label: 'Bossini' })
-  await create.getByLabel('Precio base (C$)').fill('450')
+  await create.getByLabel('Precio de venta (C$)').fill('450')
   await create.getByRole('checkbox', { name: 'S', exact: true }).check()
   await create.getByRole('checkbox', { name: 'Negro' }).check()
   await create.getByTestId('create-image-input').setInputFiles([
@@ -336,7 +336,7 @@ try {
   await create2.getByLabel('Nombre del producto').fill('Falda Plisada')
   await create2.getByLabel('Categoría').selectOption({ label: 'Camisas' })
   await create2.getByLabel('Marca').selectOption({ label: 'Bossini' })
-  await create2.getByLabel('Precio base (C$)').fill('300')
+  await create2.getByLabel('Precio de venta (C$)').fill('300')
   await create2.getByRole('checkbox', { name: 'S', exact: true }).check()
   await create2.getByRole('checkbox', { name: 'Negro' }).check()
   await create2.getByTestId('create-image-input').setInputFiles([{ name: 'falla.jpg', mimeType: 'image/jpeg', buffer: big }])
