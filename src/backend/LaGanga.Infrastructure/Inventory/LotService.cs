@@ -136,6 +136,12 @@ internal sealed class LotService(LaGangaDbContext dbContext)
             .Where(lot => lot.VariantId == variantId && lot.QuantityRemaining > 0)
             .OrderByDescending(lot => lot.EnteredAtUtc).ThenByDescending(lot => lot.Id)
             .ToListAsync(cancellationToken);
+        var lotIds = lots.Select(lot => lot.Id).ToList();
+        var withHistory = await dbContext.LotAllocations
+            .Where(allocation => allocation.LotId != null && lotIds.Contains(allocation.LotId.Value))
+            .Select(allocation => allocation.LotId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
         var pending = units;
         foreach (var lot in lots)
         {
@@ -145,16 +151,38 @@ internal sealed class LotService(LaGangaDbContext dbContext)
             }
 
             var taken = Math.Min(pending, lot.QuantityRemaining);
+            if (taken == lot.QuantityIn)
+            {
+                // Toda la entrada fue un error: si nunca se vendió nada de ella, se borra.
+                if (!withHistory.Contains(lot.Id))
+                {
+                    dbContext.StockLots.Remove(lot);
+                    pending -= taken;
+                    continue;
+                }
+
+                // Tiene ventas o devoluciones registradas: se conserva con al menos una unidad.
+                taken--;
+                if (taken == 0)
+                {
+                    continue;
+                }
+            }
+
             lot.CorrectQuantityIn(taken);
             pending -= taken;
         }
+
+        // Lo que no se pudo corregir lo cuadra ReconcileAsync con la existencia real.
     }
 
     /// <summary>Cuadra las entradas con la existencia real de la variante (ver la invariante de la clase).</summary>
     public async Task ReconcileAsync(Guid variantId, int balance, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var persisted = await dbContext.StockLots.Where(lot => lot.VariantId == variantId).ToListAsync(cancellationToken);
-        var lots = persisted.Concat(dbContext.StockLots.Local.Where(lot => lot.VariantId == variantId && !persisted.Contains(lot))).ToList();
+        var lots = persisted.Concat(dbContext.StockLots.Local.Where(lot => lot.VariantId == variantId && !persisted.Contains(lot)))
+            .Where(lot => dbContext.Entry(lot).State != EntityState.Deleted)
+            .ToList();
         var remaining = lots.Sum(lot => lot.QuantityRemaining);
         var target = Math.Max(balance, 0);
         if (remaining < target)
