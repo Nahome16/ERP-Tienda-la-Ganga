@@ -352,6 +352,30 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task EntryCorrectionCanTakeAWholeEntryDownToZero()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        // Primera talla: se ingresó 1 y no llegó ninguna.
+        var product = await CreateProductAsync(catalogs, "Corrección a cero", 500m, [(1, 200m), (1, 200m)]);
+        var single = product.GetProperty("variants")[0].GetProperty("id").GetGuid();
+        var twice = product.GetProperty("variants")[1].GetProperty("id").GetGuid();
+        // Segunda talla: dos entradas de 1, pero llegó solo una.
+        _ = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments", new { variantId = twice, kind = "Entry", delta = 1, reason = "Segunda entrada" });
+
+        var zero = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments", new { variantId = single, kind = "Correction", delta = -1, reason = "Corrección de ingreso: se ingresó de más" });
+        Assert.Equal(0, zero.GetProperty("newStock").GetInt32());
+        var one = await PostAsync(fixture.Admin, fixture.AdminCsrf, "/api/v1/inventory/adjustments", new { variantId = twice, kind = "Correction", delta = -1, reason = "Corrección de ingreso: se ingresó de más" });
+        Assert.Equal(1, one.GetProperty("newStock").GetInt32());
+
+        // La entrada equivocada desaparece: no queda como inversión ni como pérdida.
+        var lots = (await GetAsync(fixture.Admin, "/api/v1/investment/lots?pageSize=100")).GetProperty("items").EnumerateArray().ToList();
+        Assert.DoesNotContain(lots, item => item.GetProperty("variantId").GetGuid() == single);
+        var remaining = Assert.Single(lots, item => item.GetProperty("variantId").GetGuid() == twice);
+        Assert.Equal(1, remaining.GetProperty("quantityIn").GetInt32());
+        Assert.Equal(1, remaining.GetProperty("quantityRemaining").GetInt32());
+    }
+
+    [PostgresFact]
     public async Task OnlineSaleRejectsAClientPriceDifferentFromTheOfficialPrice()
     {
         var catalogs = await LoadCatalogsAsync();

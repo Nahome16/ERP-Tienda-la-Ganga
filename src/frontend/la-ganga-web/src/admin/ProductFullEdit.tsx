@@ -171,13 +171,18 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
         await addVariant(product.id, input)
       }
       if (built.inputs.length > 0) done.push(`${built.inputs.length} variante(s) nueva(s)`)
-      for (const [index, { variant, target }] of stockChanges.entries()) {
-        setStep(`Corrigiendo existencias (${index + 1}/${stockChanges.length})…`)
-        const delta = Number(target) - variant.stock
-        // Bajar = corrección de ingreso (se descuenta de la entrada, no es pérdida); subir = ajuste.
-        await adjustInventory({ variantId: variant.id, kind: delta < 0 ? 'Correction' : 'Adjustment', delta, reason: stockReason.trim() })
+      let corrected = 0
+      try {
+        for (const [index, { variant, target }] of stockChanges.entries()) {
+          setStep(`Corrigiendo existencias (${index + 1}/${stockChanges.length})…`)
+          const delta = Number(target) - variant.stock
+          // Bajar = corrección de ingreso (se descuenta de la entrada, no es pérdida); subir = ajuste.
+          await adjustInventory({ variantId: variant.id, kind: delta < 0 ? 'Correction' : 'Adjustment', delta, reason: stockReason.trim() })
+          corrected++
+        }
+      } finally {
+        if (corrected > 0) done.push(`existencia de ${corrected} talla(s)/color(es)`)
       }
-      if (stockChanges.length > 0) done.push(`existencia de ${stockChanges.length} talla(s)/color(es)`)
       if (applyingCost) {
         setStep('Poniendo el costo a todas las tallas y su existencia…')
         const result = await applyProductCost(product.id, parseDecimal(allCost)!, overwriteLots)
