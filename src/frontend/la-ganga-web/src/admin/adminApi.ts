@@ -90,6 +90,9 @@ export const deleteProduct = (productId: string) =>
 export const getProductByBarcode = (barcode: string, signal?: AbortSignal) =>
   apiRequest<{ product: ProductDetail; colorId: string | null }>(`${v1}/products/by-barcode/${encodeURIComponent(barcode)}`, { signal })
 /** Pone, cambia o quita (vacío) el código de fábrica de un color del producto. */
+/** Genera un código propio para todo el producto (si todavía no tiene). */
+export const generateProductBarcode = (productId: string) =>
+  apiRequest<ProductDetail>(`${v1}/products/${productId}/barcode/generate`, { method: 'POST' })
 export const setColorBarcode = (productId: string, colorId: string, barcode: string) =>
   apiRequest<ProductDetail>(`${v1}/products/${productId}/color-barcodes/${colorId}`, { method: 'PUT', body: { barcode } })
 

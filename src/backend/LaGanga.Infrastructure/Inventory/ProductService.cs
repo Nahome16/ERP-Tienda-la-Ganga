@@ -1024,6 +1024,35 @@ public sealed class ProductService : IProductService
         return null;
     }
 
+    public async Task<ServiceResult<ProductDetailDto>> GenerateProductBarcodeAsync(Guid productId, Actor actor, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var product = await dbContext.Products.SingleOrDefaultAsync(candidate => candidate.Id == productId, cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        // Si ya tiene código (de fábrica o generado) se deja el que tiene.
+        if (string.IsNullOrEmpty(product.Barcode))
+        {
+            var code = await InventoryHelpers.NextBarcodeAsync(dbContext, cancellationToken);
+            product.SetBarcode(code);
+            audit.Add(actor.UserId, "product.updated", "Product", productId.ToString(), $"Se generó el código {code} para todo el producto.");
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (InventoryHelpers.IsUniqueViolation(exception))
+            {
+                return Result.Fail<ProductDetailDto>(ServiceErrorKind.Conflict, "duplicate_barcode", "No se pudo generar un código libre. Probá de nuevo.", "barcode");
+            }
+        }
+
+        return Result.Ok((await LoadDetailAsync(productId, actor.CanSeeCosts, cancellationToken))!);
+    }
+
     public async Task<ServiceResult<ProductDetailDto>> SetColorBarcodeAsync(
         Guid productId,
         Guid colorId,

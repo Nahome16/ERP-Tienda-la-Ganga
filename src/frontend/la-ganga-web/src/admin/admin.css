@@ -537,6 +537,15 @@
 .adm-generate em { font-style: normal; color: #1d7a3e; font-size: .85rem; }
 .adm-generate .adm-help { margin: 0; }
 
+/* Etiquetas: un código para todo el producto o uno por talla y color. */
+.adm-label-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.adm-label-mode label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #d8e4e2; border-radius: 10px; background: var(--paper, #fff); cursor: pointer; }
+.adm-label-mode label.is-on { border-color: var(--teal); background: var(--teal-soft); box-shadow: 0 0 0 2px color-mix(in srgb, var(--teal) 25%, transparent); }
+.adm-label-mode label span { display: grid; gap: 2px; }
+.adm-label-mode label small { color: var(--muted, #6d6860); }
+.adm-label-generate { display: grid; gap: 8px; justify-items: start; padding: 14px; border: 1px dashed #d9cdb9; border-radius: 12px; background: #fffaf2; }
+.adm-label-generate p { margin: 0; }
+
 /* Editar producto: costo para todas las tallas. */
 .adm-allcost { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; align-items: center; padding: 12px; border: 1px dashed #d9cdb9; border-radius: 12px; background: #fffaf2; }
 .adm-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }

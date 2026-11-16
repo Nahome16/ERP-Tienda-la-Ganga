@@ -69,6 +69,7 @@ export function createMock(options = {}) {
       id: p.id, name: p.name, categoryId: p.categoryId, categoryName: s.categories.find((c) => c.id === p.categoryId)?.name,
       brandId: p.brandId, brandName: s.brands.find((c) => c.id === p.brandId)?.name, cutId: p.cutId, cutName: s.cuts.find((c) => c.id === p.cutId)?.name ?? null,
       basePrice: p.basePrice, isActive: p.isActive, variantCount: vs.length, totalStock: vs.reduce((a, v) => a + v.stock, 0), version: p.version,
+      barcode: p.barcode ?? null, referenceCode: p.referenceCode ?? null,
     }
   }
   const productDetail = (p) => ({ ...productItem(p), variants: s.variants.filter((v) => v.productId === p.id).map(variantView) })
@@ -229,6 +230,12 @@ export function createMock(options = {}) {
       if (s.variants.some((v) => v.productId === p.id && v.sizeId === body.sizeId && v.colorId === body.colorId)) return problem(route, 409, 'La variante ya existe.', 'duplicate_variant', {})
       s.variants.push({ id: `v${++s.nextId}`, productId: p.id, sizeId: body.sizeId, colorId: body.colorId, barcode: body.barcode || barcodeFor(), priceOverride: body.priceOverride, cost: body.cost, stock: body.initialQuantity, isActive: true, version: 1, movements: [] })
       return json(route, 201, variantView(s.variants.at(-1)))
+    }
+    if ((r = m(/^\/api\/v1\/products\/([^/]+)\/barcode\/generate$/)) && method === 'POST') {
+      const p = s.products.find((x) => x.id === r[1])
+      if (!p) return problem(route, 404, 'No existe el producto.', 'not_found', {})
+      if (!p.barcode) { p.barcode = barcodeFor(); p.version += 1 }
+      return json(route, 200, productDetail(p))
     }
     if ((r = m(/^\/api\/v1\/products\/([^/]+)$/))) {
       const p = s.products.find((x) => x.id === r[1])
