@@ -66,6 +66,10 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
   const [overwriteLots, setOverwriteLots] = useState(false)
   const applyingCost = canCost && allCost.trim() !== ''
   const [showAdd, setShowAdd] = useState(false)
+  // Precio especial para varias tallas a la vez (llena la columna «Precio especial»; se guarda con «Guardar cambios»).
+  const [specialPrice, setSpecialPrice] = useState('')
+  const [specialSizes, setSpecialSizes] = useState<string[]>([])
+  const [specialNote, setSpecialNote] = useState<string | null>(null)
 
   // Socio de las unidades (se guarda en cada entrada de mercadería).
   const [lots, setLots] = useState<Lot[] | null>(null)
@@ -208,6 +212,25 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
 
   const sortedVariants = [...product.variants].sort((a, b) => a.colorName.localeCompare(b.colorName, 'es') || a.sizeName.localeCompare(b.sizeName, 'es', { numeric: true }))
   const basePrice = parseDecimal(fields.basePrice || '0') ?? 0
+  const sizeNames = [...new Set(product.variants.map((variant) => variant.sizeName))]
+    .sort((a, b) => a.localeCompare(b, 'es', { numeric: true }))
+  const specialValue = parseDecimal(specialPrice)
+  const specialTargets = product.variants.filter((variant) => specialSizes.includes(variant.sizeName))
+
+  function toggleSpecialSize(size: string) {
+    setSpecialNote(null)
+    setSpecialSizes((current) => (current.includes(size) ? current.filter((item) => item !== size) : [...current, size]))
+  }
+
+  function applySpecialPrice(clear: boolean) {
+    if (specialTargets.length === 0) return
+    if (!clear && (specialValue === null || specialValue <= 0)) return
+    for (const variant of specialTargets) setDraft(variant.id, { price: clear ? '' : String(specialValue) })
+    const sizes = sizeNames.filter((size) => specialSizes.includes(size)).join(', ')
+    setSpecialNote(clear
+      ? `Tallas ${sizes}: vuelven al precio base. Tocá «Guardar cambios» para guardarlo.`
+      : `Precio especial ${formatNio(specialValue ?? 0)} puesto en las tallas ${sizes} (${specialTargets.length} talla(s)/color(es)). Tocá «Guardar cambios» para guardarlo.`)
+  }
 
   return (
     <Dialog
@@ -249,6 +272,55 @@ export function ProductFullEditDialog({ product, catalogs: baseCatalogs, user, o
 
         <h3 className="adm-step"><span>2</span>Tallas y colores que ya tiene</h3>
         <p className="adm-help">Precio especial vacío = usa el precio base{basePrice > 0 ? ` (${formatNio(basePrice)})` : ''}. Para cambiar un color, agregá el color nuevo abajo y desactivá el anterior.</p>
+        {sizeNames.length > 0 && (
+          <div className="adm-special-price">
+            <div className="adm-special-price-head">
+              <strong>Poner precio especial por talla</strong>
+              <span className="adm-muted">Se aplica a todos los colores de las tallas que elijas.</span>
+            </div>
+            <div className="adm-special-price-body">
+              <label className="adm-field">
+                <span>Precio especial (C$)</span>
+                <input
+                  type="number" min={0} step="0.01" inputMode="decimal" value={specialPrice} placeholder={basePrice > 0 ? String(basePrice) : '0.00'}
+                  onChange={(event) => { setSpecialPrice(event.target.value); setSpecialNote(null) }}
+                />
+              </label>
+              <fieldset className="adm-special-price-sizes">
+                <legend>Tallas</legend>
+                <div className="adm-chips">
+                  {sizeNames.map((size) => (
+                    <label key={size} className={`adm-chip${specialSizes.includes(size) ? ' on' : ''}`}>
+                      <input type="checkbox" checked={specialSizes.includes(size)} onChange={() => toggleSpecialSize(size)} />
+                      {size}
+                    </label>
+                  ))}
+                  <button
+                    type="button" className="link-button"
+                    onClick={() => { setSpecialNote(null); setSpecialSizes(specialSizes.length === sizeNames.length ? [] : sizeNames) }}
+                  >
+                    {specialSizes.length === sizeNames.length ? 'Ninguna' : 'Todas'}
+                  </button>
+                </div>
+              </fieldset>
+            </div>
+            <div className="adm-actions">
+              <button
+                type="button" className="primary-button"
+                disabled={specialTargets.length === 0 || specialValue === null || specialValue <= 0}
+                onClick={() => applySpecialPrice(false)}
+              >
+                {specialTargets.length > 0 && specialValue !== null && specialValue > 0
+                  ? `Poner ${formatNio(specialValue)} a ${specialSizes.length} talla(s)`
+                  : 'Poner precio especial'}
+              </button>
+              <button type="button" className="secondary-button" disabled={specialTargets.length === 0} onClick={() => applySpecialPrice(true)}>
+                Quitar precio especial
+              </button>
+            </div>
+            {specialNote && <p className="adm-help adm-special-price-note" role="status">{specialNote}</p>}
+          </div>
+        )}
         <div className="table-scroll">
           <table className="adm-table adm-edit-grid">
             <thead>
