@@ -569,3 +569,14 @@
 @media (max-width: 560px) { .adm-special-price-body { grid-template-columns: 1fr; } }
 .adm-special-price .adm-field { min-width: 0; }
 .adm-special-price .adm-field input { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* Lista con búsqueda (marca, categoría, corte). */
+.search-select { position: relative; }
+.search-select > input { width: 100%; padding-right: 36px; box-sizing: border-box; }
+.search-select-toggle { position: absolute; top: 0; right: 0; bottom: 0; display: grid; place-items: center; width: 34px; padding: 0; color: var(--muted, #6d6860); border: 0; background: transparent; cursor: pointer; }
+.search-select-list { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; max-height: 260px; margin: 0; padding: 4px; overflow-y: auto; list-style: none; border: 1px solid var(--line, #dfcfb6); border-radius: 10px; background: #fff; box-shadow: 0 10px 28px rgba(8, 47, 53, .16); }
+.search-select-list li { padding: 8px 10px; border-radius: 7px; font-size: .9rem; cursor: pointer; }
+.search-select-list li.is-active { background: var(--teal-soft, #e7f1f0); }
+.search-select-list li[aria-selected="true"] { color: var(--teal-dark, #083f45); font-weight: 800; }
+.search-select-list li.is-empty { color: var(--muted, #6d6860); font-style: italic; }
+.search-select-list .search-select-empty { color: var(--muted, #6d6860); cursor: default; }
