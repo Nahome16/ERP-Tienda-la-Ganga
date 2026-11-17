@@ -1207,6 +1207,26 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("SellerUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ShippingCarrier")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ShippingDestination")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<decimal>("ShippingNio")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ShippingPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ShippingRecipient")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1252,6 +1272,8 @@ namespace LaGanga.Infrastructure.Persistence.Migrations
                     b.ToTable("sales", "sales", t =>
                         {
                             t.HasCheckConstraint("CK_sales_amounts", "\"SubtotalNio\" >= 0 AND \"DiscountNio\" >= 0 AND \"TotalNio\" >= 0 AND \"ChangeNio\" >= 0");
+
+                            t.HasCheckConstraint("CK_sales_shipping", "\"ShippingNio\" >= 0");
                         });
                 });
 

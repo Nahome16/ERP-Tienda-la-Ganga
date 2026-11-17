@@ -131,13 +131,43 @@ public sealed class ImagesAndReportsTests(CatalogApiFixture fixture) : IClassFix
             lines = new[] { new { variantId, quantity = 2, unitPrice = 500m } },
             discount = new { type = "Amount", value = 100m },
             discountApprovalId = (Guid?)null,
-            payments = new[] { new { method = "Transfer", currency = "NIO", amount = 900m, exchangeRate = (decimal?)null, bank = "BAC", reference = "123" } },
+            payments = new[] { new { method = "Transfer", currency = "NIO", amount = 980m, exchangeRate = (decimal?)null, bank = "BAC", reference = "123" } },
             note = (string?)null,
             customerName = "  María Pérez  ",
+            shipping = new { costNio = 80m, destination = "  Masaya, frente al parque central  ", recipient = "María Pérez", phone = "8888-0000", carrier = "Delivery Juan" },
         }, HttpStatusCode.Created);
-        Assert.Equal(900m, sale.GetProperty("sale").GetProperty("totalNio").GetDecimal());
+        // Subtotal 1000 − descuento 100 (solo sobre la ropa) + envío 80.
+        Assert.Equal(980m, sale.GetProperty("sale").GetProperty("totalNio").GetDecimal());
         // El nombre del cliente se guarda limpio y vuelve para imprimirlo en el recibo.
         Assert.Equal("María Pérez", sale.GetProperty("sale").GetProperty("customerName").GetString());
+        var shipping = sale.GetProperty("sale").GetProperty("shipping");
+        Assert.Equal(80m, shipping.GetProperty("costNio").GetDecimal());
+        Assert.Equal("Masaya, frente al parque central", shipping.GetProperty("destination").GetString());
+        Assert.Equal("8888-0000", shipping.GetProperty("phone").GetString());
+        Assert.Equal("Delivery Juan", shipping.GetProperty("carrier").GetString());
+
+        // Un envío sin destino no se acepta.
+        using (var noDestination = ApiTestHelpers.Build(HttpMethod.Post, "/api/v1/pos/sales", csrf, new
+        {
+            clientSaleId = Guid.NewGuid(),
+            cashSessionId = sessionId,
+            channel = "WhatsApp",
+            createdAtUtc = DateTimeOffset.UtcNow,
+            isOffline = false,
+            lines = new[] { new { variantId, quantity = 1, unitPrice = 500m } },
+            discount = (object?)null,
+            discountApprovalId = (Guid?)null,
+            payments = new[] { new { method = "Cash", currency = "NIO", amount = 550m, exchangeRate = (decimal?)null, bank = (string?)null, reference = (string?)null } },
+            note = (string?)null,
+            shipping = new { costNio = 50m, destination = " ", recipient = (string?)null, phone = (string?)null, carrier = (string?)null },
+        }))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await seller.SendAsync(noDestination)).StatusCode);
+        }
+
+        var summaryTotals = await GetAsync(seller, $"/api/v1/cash/sessions/{sessionId}/summary");
+        Assert.Equal(1, summaryTotals.GetProperty("totals").GetProperty("shippingCount").GetInt32());
+        Assert.Equal(80m, summaryTotals.GetProperty("totals").GetProperty("shippingTotalNio").GetDecimal());
 
         var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-6)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var salesFile = await DownloadAsync(fixture.Admin, $"/api/v1/reports/sales?from={today}&to={today}");
@@ -151,6 +181,8 @@ public sealed class ImagesAndReportsTests(CatalogApiFixture fixture) : IClassFix
             Assert.Contains(workbook.Worksheet("Ventas").CellsUsed(), cell => cell.GetString().StartsWith("V-", StringComparison.Ordinal));
             Assert.Contains(workbook.Worksheet("Detalle").CellsUsed(), cell => cell.GetString().Contains("Jeans para reporte", StringComparison.Ordinal));
             Assert.Contains(workbook.Worksheet("Pagos").CellsUsed(), cell => cell.GetString() == "BAC");
+            Assert.Contains(workbook.Worksheet("Ventas").CellsUsed(), cell => cell.GetString() == "Masaya, frente al parque central");
+            Assert.Contains(summary.CellsUsed(), cell => cell.GetString().StartsWith("Envíos cobrados", StringComparison.Ordinal));
         }
 
         var adminStock = await DownloadAsync(fixture.Admin, "/api/v1/reports/inventory");

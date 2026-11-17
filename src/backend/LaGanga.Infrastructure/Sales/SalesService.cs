@@ -147,7 +147,14 @@ public sealed class SalesService : ISalesService
             return Result.Fail<SaleResultDto>(discountError);
         }
 
-        var total = Money.Round(subtotal - discountNio);
+        // El envío se suma después del descuento: el descuento es solo sobre la ropa.
+        var shippingNio = request.Shipping is null ? 0m : Money.Round(request.Shipping.CostNio);
+        if (request.Shipping is { } shipping)
+        {
+            sale.SetShipping(shippingNio, shipping.Destination!, shipping.Recipient, shipping.Phone, shipping.Carrier);
+        }
+
+        var total = Money.Round(subtotal - discountNio + shippingNio);
         var discountPercent = subtotal > 0 ? Money.Round(discountNio / subtotal * 100) : 0m;
         DiscountApproval? approval = null;
         if (discountPercent > settings.SellerDiscountLimitPercent && !actor.Has(PermissionNames.SaleDiscountUnlimited))
@@ -557,6 +564,39 @@ public sealed class SalesService : ISalesService
             return Bad("El nombre del cliente admite hasta 120 caracteres.", "customerName");
         }
 
+        if (request.Shipping is { } shipping)
+        {
+            if (shipping.CostNio is < 0 or > 100_000)
+            {
+                return Bad("El costo del envío debe estar entre C$ 0 y C$ 100,000.", "shipping.costNio");
+            }
+
+            if (string.IsNullOrWhiteSpace(shipping.Destination))
+            {
+                return Bad("Escribí el destino del envío.", "shipping.destination");
+            }
+
+            if (shipping.Destination.Trim().Length > Sale.ShippingDestinationMaxLength)
+            {
+                return Bad("El destino del envío admite hasta 300 caracteres.", "shipping.destination");
+            }
+
+            if (shipping.Recipient is { } recipient && recipient.Trim().Length > 120)
+            {
+                return Bad("El nombre de quien recibe admite hasta 120 caracteres.", "shipping.recipient");
+            }
+
+            if (shipping.Phone is { } phone && phone.Trim().Length > 30)
+            {
+                return Bad("El teléfono admite hasta 30 caracteres.", "shipping.phone");
+            }
+
+            if (shipping.Carrier is { } carrier && carrier.Trim().Length > 120)
+            {
+                return Bad("Quién lleva el envío admite hasta 120 caracteres.", "shipping.carrier");
+            }
+        }
+
         if (request.CreatedAtUtc == default)
         {
             return Bad("Falta la fecha de la venta.", "createdAtUtc");
@@ -792,7 +832,10 @@ public sealed class SalesService : ISalesService
                 line.VariantId, line.ProductName, line.SizeName, line.ColorName, line.Barcode, line.Quantity, line.UnitPrice, line.LineTotalNio)).ToArray(),
             sale.Payments.Select(payment => new SalePaymentDto(
                 payment.Method, payment.Currency, payment.Amount, payment.ExchangeRate, payment.AmountNio, payment.Bank, payment.Reference)).ToArray(),
-            sale.CustomerName))
+            sale.CustomerName,
+            sale.ShippingDestination is { } destination
+                ? new ShippingDto(sale.ShippingNio, destination, sale.ShippingRecipient, sale.ShippingPhone, sale.ShippingCarrier)
+                : null))
             .ToArray();
     }
 

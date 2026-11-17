@@ -70,6 +70,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.ToTable("sales", SalesSchema.Name, table =>
         {
             table.HasCheckConstraint("CK_sales_amounts", "\"SubtotalNio\" >= 0 AND \"DiscountNio\" >= 0 AND \"TotalNio\" >= 0 AND \"ChangeNio\" >= 0");
+            table.HasCheckConstraint("CK_sales_shipping", "\"ShippingNio\" >= 0");
         });
         builder.HasKey(sale => sale.Id);
         builder.Property(sale => sale.Id).ValueGeneratedNever();
@@ -86,6 +87,11 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(sale => sale.ReviewNote).HasMaxLength(1000);
         builder.Property(sale => sale.Note).HasMaxLength(500);
         builder.Property(sale => sale.CustomerName).HasMaxLength(120);
+        builder.Property(sale => sale.ShippingNio).HasPrecision(18, 2);
+        builder.Property(sale => sale.ShippingDestination).HasMaxLength(Sale.ShippingDestinationMaxLength);
+        builder.Property(sale => sale.ShippingRecipient).HasMaxLength(120);
+        builder.Property(sale => sale.ShippingPhone).HasMaxLength(30);
+        builder.Property(sale => sale.ShippingCarrier).HasMaxLength(120);
         builder.Property(sale => sale.VoidReason).HasMaxLength(500);
         builder.HasOne(sale => sale.CashSession).WithMany().HasForeignKey(sale => sale.CashSessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(sale => sale.SellerUserId).OnDelete(DeleteBehavior.Restrict);
