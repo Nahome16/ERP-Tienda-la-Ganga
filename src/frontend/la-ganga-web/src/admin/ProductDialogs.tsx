@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { QuickCreate } from './QuickCreate'
+import { SearchSelect } from './SearchSelect'
 import type { CatalogItem } from '../lib/catalogApi'
 import { ScanBarcode } from 'lucide-react'
 import { ScanResult } from './ScanResult'
@@ -43,8 +44,10 @@ export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, e
   const categories = categoryOptions(catalogs.categories)
   if (extraCategory && !categories.some((item) => item.id === extraCategory.id)) categories.push({ id: extraCategory.id, label: `${extraCategory.name} (inactiva)` })
   const brands = [...catalogs.brands]
-  const brandOptions = brands.map((brand) => ({ id: brand.id, name: brand.name }))
-  if (extraBrand && !brandOptions.some((item) => item.id === extraBrand.id)) brandOptions.push({ id: extraBrand.id, name: `${extraBrand.name} (inactiva)` })
+  const brandOptions = brands.map((brand) => ({ id: brand.id, label: brand.name }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+  if (extraBrand && !brandOptions.some((item) => item.id === extraBrand.id)) brandOptions.push({ id: extraBrand.id, label: `${extraBrand.name} (inactiva)` })
+  const cutOptions = catalogs.cuts.map((cut) => ({ id: cut.id, label: cut.name }))
   return (
     <>
       <label className="adm-field">
@@ -54,10 +57,10 @@ export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, e
       <div className="adm-grid-2">
         <div className="adm-field">
           <span>Categoría</span>
-          <select aria-label="Categoría" value={fields.categoryId} required onChange={(event) => onChange({ ...fields, categoryId: event.target.value })}>
-            <option value="">Elegí una categoría</option>
-            {categories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select>
+          <SearchSelect
+            label="Categoría" value={fields.categoryId} required placeholder="Escribí para buscar la categoría"
+            options={categories} onChange={(categoryId) => onChange({ ...fields, categoryId })}
+          />
           {onCatalogCreated && (
             <QuickCreate
               kind="categories" label="categoría"
@@ -68,18 +71,18 @@ export function ProductFieldsForm({ fields, onChange, catalogs, extraCategory, e
         </div>
         <div className="adm-field">
           <span>Marca</span>
-          <select aria-label="Marca" value={fields.brandId} required onChange={(event) => onChange({ ...fields, brandId: event.target.value })}>
-            <option value="">Elegí una marca</option>
-            {brandOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          <SearchSelect
+            label="Marca" value={fields.brandId} required placeholder="Escribí para buscar la marca"
+            options={brandOptions} onChange={(brandId) => onChange({ ...fields, brandId })}
+          />
           {onCatalogCreated && <QuickCreate kind="brands" label="marca" onCreated={(item) => { onCatalogCreated('brands', item); onChange({ ...fields, brandId: item.id }) }} />}
         </div>
         <div className="adm-field">
           <span>Corte (opcional)</span>
-          <select aria-label="Corte" value={fields.cutId} onChange={(event) => onChange({ ...fields, cutId: event.target.value })}>
-            <option value="">Sin corte</option>
-            {catalogs.cuts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          <SearchSelect
+            label="Corte" value={fields.cutId} emptyLabel="Sin corte"
+            options={cutOptions} onChange={(cutId) => onChange({ ...fields, cutId })}
+          />
           {onCatalogCreated && <QuickCreate kind="cuts" label="corte" masculine onCreated={(item) => { onCatalogCreated('cuts', item); onChange({ ...fields, cutId: item.id }) }} />}
         </div>
         {!hideBarcode && <label className="adm-field">
