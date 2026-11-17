@@ -190,6 +190,9 @@ public interface IProductService
     /// <summary>Elimina un producto sin ventas, con todo lo suyo. Con ventas: conflicto «product_has_sales».</summary>
     Task<ServiceResult<bool>> DeleteAsync(Guid id, Actor actor, CancellationToken cancellationToken);
 
+    /// <summary>Genera un código propio para todo el producto si todavía no tiene (en caja se elige la talla).</summary>
+    Task<ServiceResult<ProductDetailDto>> GenerateProductBarcodeAsync(Guid productId, Actor actor, CancellationToken cancellationToken);
+
     /// <summary>Pone, cambia o quita (vacío) el código de fábrica de un color del producto.</summary>
     Task<ServiceResult<ProductDetailDto>> SetColorBarcodeAsync(
         Guid productId,

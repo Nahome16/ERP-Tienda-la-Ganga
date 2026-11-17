@@ -7,11 +7,11 @@ import { hasPermission } from '../lib/access'
 import type { ProductDetail, Variant } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
 import type { CurrentUser } from '../types'
-import { deleteProduct, getProduct, setColorBarcode, updateProduct, updateVariant } from './adminApi'
+import { deleteProduct, generateProductBarcode, getProduct, setColorBarcode, updateProduct, updateVariant } from './adminApi'
 import { messageFrom } from './format'
 import { ImageManager } from './ImageManager'
 import { useFetch } from './hooks'
-import { LabelsDialog, type LabelVariant } from './LabelsDialog'
+import { LabelsDialog, type LabelVariant, type ProductLabelOption } from './LabelsDialog'
 import { AddVariantsDialog, EditVariantDialog } from './ProductDialogs'
 import { ProductFullEditDialog } from './ProductFullEdit'
 import { ReceiveStockDialog } from './ReceiveStockDialog'
@@ -94,6 +94,25 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
       barcode: variant.barcode, price: variant.price, stock: variant.stock,
     }))
     : []
+
+  const productLabel: ProductLabelOption | undefined = product
+    ? {
+      label: product.barcode
+        ? {
+          variantId: `p:${product.id}`, productName: product.name, sizeName: '', colorName: 'Todas las tallas',
+          barcode: product.barcode, price: product.basePrice,
+          stock: product.variants.reduce((sum, variant) => sum + Math.max(variant.stock, 0), 0),
+        }
+        : null,
+      onGenerate: canEdit
+        ? async () => {
+          await generateProductBarcode(product.id)
+          reload()
+          onChanged()
+        }
+        : undefined,
+    }
+    : undefined
 
   return (
     <>
@@ -225,7 +244,7 @@ export function ProductDetailDialog({ productId, user, catalogs, openLabels, onC
         <ReceiveStockDialog productId={product.id} user={user} catalogs={catalogs} onClose={() => { setNested(null); reload() }} onChanged={() => { reload(); onChanged() }} />
       )}
       {product && nested?.kind === 'labels' && (
-        <LabelsDialog title={product.name} variants={labelVariants} onClose={() => setNested(null)} />
+        <LabelsDialog title={product.name} variants={labelVariants} productLabel={productLabel} onClose={() => setNested(null)} />
       )}
     </>
   )

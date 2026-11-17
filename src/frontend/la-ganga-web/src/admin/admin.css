@@ -537,6 +537,15 @@
 .adm-generate em { font-style: normal; color: #1d7a3e; font-size: .85rem; }
 .adm-generate .adm-help { margin: 0; }
 
+/* Etiquetas: un código para todo el producto o uno por talla y color. */
+.adm-label-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.adm-label-mode label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #d8e4e2; border-radius: 10px; background: var(--paper, #fff); cursor: pointer; }
+.adm-label-mode label.is-on { border-color: var(--teal); background: var(--teal-soft); box-shadow: 0 0 0 2px color-mix(in srgb, var(--teal) 25%, transparent); }
+.adm-label-mode label span { display: grid; gap: 2px; }
+.adm-label-mode label small { color: var(--muted, #6d6860); }
+.adm-label-generate { display: grid; gap: 8px; justify-items: start; padding: 14px; border: 1px dashed #d9cdb9; border-radius: 12px; background: #fffaf2; }
+.adm-label-generate p { margin: 0; }
+
 /* Editar producto: costo para todas las tallas. */
 .adm-allcost { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; align-items: center; padding: 12px; border: 1px dashed #d9cdb9; border-radius: 12px; background: #fffaf2; }
 .adm-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
@@ -548,3 +557,15 @@
 .adm-edit-grid input.adm-stock-input { min-width: 72px; max-width: 90px; text-align: right; }
 .adm-stock-change { display: grid; gap: 8px; padding: 12px; border: 1.5px solid #e8b860; border-radius: 12px; background: #fff4dc; color: #6b4300; }
 .adm-stock-change ul { margin: 0; padding-left: 18px; }
+
+/* Editar producto: precio especial para varias tallas a la vez. */
+.adm-special-price { display: grid; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid #d8e4e2; border-radius: 12px; background: var(--teal-soft, #eef6f5); }
+.adm-special-price-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.adm-special-price-body { display: grid; grid-template-columns: minmax(150px, 200px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.adm-special-price-sizes { min-width: 0; margin: 0; padding: 0; border: 0; }
+.adm-special-price-sizes legend { margin-bottom: 6px; padding: 0; font-size: .78rem; font-weight: 800; }
+.adm-special-price .adm-actions { justify-content: flex-start; }
+.adm-special-price-note { margin: 0; color: var(--teal-dark, #083f45); font-weight: 600; }
+@media (max-width: 560px) { .adm-special-price-body { grid-template-columns: 1fr; } }
+.adm-special-price .adm-field { min-width: 0; }
+.adm-special-price .adm-field input { width: 100%; min-width: 0; box-sizing: border-box; }

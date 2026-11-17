@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatNio } from '../lib/money'
 import { Barcode } from './Barcode'
@@ -42,33 +42,62 @@ function storeValue(key: string, value: number) {
   try { window.localStorage.setItem(key, String(value)) } catch { /* sin almacenamiento: no pasa nada */ }
 }
 
+/** Etiqueta única del producto: su código sirve para todas las tallas y colores (en caja se elige la talla). */
+export type ProductLabelOption = {
+  /** null si el producto todavía no tiene código propio. */
+  label: LabelVariant | null
+  /** Genera el código del producto (solo si el usuario puede editar productos). */
+  onGenerate?: () => Promise<void>
+}
+
+type Mode = 'variants' | 'product'
+
 /** Imprime etiquetas de código de barras de las variantes elegidas con el cuadro de impresión del navegador. */
-export function LabelsDialog({ title, variants, onClose, initialCopies = 'one', onPrinted }: {
+export function LabelsDialog({ title, variants: variantRows, onClose, initialCopies = 'one', onPrinted, productLabel }: {
   title: string
   variants: LabelVariant[]
+  /** Si se da, permite imprimir un solo código para todo el producto. */
+  productLabel?: ProductLabelOption
   onClose: () => void
   /** Copias al abrir: 1 por variante o tantas como unidades en existencia. */
   initialCopies?: 'one' | 'stock'
   /** Se avisa qué se mandó a imprimir (para marcar las etiquetas como impresas). */
   onPrinted?: (printed: { variantId: string; copies: number }[]) => void
 }) {
-  const [selected, setSelected] = useState<Record<string, boolean>>(() => Object.fromEntries(variants.map((variant) => [variant.variantId, true])))
-  const [copies, setCopies] = useState<Record<string, string>>(() => Object.fromEntries(variants.map((variant) => [variant.variantId, initialCopies === 'stock' ? String(Math.max(variant.stock, 1)) : '1'])))
+  const [mode, setMode] = useState<Mode>(productLabel?.label ? 'product' : 'variants')
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+  const variants = mode === 'product' ? (productLabel?.label ? [productLabel.label] : []) : variantRows
+  const [selectedState, setSelected] = useState<Record<string, boolean>>({})
+  const [copiesState, setCopies] = useState<Record<string, string>>({})
+  // Lo no tocado queda elegido y con las copias iniciales (también la etiqueta del producto recién generada).
+  const selected: Record<string, boolean> = Object.fromEntries(variants.map((variant) => [variant.variantId, selectedState[variant.variantId] ?? true]))
+  const copies: Record<string, string> = Object.fromEntries(variants.map((variant) => [variant.variantId, copiesState[variant.variantId] ?? (initialCopies === 'stock' ? String(Math.max(variant.stock, 1)) : '1')]))
+
+  async function generate() {
+    if (!productLabel?.onGenerate) return
+    setGenerating(true)
+    setGenerateError(null)
+    try {
+      await productLabel.onGenerate()
+    } catch (caught) {
+      setGenerateError(caught instanceof Error && caught.message ? caught.message : 'No fue posible generar el código.')
+    } finally {
+      setGenerating(false)
+    }
+  }
   const [widthMm, setWidthMm] = useState(() => readStored('la-ganga-label-w', 50))
   const [heightMm, setHeightMm] = useState(() => readStored('la-ganga-label-h', 30))
   const [layout, setLayout] = useState<Layout>('roll')
 
   useEffect(() => () => document.body.classList.remove('printing-labels'), [])
 
-  const queue = useMemo(() => {
-    const items: LabelVariant[] = []
-    for (const variant of variants) {
-      if (!selected[variant.variantId]) continue
-      const count = Math.max(0, Math.min(Math.floor(Number(copies[variant.variantId]) || 0), maxLabels))
-      for (let index = 0; index < count; index += 1) items.push(variant)
-    }
-    return items
-  }, [variants, selected, copies])
+  const queue: LabelVariant[] = []
+  for (const variant of variants) {
+    if (!selected[variant.variantId]) continue
+    const count = Math.max(0, Math.min(Math.floor(Number(copies[variant.variantId]) || 0), maxLabels))
+    for (let index = 0; index < count; index += 1) queue.push(variant)
+  }
 
   const unreadable = variants.filter((variant) => selected[variant.variantId] && !normalizeBarcode(variant.barcode))
   const tooMany = queue.length > maxLabels
@@ -97,8 +126,8 @@ export function LabelsDialog({ title, variants, onClose, initialCopies = 'one', 
       .filter((item) => item.copies > 0))
   }
 
-  function setAllCopies(mode: 'one' | 'stock') {
-    setCopies(Object.fromEntries(variants.map((variant) => [variant.variantId, String(mode === 'one' ? 1 : Math.max(variant.stock, 1))])))
+  function setAllCopies(kind: 'one' | 'stock') {
+    setCopies({ ...copiesState, ...Object.fromEntries(variants.map((variant) => [variant.variantId, String(kind === 'one' ? 1 : Math.max(variant.stock, 1))])) })
   }
 
   const allSelected = variants.every((variant) => selected[variant.variantId])
@@ -117,10 +146,37 @@ export function LabelsDialog({ title, variants, onClose, initialCopies = 'one', 
         </>
       )}
     >
+      {productLabel && (
+        <div className="adm-label-mode" role="radiogroup" aria-label="Qué código imprimir">
+          <label className={mode === 'product' ? 'is-on' : undefined}>
+            <input type="radio" name="label-mode" checked={mode === 'product'} onChange={() => setMode('product')} />
+            <span><strong>Un solo código para todo el producto</strong><small>La misma etiqueta para todas las tallas y colores. En caja se escanea y se elige la talla.</small></span>
+          </label>
+          <label className={mode === 'variants' ? 'is-on' : undefined}>
+            <input type="radio" name="label-mode" checked={mode === 'variants'} onChange={() => setMode('variants')} />
+            <span><strong>Un código por talla y color</strong><small>Cada etiqueta dice la talla y el color. En caja entra directo.</small></span>
+          </label>
+        </div>
+      )}
+      {mode === 'product' && !productLabel?.label && (
+        <div className="adm-label-generate">
+          <p>Este producto todavía no tiene un código propio: cada talla y color tiene el suyo.</p>
+          {productLabel?.onGenerate
+            ? (
+              <button type="button" className="primary-button" onClick={() => { void generate() }} disabled={generating}>
+                {generating ? 'Generando…' : 'Generar código para todo el producto'}
+              </button>
+            )
+            : <p className="adm-muted">Pedí a un administrador que lo genere desde el producto.</p>}
+          <p className="adm-help">Los códigos de cada talla y color siguen funcionando.</p>
+          {generateError && <Notice tone="error">{generateError}</Notice>}
+        </div>
+      )}
+      {variants.length > 0 && (
       <div className="adm-columns">
         <section>
           <div className="adm-actions" style={{ marginBottom: 8 }}>
-            <button type="button" className="link-button" onClick={() => setSelected(Object.fromEntries(variants.map((variant) => [variant.variantId, !allSelected])))}>
+            <button type="button" className="link-button" onClick={() => setSelected({ ...selectedState, ...Object.fromEntries(variants.map((variant) => [variant.variantId, !allSelected])) })}>
               {allSelected ? 'Quitar todas' : 'Elegir todas'}
             </button>
             <button type="button" className="link-button" onClick={() => setAllCopies('one')}>1 copia cada una</button>
@@ -136,18 +192,18 @@ export function LabelsDialog({ title, variants, onClose, initialCopies = 'one', 
                       <input
                         type="checkbox"
                         checked={Boolean(selected[variant.variantId])}
-                        onChange={(event) => setSelected({ ...selected, [variant.variantId]: event.target.checked })}
+                        onChange={(event) => setSelected({ ...selectedState, [variant.variantId]: event.target.checked })}
                         aria-label={`Elegir ${variant.productName} ${variant.sizeName} ${variant.colorName}`}
                       />
                     </td>
-                    <td>{variant.sizeName} · {variant.colorName}</td>
+                    <td>{variant.sizeName ? `${variant.sizeName} · ${variant.colorName}` : variant.colorName}</td>
                     <td className="adm-mono">{variant.barcode}</td>
                     <td className="numeric">{variant.stock}</td>
                     <td className="numeric">
                       <input
                         type="number" min={0} max={maxLabels} step={1}
                         value={copies[variant.variantId] ?? '1'}
-                        onChange={(event) => setCopies({ ...copies, [variant.variantId]: event.target.value })}
+                        onChange={(event) => setCopies({ ...copiesState, [variant.variantId]: event.target.value })}
                         aria-label={`Copias de ${variant.sizeName} ${variant.colorName}`}
                         style={{ width: 76 }}
                       />
@@ -194,6 +250,7 @@ export function LabelsDialog({ title, variants, onClose, initialCopies = 'one', 
           </div>
         </section>
       </div>
+      )}
       {createPortal(
         <div className="labels-print-root">
           <div className="label-sheet">

@@ -13,6 +13,7 @@ import { channelLabel, channels } from './format'
 import { useNow } from './hooks'
 import { Modal } from './Modal'
 import { PaymentModal } from './PaymentModal'
+import { PriceModal } from './PriceModal'
 import { ShippingModal } from './ShippingModal'
 import { parseAmount } from './payments'
 import { buildSaleRequest, buildLocalSale, newClientSaleId } from './sale'
@@ -44,6 +45,7 @@ type ModalState =
   | { kind: 'shipping' }
   | { kind: 'approval' }
   | { kind: 'done'; clientSaleId: string }
+  | { kind: 'price'; variant: PosVariant }
   | null
 
 type ScanFeedback = { tone: 'ok' | 'error' | 'info'; text: string }
@@ -87,6 +89,8 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   const pending = useMemo(() => pendingUnits(engineState.outbox, snapshot), [engineState.outbox, snapshot])
   const unlimitedDiscount = hasPermission(user, 'sale.discount.unlimited')
   const offline = engineState.connection === 'offline'
+  // Quien puede editar productos pone el precio que falta sin salir de la caja.
+  const canSetPrice = hasPermission(user, 'product.edit')
 
   const focusScanner = useCallback((select = false) => {
     const input = scannerRef.current
@@ -201,7 +205,12 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
 
   function addVariant(variant: PosVariant) {
     if (variant.price <= 0) {
-      announce('error', `${variantLabel(variant)} todavía no tiene precio de venta: pedí al administrador que lo complete.`)
+      if (canSetPrice && !offline) {
+        announce('info', `${variant.productName} no tiene precio de venta: ponelo para seguir.`)
+        setModal({ kind: 'price', variant })
+        return
+      }
+      announce('error', `${variantLabel(variant)} no tiene precio de venta: pedí a un administrador que se lo ponga (en la caja o en «Editar producto»).`)
       return
     }
     const current = cartQuantity(lines, variant.variantId)
@@ -674,6 +683,21 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
             notify(`Envío agregado: ${formatNio(value.costNio)} a ${value.destination}.`, 'ok')
           }}
           onRemove={() => { setShipping(null); closeModal(); notify('Se quitó el envío.', 'ok') }}
+          onCancel={closeModal}
+        />
+      )}
+
+      {modal?.kind === 'price' && (
+        <PriceModal
+          productId={modal.variant.productId}
+          productName={modal.variant.productName}
+          onSaved={(price) => {
+            const variant = modal.variant
+            closeModal()
+            notify(`Precio de ${variant.productName}: ${formatNio(price)}.`, 'ok')
+            addVariant({ ...variant, price })
+            void engine.refreshSnapshot()
+          }}
           onCancel={closeModal}
         />
       )}
