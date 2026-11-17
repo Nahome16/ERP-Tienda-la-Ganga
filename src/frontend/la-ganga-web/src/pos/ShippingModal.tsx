@@ -60,7 +60,7 @@ export function ShippingModal({ initial, onSave, onRemove, onCancel }: ShippingM
         </>
       )}
     >
-      <form id="pv-shipping-form" className="pv-form" onSubmit={submit}>
+      <form id="pv-shipping-form" className="pv-form pv-shipping-form" onSubmit={submit}>
         <label>Costo del envío (C$)
           <input
             data-autofocus inputMode="decimal" autoComplete="off" placeholder="0" value={cost}
