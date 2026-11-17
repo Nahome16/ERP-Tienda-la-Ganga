@@ -352,6 +352,24 @@ public sealed class MvpApiTests(CatalogApiFixture fixture) : IClassFixture<Catal
     }
 
     [PostgresFact]
+    public async Task ProductBarcodeCanBeGeneratedOnceForAnExistingProduct()
+    {
+        var catalogs = await LoadCatalogsAsync();
+        var product = await CreateProductAsync(catalogs, "Código para todo", 450m, [(2, 200m), (1, 200m)]);
+        var id = product.GetProperty("id").GetGuid();
+        Assert.Equal(JsonValueKind.Null, product.GetProperty("barcode").ValueKind);
+
+        var first = await PostAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/products/{id}/barcode/generate", new { });
+        var code = first.GetProperty("barcode").GetString();
+        Assert.Matches("^[0-9]{13}$", code);
+        Assert.DoesNotContain(first.GetProperty("variants").EnumerateArray(), variant => variant.GetProperty("barcode").GetString() == code);
+
+        // Pedirlo otra vez no lo cambia.
+        var second = await PostAsync(fixture.Admin, fixture.AdminCsrf, $"/api/v1/products/{id}/barcode/generate", new { });
+        Assert.Equal(code, second.GetProperty("barcode").GetString());
+    }
+
+    [PostgresFact]
     public async Task EntryCorrectionCanTakeAWholeEntryDownToZero()
     {
         var catalogs = await LoadCatalogsAsync();
