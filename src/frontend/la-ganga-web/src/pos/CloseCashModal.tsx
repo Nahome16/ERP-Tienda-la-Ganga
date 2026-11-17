@@ -240,6 +240,7 @@ export function CloseCashModal({
               <Row label="Anuladas">{totals.voidedCount} · {formatNio(totals.voidedTotalNio)}</Row>
               <Row label="Venta bruta">{formatNio(totals.grossTotalNio)}</Row>
               <Row label="Descuentos">−{formatNio(totals.discountTotalNio)}</Row>
+              {(totals.shippingTotalNio ?? 0) > 0 && <Row label={`Envíos (${totals.shippingCount ?? 0})`}>+{formatNio(totals.shippingTotalNio ?? 0)}</Row>}
               <Row label="Total vendido" strong>{formatNio(totals.netTotalNio)}</Row>
               {totals.reviewCount > 0 && <p className="pv-banner pv-banner-warn"><TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" /><span>{totals.reviewCount} venta(s) con revisión pendiente.</span></p>}
               {totals.byChannel.length > 0 && <h3 className="pv-sub">Por canal</h3>}

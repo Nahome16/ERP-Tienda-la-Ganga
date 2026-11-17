@@ -137,6 +137,8 @@ public sealed class CashSession
 
 public sealed class Sale
 {
+    public const int ShippingDestinationMaxLength = 300;
+
     private readonly List<SaleLine> _lines = [];
     private readonly List<SalePayment> _payments = [];
 
@@ -213,6 +215,21 @@ public sealed class Sale
     /// <summary>Nombre del cliente (opcional) que se imprime en el recibo.</summary>
     public string? CustomerName { get; private set; }
 
+    /// <summary>Costo del envío cobrado al cliente (C$). Se suma al total; el descuento no lo toca.</summary>
+    public decimal ShippingNio { get; private set; }
+
+    /// <summary>Destino del envío (dirección, ciudad o punto de entrega). Null si la venta no lleva envío.</summary>
+    public string? ShippingDestination { get; private set; }
+
+    /// <summary>Quién recibe el paquete.</summary>
+    public string? ShippingRecipient { get; private set; }
+
+    /// <summary>Teléfono de quien recibe.</summary>
+    public string? ShippingPhone { get; private set; }
+
+    /// <summary>Quién lo lleva: repartidor o empresa de envíos.</summary>
+    public string? ShippingCarrier { get; private set; }
+
     public Guid? DiscountApprovalId { get; private set; }
 
     public DateTimeOffset? VoidedAtUtc { get; private set; }
@@ -242,6 +259,19 @@ public sealed class Sale
         ChangeNio = changeNio;
         DiscountApprovalId = discountApprovalId;
     }
+
+    public void SetShipping(decimal costNio, string destination, string? recipient, string? phone, string? carrier)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(costNio);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        ShippingNio = costNio;
+        ShippingDestination = destination.Trim();
+        ShippingRecipient = Clean(recipient);
+        ShippingPhone = Clean(phone);
+        ShippingCarrier = Clean(carrier);
+    }
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public void AddLine(SaleLine line) => _lines.Add(line);
 

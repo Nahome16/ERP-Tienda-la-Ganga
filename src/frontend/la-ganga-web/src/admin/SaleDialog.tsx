@@ -146,6 +146,15 @@ export function SaleDialog({ sale, user, onClose, onChanged }: {
             <h3 className="adm-card-title">Datos</h3>
             <Row label="Vendedor">{sale.sellerName}</Row>
             {sale.customerName && <Row label="Cliente">{sale.customerName}</Row>}
+            {sale.shipping && (
+              <>
+                <Row label="Envío">{sale.shipping.costNio > 0 ? formatNio(sale.shipping.costNio) : 'Gratis'}</Row>
+                <Row label="Destino">{sale.shipping.destination}</Row>
+                {sale.shipping.recipient && <Row label="Recibe">{sale.shipping.recipient}</Row>}
+                {sale.shipping.phone && <Row label="Teléfono">{sale.shipping.phone}</Row>}
+                {sale.shipping.carrier && <Row label="Lo lleva">{sale.shipping.carrier}</Row>}
+              </>
+            )}
             <Row label="Caja">{sale.registerName}</Row>
             <Row label="Hora del equipo">{formatDateTime(sale.createdAtUtc)}</Row>
             <Row label="Recibida en el servidor">{formatDateTime(sale.receivedAtUtc)}</Row>

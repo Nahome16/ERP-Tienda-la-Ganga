@@ -102,6 +102,7 @@ export function CashView({ user }: { user: CurrentUser }) {
             <Kpi label="Transferencia" value={formatNio(totals.transferTotalNio)} hint={totals.transferUsdTendered > 0 ? `Incluye ${formatUsd(totals.transferUsdTendered)}` : 'Equivalente en C$'} />
             <Kpi label="POS / Tarjeta" value={formatNio(totals.cardTotalNio)} hint={totals.cardUsdTendered > 0 ? `Incluye ${formatUsd(totals.cardUsdTendered)}` : 'Equivalente en C$'} />
             <Kpi label="Descuentos" value={formatNio(totals.discountTotalNio)} />
+            {(totals.shippingTotalNio ?? 0) > 0 && <Kpi label="Envíos cobrados" value={formatNio(totals.shippingTotalNio ?? 0)} hint={`${totals.shippingCount ?? 0} venta${totals.shippingCount === 1 ? '' : 's'} con envío · incluido en el total`} />}
             <Kpi label="Ventas" value={totals.salesCount} hint={`${totals.voidedCount} anulada${totals.voidedCount === 1 ? '' : 's'} (${formatNio(totals.voidedTotalNio)})`} tone={totals.reviewCount > 0 ? 'warn' : undefined} />
           </div>
 

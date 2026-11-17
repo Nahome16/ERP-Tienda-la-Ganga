@@ -103,7 +103,9 @@ public sealed record CashTotalsDto(
     decimal CardUsdTendered,
     decimal CardUsdEquivalentNio,
     IReadOnlyList<BankTotalDto> TransfersByBank,
-    IReadOnlyList<ChannelTotalDto> ByChannel);
+    IReadOnlyList<ChannelTotalDto> ByChannel,
+    int ShippingCount = 0,
+    decimal ShippingTotalNio = 0);
 
 public sealed record CashSummaryDto(
     CashSessionDto Session,
@@ -177,6 +179,21 @@ public sealed record PaymentRequest(
     string? Bank,
     string? Reference);
 
+/// <summary>Envío de la venta: el costo se suma al total que paga el cliente.</summary>
+public sealed record ShippingRequest(
+    decimal CostNio,
+    string? Destination,
+    string? Recipient,
+    string? Phone,
+    string? Carrier);
+
+public sealed record ShippingDto(
+    decimal CostNio,
+    string Destination,
+    string? Recipient,
+    string? Phone,
+    string? Carrier);
+
 public sealed record SaleRequest(
     Guid ClientSaleId,
     Guid CashSessionId,
@@ -188,7 +205,8 @@ public sealed record SaleRequest(
     Guid? DiscountApprovalId,
     IReadOnlyList<PaymentRequest>? Payments,
     string? Note,
-    string? CustomerName = null);
+    string? CustomerName = null,
+    ShippingRequest? Shipping = null);
 
 public sealed record SaleLineDto(
     Guid VariantId,
@@ -235,7 +253,8 @@ public sealed record SaleDto(
     string? VoidReason,
     IReadOnlyList<SaleLineDto> Lines,
     IReadOnlyList<SalePaymentDto> Payments,
-    string? CustomerName = null);
+    string? CustomerName = null,
+    ShippingDto? Shipping = null);
 
 public sealed record SaleResultDto(bool AlreadyProcessed, SaleDto Sale);
 

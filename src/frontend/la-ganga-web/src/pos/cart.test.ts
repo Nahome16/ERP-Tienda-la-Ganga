@@ -75,4 +75,27 @@ describe('venta local', () => {
     expect(sale.changeNio).toBe(70)
     expect(sale.lines[0]?.productName).toBe('Camisa Oxford')
   })
+
+  it('suma el envío al total y lo guarda en el recibo; sin destino no hay envío', () => {
+    const lines = addToCart([], variants[0] as PosVariant, 2)
+    const base = {
+      clientSaleId: 'abcdef12-0000-4000-8000-000000000001', cashSessionId: 'cs', channel: 'WhatsApp' as const,
+      createdAtUtc: '2026-11-10T15:00:00Z', isOffline: false, lines, discount: { type: 'Amount' as const, value: 100 },
+      discountApprovalId: null,
+      payments: [{ method: 'Transfer' as const, currency: 'NIO' as const, amount: 680, exchangeRate: null, bank: 'BAC', reference: null }],
+      note: null,
+    }
+    const request = buildSaleRequest({
+      ...base,
+      shipping: { costNio: 80, destination: '  Masaya, frente al parque  ', recipient: ' ', phone: '8888-0000', carrier: null },
+    })
+    expect(request.shipping).toEqual({ costNio: 80, destination: 'Masaya, frente al parque', recipient: null, phone: '8888-0000', carrier: null })
+    const sale = buildLocalSale(request, lines, { session: { registerName: 'Caja 1' }, sellerName: 'Ana', settings: { usdRate: 36.7 } })
+    expect(sale.totalNio).toBe(680)
+    expect(sale.changeNio).toBe(0)
+    expect(sale.shipping?.destination).toBe('Masaya, frente al parque')
+
+    const noDestination = buildSaleRequest({ ...base, shipping: { costNio: 80, destination: '  ', recipient: null, phone: null, carrier: null } })
+    expect(noDestination.shipping).toBeNull()
+  })
 })

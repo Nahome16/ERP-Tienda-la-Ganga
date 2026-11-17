@@ -230,6 +230,11 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
 .pv-discount-row { display: grid; grid-template-columns: auto 104px minmax(0, 1fr); align-items: center; gap: 10px; }
 .pv-discount-row > span { color: #384a4c; font-weight: 650; font-size: .85rem; }
 .pv-page .pv-discount-row input { width: 100%; min-width: 0; text-align: right; font-weight: 700; }
+.pv-shipping-add { width: 100%; justify-content: center; gap: 8px; margin-top: 10px; }
+.pv-shipping { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 8px 8px 12px; color: var(--teal-dark, #083f45); border: 1px solid rgba(12,85,91,.22); border-radius: 12px; background: rgba(12,85,91,.06); }
+.pv-shipping-text { display: grid; gap: 2px; min-width: 0; }
+.pv-shipping-text strong { font-size: .9rem; }
+.pv-shipping-text span { overflow: hidden; color: #4d5a5b; font-size: .8rem; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
 .pv-totals { margin: 12px 0 14px; }
 .pv-totals div { display: flex; justify-content: space-between; margin: 4px 0; color: #4d5a5b; font-size: .9rem; }
 .pv-totals dt, .pv-totals dd { margin: 0; }

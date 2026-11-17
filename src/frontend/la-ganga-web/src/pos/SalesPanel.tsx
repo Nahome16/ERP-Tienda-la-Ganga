@@ -136,7 +136,7 @@ function SaleItem({ row, onPrint, onRetry, onDetail, onVoid }: {
     <li className={`pv-sale-item is-${row.status}`}>
       <div className="pv-sale-main">
         <strong>{sale.number}</strong>
-        <span>{formatTime(sale.createdAtUtc)} · {channelLabel[sale.channel]}{sale.customerName ? ` · ${sale.customerName}` : ''}{sale.isOffline ? ' · sin conexión' : ''}</span>
+        <span>{formatTime(sale.createdAtUtc)} · {channelLabel[sale.channel]}{sale.customerName ? ` · ${sale.customerName}` : ''}{sale.shipping ? ` · envío a ${sale.shipping.destination}` : ''}{sale.isOffline ? ' · sin conexión' : ''}</span>
       </div>
       <b className="pv-sale-total">{formatNio(sale.totalNio)}</b>
       <span className={`pv-pill pv-pill-${row.status}`}><StatusIcon size={13} strokeWidth={2} aria-hidden="true" />{row.label}</span>

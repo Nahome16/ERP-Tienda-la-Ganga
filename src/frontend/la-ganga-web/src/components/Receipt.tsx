@@ -44,6 +44,14 @@ export function Receipt({ sale, settings }: ReceiptProps) {
       <div className="receipt-row"><span>{sale.registerName}</span><span>{sale.sellerName}</span></div>
       {sale.customerName && <div className="receipt-row"><span>Cliente</span><span>{sale.customerName}</span></div>}
       {sale.channel !== 'Store' && <div className="receipt-row"><span>Canal</span><span>{channelNames[sale.channel]}</span></div>}
+      {sale.shipping && (
+        <div className="receipt-shipping">
+          <div className="receipt-bold">ENVÍO A:</div>
+          <div>{sale.shipping.destination}</div>
+          {(sale.shipping.recipient || sale.shipping.phone) && <div>Recibe: {[sale.shipping.recipient, sale.shipping.phone].filter(Boolean).join(' · ')}</div>}
+          {sale.shipping.carrier && <div>Lo lleva: {sale.shipping.carrier}</div>}
+        </div>
+      )}
       {sale.status === 'Voided' && <div className="receipt-center"><strong>*** ANULADO ***</strong></div>}
       <hr className="receipt-rule" />
       {sale.lines.map((line) => (
@@ -63,6 +71,7 @@ export function Receipt({ sale, settings }: ReceiptProps) {
           <span>−{formatNio(sale.discountNio)}</span>
         </div>
       )}
+      {sale.shipping && <div className="receipt-row"><span>Envío</span><span>{sale.shipping.costNio > 0 ? formatNio(sale.shipping.costNio) : 'Gratis'}</span></div>}
       <div className="receipt-row receipt-total"><span>TOTAL</span><span>{formatNio(sale.totalNio)}</span></div>
       <hr className="receipt-rule" />
       {sale.payments.map((payment, index) => (
@@ -176,6 +185,7 @@ export function CashSummarySheet({ summary, storeName }: CashSummaryProps) {
       <div className="receipt-row"><span>Anuladas</span><span>{totals.voidedCount} ({formatNio(totals.voidedTotalNio)})</span></div>
       <div className="receipt-row"><span>Venta bruta</span><span>{formatNio(totals.grossTotalNio)}</span></div>
       <div className="receipt-row"><span>Descuentos</span><span>−{formatNio(totals.discountTotalNio)}</span></div>
+      {(totals.shippingTotalNio ?? 0) > 0 && <div className="receipt-row"><span>Envíos ({totals.shippingCount ?? 0})</span><span>+{formatNio(totals.shippingTotalNio ?? 0)}</span></div>}
       <div className="receipt-row receipt-total"><span>TOTAL VENDIDO</span><span>{formatNio(totals.netTotalNio)}</span></div>
       <hr className="receipt-rule" />
       <div className="receipt-center"><strong>VENDIDO POR METODO</strong></div>

@@ -24,6 +24,7 @@ public sealed class ReportService(
     [
         "N.º de venta", "Fecha y hora", "Caja", "Vendedor/a", "Canal", "Subtotal C$", "Descuento C$", "Total C$",
         "Cambio C$", "Pagos", "Estado", "Hecha sin conexión", "Requiere revisión", "Nota de revisión", "Motivo de anulación",
+        "Envío C$", "Destino del envío", "Recibe", "Teléfono", "Lo lleva",
     ];
 
     public async Task<ServiceResult<ReportFile>> SalesAsync(DateOnly fromDate, DateOnly toDate, Actor actor, CancellationToken cancellationToken)
@@ -66,6 +67,7 @@ public sealed class ReportService(
         summary.Blank();
         summary.KeyValue("Total bruto C$ (antes de descuentos)", totals.GrossTotalNio);
         summary.KeyValue("Descuentos C$", totals.DiscountTotalNio);
+        summary.KeyValue($"Envíos cobrados ({totals.ShippingCount}) C$", totals.ShippingTotalNio);
         summary.KeyValue("TOTAL VENDIDO C$", totals.NetTotalNio, bold: true);
         summary.Blank();
         summary.SectionTitle("Por método de pago (neto del cambio)");
@@ -98,7 +100,7 @@ public sealed class ReportService(
         }
 
         var salesSheet = new XlsxSheet(workbook, "Ventas");
-        salesSheet.Header(SalesHeaders, [12, 17, 10, 20, 11, 13, 13, 13, 11, 34, 12, 12, 12, 40, 34]);
+        salesSheet.Header(SalesHeaders, [12, 17, 10, 20, 11, 13, 13, 13, 11, 34, 12, 12, 12, 40, 34, 11, 36, 22, 14, 20]);
         var first = salesSheet.NextRow;
         foreach (var sale in sales)
         {
@@ -117,7 +119,12 @@ public sealed class ReportService(
                 sale.IsOffline,
                 sale.RequiresReview,
                 sale.ReviewNote,
-                sale.VoidReason);
+                sale.VoidReason,
+                sale.ShippingNio,
+                sale.ShippingDestination,
+                sale.ShippingRecipient,
+                sale.ShippingPhone,
+                sale.ShippingCarrier);
         }
 
         salesSheet.FinishTable(first);

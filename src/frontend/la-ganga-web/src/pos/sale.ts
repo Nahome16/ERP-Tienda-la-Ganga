@@ -1,5 +1,5 @@
 import type {
-  CashSession, Sale, SaleChannel, SaleRequest, SaleRequestPayment, StoreSettings,
+  CashSession, Sale, SaleChannel, SaleRequest, SaleRequestPayment, SaleShipping, StoreSettings,
 } from '../lib/apiTypes'
 import { computePayments, computeTotals, paymentNio, round2 } from '../lib/money'
 import type { CartLine, DiscountInput } from './types'
@@ -34,6 +34,23 @@ export type BuildSaleInput = {
   note: string | null
   /** Nombre del cliente para el recibo (opcional). */
   customerName?: string | null
+  /** Envío (opcional): su costo se suma al total. */
+  shipping?: SaleShipping | null
+}
+
+const clean = (value: string | null | undefined, max: number) => (value && value.trim() ? value.trim().slice(0, max) : null)
+
+/** Limpia el envío antes de mandarlo: sin destino no hay envío. */
+export function normalizeShipping(shipping: SaleShipping | null | undefined): SaleShipping | null {
+  const destination = clean(shipping?.destination, 300)
+  if (!shipping || !destination) return null
+  return {
+    costNio: round2(Math.max(shipping.costNio, 0)),
+    destination,
+    recipient: clean(shipping.recipient, 120),
+    phone: clean(shipping.phone, 30),
+    carrier: clean(shipping.carrier, 120),
+  }
 }
 
 export function buildSaleRequest(input: BuildSaleInput): SaleRequest {
@@ -49,6 +66,7 @@ export function buildSaleRequest(input: BuildSaleInput): SaleRequest {
     payments: input.payments,
     note: input.note && input.note.trim() ? input.note.trim() : null,
     customerName: input.customerName && input.customerName.trim() ? input.customerName.trim().slice(0, 120) : null,
+    shipping: normalizeShipping(input.shipping),
   }
 }
 
@@ -58,7 +76,7 @@ export function buildLocalSale(
   cartLines: CartLine[],
   context: { session: Pick<CashSession, 'registerName'>; sellerName: string; settings: Pick<StoreSettings, 'usdRate'> },
 ): Sale {
-  const totals = computeTotals({ lines: request.lines, discount: request.discount })
+  const totals = computeTotals({ lines: request.lines, discount: request.discount, shippingNio: request.shipping?.costNio ?? 0 })
   const { changeNio } = computePayments(totals.totalNio, request.payments)
   return {
     id: request.clientSaleId,
@@ -82,6 +100,7 @@ export function buildLocalSale(
     reviewNote: null,
     note: request.note,
     customerName: request.customerName ?? null,
+    shipping: request.shipping ?? null,
     voidedAtUtc: null,
     voidedByName: null,
     voidReason: null,

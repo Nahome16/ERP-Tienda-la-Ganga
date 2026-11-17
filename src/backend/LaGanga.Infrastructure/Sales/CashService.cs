@@ -293,7 +293,9 @@ public sealed class CashService(
             Tendered(PaymentMethod.Card, Currency.USD),
             Equivalent(PaymentMethod.Card, Currency.USD),
             banks,
-            channels);
+            channels,
+            confirmed.Count(sale => sale.ShippingDestination != null),
+            confirmed.Sum(sale => sale.ShippingNio));
     }
 
     private async Task<IReadOnlyList<Sale>> LoadSalesAsync(Guid[] sessionIds, CancellationToken cancellationToken) =>

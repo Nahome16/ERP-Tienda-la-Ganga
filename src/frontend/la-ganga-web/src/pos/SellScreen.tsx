@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { swatchFor } from '../lib/colorPalette'
 import { hasPermission } from '../lib/access'
-import type { CashSession, DiscountType, PosVariant, Sale, SaleChannel, SaleRequestPayment } from '../lib/apiTypes'
+import type { CashSession, DiscountType, PosVariant, Sale, SaleChannel, SaleRequestPayment, SaleShipping } from '../lib/apiTypes'
 import { computeTotals, discountExceedsLimit, formatNio } from '../lib/money'
 import { discountProblem } from './discountInput'
 import type { CurrentUser } from '../types'
@@ -14,6 +14,7 @@ import { useNow } from './hooks'
 import { Modal } from './Modal'
 import { PaymentModal } from './PaymentModal'
 import { PriceModal } from './PriceModal'
+import { ShippingModal } from './ShippingModal'
 import { parseAmount } from './payments'
 import { buildSaleRequest, buildLocalSale, newClientSaleId } from './sale'
 import { PosThumb } from './Thumb'
@@ -22,7 +23,7 @@ import { availableStock, pendingUnits } from './stock'
 import { clearCartDraft, loadCartDraft, saveCartDraft } from './storage'
 import type { CartLine, DiscountApproval } from './types'
 import {
-  Ban, Check, ChevronDown, ChevronUp, CircleAlert, CircleCheck, Info, Minus, PackageX, Plus, Printer, ScanBarcode, ShoppingBag, Trash2, TriangleAlert, X,
+  Ban, Check, ChevronDown, ChevronUp, CircleAlert, CircleCheck, Info, Minus, PackageX, Pencil, Plus, Printer, ScanBarcode, ShoppingBag, Trash2, TriangleAlert, Truck, X,
 } from 'lucide-react'
 
 type SellScreenProps = {
@@ -41,6 +42,7 @@ export type ReloadRequest = { nonce: number; lines: { variantId: string; quantit
 
 type ModalState =
   | { kind: 'pay' }
+  | { kind: 'shipping' }
   | { kind: 'approval' }
   | { kind: 'done'; clientSaleId: string }
   | { kind: 'price'; variant: PosVariant }
@@ -73,6 +75,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
   const [channel, setChannel] = useState<SaleChannel>('Store')
   const [discountType, setDiscountType] = useState<DiscountType>('Percent')
   const [discountText, setDiscountText] = useState('')
+  const [shipping, setShipping] = useState<SaleShipping | null>(null)
   const [approval, setApproval] = useState<DiscountApproval | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
   const [payBusy, setPayBusy] = useState(false)
@@ -104,6 +107,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       if (draft && draft.lines.length > 0) {
         setLines(draft.lines)
         setChannel(draft.channel)
+        setShipping(draft.shipping ?? null)
         if (draft.discount) {
           setDiscountType(draft.discount.type)
           setDiscountText(String(draft.discount.value))
@@ -124,13 +128,13 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
     if (!draftLoaded) return
     const timer = setTimeout(() => {
       if (lines.length === 0) void clearCartDraft().catch(() => undefined)
-      else void saveCartDraft({ key: 'cartDraft', userId: user.id, lines, channel, discount, note: '' }).catch(() => undefined)
+      else void saveCartDraft({ key: 'cartDraft', userId: user.id, lines, channel, discount, shipping, note: '' }).catch(() => undefined)
     }, 400)
     return () => clearTimeout(timer)
-  }, [draftLoaded, lines, channel, discount, user.id])
+  }, [draftLoaded, lines, channel, discount, shipping, user.id])
 
   // --- Totales y descuento ---
-  const totals = useMemo(() => computeTotals({ lines, discount }), [lines, discount])
+  const totals = useMemo(() => computeTotals({ lines, discount, shippingNio: shipping?.costNio ?? 0 }), [lines, discount, shipping])
   const needsApproval = settings ? !unlimitedDiscount && discountExceedsLimit(totals, settings) : false
   const approvalValid = Boolean(
     approval && approval.type === discountType && approval.value === discountValue && Date.parse(approval.expiresAtUtc) > now,
@@ -312,6 +316,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
         payments,
         note: null,
         customerName,
+        shipping,
       })
       const localSale = buildLocalSale(request, lines, { session, sellerName: user.displayName, settings })
       // Primero a la cola local (IndexedDB); el envío al servidor ocurre en segundo plano.
@@ -320,6 +325,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
       void clearCartDraft().catch(() => undefined)
       setLines([])
       setDiscountText('')
+      setShipping(null)
       setApproval(null)
       setChannel('Store')
       setQuery('')
@@ -528,7 +534,7 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
                 type="button" className={`pv-link pv-clear${confirmClear ? ' is-confirm' : ''}`}
                 onClick={() => {
                   if (!confirmClear) { setConfirmClear(true); setTimeout(() => setConfirmClear(false), 3000); return }
-                  setLines([]); setDiscountText(''); setApproval(null); setConfirmClear(false); setSheetOpen(false); focusScanner()
+                  setLines([]); setDiscountText(''); setShipping(null); setApproval(null); setConfirmClear(false); setSheetOpen(false); focusScanner()
                 }}
               ><Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />{confirmClear ? '¿Seguro? Tocá otra vez' : 'Vaciar'}</button>
             )}
@@ -611,9 +617,27 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
             )}
           </div>
 
+          {shipping
+            ? (
+              <div className="pv-shipping">
+                <Truck size={18} strokeWidth={1.75} aria-hidden="true" />
+                <span className="pv-shipping-text">
+                  <strong>Envío · {formatNio(shipping.costNio)}</strong>
+                  <span>{[shipping.destination, shipping.recipient, shipping.phone].filter(Boolean).join(' · ')}</span>
+                </span>
+                <button type="button" className="pv-icon-button" aria-label="Editar el envío" title="Editar el envío" onClick={() => setModal({ kind: 'shipping' })}><Pencil size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+              </div>
+            )
+            : (
+              <button type="button" className="pv-btn pv-btn-secondary pv-shipping-add" onClick={() => setModal({ kind: 'shipping' })}>
+                <Truck size={18} strokeWidth={1.75} aria-hidden="true" />Agregar envío
+              </button>
+            )}
+
           <dl className="pv-totals">
             <div><dt>Subtotal</dt><dd>{formatNio(totals.subtotalNio)}</dd></div>
             <div><dt>Descuento {discountPercentLabel}</dt><dd>{totals.discountNio > 0 ? `−${formatNio(totals.discountNio)}` : '—'}</dd></div>
+            {shipping && <div><dt>Envío</dt><dd>{totals.shippingNio > 0 ? `+${formatNio(totals.shippingNio)}` : 'Gratis'}</dd></div>}
             <div className="pv-grand"><dt>Total</dt><dd data-testid="cart-total">{formatNio(totals.totalNio)}</dd></div>
           </dl>
 
@@ -646,6 +670,19 @@ export function SellScreen({ user, session, engine, engineState, soundEnabled, o
           busy={payBusy}
           error={payError}
           onConfirm={(payments, customerName) => { void confirmPayment(payments, customerName) }}
+          onCancel={closeModal}
+        />
+      )}
+
+      {modal?.kind === 'shipping' && (
+        <ShippingModal
+          initial={shipping}
+          onSave={(value) => {
+            setShipping(value)
+            closeModal()
+            notify(`Envío agregado: ${formatNio(value.costNio)} a ${value.destination}.`, 'ok')
+          }}
+          onRemove={() => { setShipping(null); closeModal(); notify('Se quitó el envío.', 'ok') }}
           onCancel={closeModal}
         />
       )}
