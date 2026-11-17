@@ -50,6 +50,7 @@ export function CashSlip({ data }: { data: SlipData }) {
       <Row label="Anuladas" value={`${totals.voidedCount} (${formatNio(totals.voidedTotalNio)})`} />
       <Row label="Total bruto" value={formatNio(totals.grossTotalNio)} />
       <Row label="Descuentos" value={`−${formatNio(totals.discountTotalNio)}`} />
+      {(totals.shippingTotalNio ?? 0) > 0 && <Row label={`Envíos (${totals.shippingCount ?? 0})`} value={`+${formatNio(totals.shippingTotalNio ?? 0)}`} />}
       <div className="slip-row slip-total"><span>TOTAL VENDIDO</span><span>{formatNio(totals.netTotalNio)}</span></div>
       <hr className="slip-rule" />
       <h2>Por método (en C$)</h2>

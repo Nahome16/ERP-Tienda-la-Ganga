@@ -87,6 +87,7 @@ export function TotalsList({ totals }: { totals: CashTotals }) {
       <Row label="Por revisar">{totals.reviewCount > 0 ? <span className="adm-neg">{totals.reviewCount}</span> : 0}</Row>
       <Row label="Total bruto">{formatNio(totals.grossTotalNio)}</Row>
       <Row label="Descuentos">−{formatNio(totals.discountTotalNio)}</Row>
+      {(totals.shippingTotalNio ?? 0) > 0 && <Row label={`Envíos cobrados (${totals.shippingCount ?? 0})`}>+{formatNio(totals.shippingTotalNio ?? 0)}</Row>}
       <Row label="Total vendido" strong>{formatNio(totals.netTotalNio)}</Row>
       <Row label="Efectivo (neto, en C$)">{formatNio(totals.cashTotalNio)}</Row>
       <Row label="Transferencia (en C$)">{formatNio(totals.transferTotalNio)}</Row>

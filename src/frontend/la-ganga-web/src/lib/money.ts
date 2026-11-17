@@ -26,18 +26,21 @@ export function formatUsd(value: number): string {
 export type TotalsInput = {
   lines: { quantity: number; unitPrice: number }[]
   discount: { type: DiscountType; value: number } | null
+  /** Costo del envío: se suma al total después del descuento (el descuento es solo sobre la ropa). */
+  shippingNio?: number
 }
 
 export type SaleTotals = {
   subtotalNio: number
   discountNio: number
+  shippingNio: number
   totalNio: number
   /** Descuento expresado como porcentaje del subtotal (para comparar con el límite del vendedor). */
   discountPercent: number
 }
 
 /** Mismas reglas que el servidor: ver docs/30-mvp-contrato-api.md, sección 4. */
-export function computeTotals({ lines, discount }: TotalsInput): SaleTotals {
+export function computeTotals({ lines, discount, shippingNio: shipping = 0 }: TotalsInput): SaleTotals {
   const subtotalNio = round2(lines.reduce((sum, line) => sum + round2(line.quantity * line.unitPrice), 0))
   let discountNio = 0
   if (discount && subtotalNio > 0) {
@@ -45,9 +48,10 @@ export function computeTotals({ lines, discount }: TotalsInput): SaleTotals {
       ? round2((subtotalNio * Math.min(Math.max(discount.value, 0), 100)) / 100)
       : Math.min(round2(Math.max(discount.value, 0)), subtotalNio)
   }
-  const totalNio = round2(subtotalNio - discountNio)
+  const shippingNio = round2(Math.max(shipping, 0))
+  const totalNio = round2(subtotalNio - discountNio + shippingNio)
   const discountPercent = subtotalNio > 0 ? round2((discountNio / subtotalNio) * 100) : 0
-  return { subtotalNio, discountNio, totalNio, discountPercent }
+  return { subtotalNio, discountNio, shippingNio, totalNio, discountPercent }
 }
 
 /** Valor de un pago en córdobas (los dólares se convierten con la tasa del pago). */

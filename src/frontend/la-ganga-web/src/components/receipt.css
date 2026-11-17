@@ -25,3 +25,4 @@
 /* Código de barras del número del recibo: ancho y con margen para que el lector lo tome fácil. */
 .receipt-barcode-box { margin-top: 3mm; display: grid; justify-items: center; gap: 1mm; }
 .receipt-barcode { display: block; width: 60mm; max-width: 100%; height: 12mm; }
+.receipt-sheet .receipt-shipping { margin: 4px 0 0; padding: 4px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; word-break: break-word; }

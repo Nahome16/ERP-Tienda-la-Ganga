@@ -6,8 +6,16 @@ describe('computeTotals', () => {
 
   it('suma líneas sin descuento', () => {
     expect(computeTotals({ lines, discount: null })).toEqual({
-      subtotalNio: 899.99, discountNio: 0, totalNio: 899.99, discountPercent: 0,
+      subtotalNio: 899.99, discountNio: 0, shippingNio: 0, totalNio: 899.99, discountPercent: 0,
     })
+  })
+
+  it('suma el envío después del descuento (el descuento no toca el envío)', () => {
+    const totals = computeTotals({ lines, discount: { type: 'Percent', value: 10 }, shippingNio: 80 })
+    expect(totals.discountNio).toBe(90)
+    expect(totals.shippingNio).toBe(80)
+    expect(totals.totalNio).toBe(889.99)
+    expect(totals.discountPercent).toBe(10)
   })
 
   it('aplica descuento por porcentaje y redondea mitad hacia arriba', () => {

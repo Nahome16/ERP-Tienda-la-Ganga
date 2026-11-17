@@ -1,4 +1,4 @@
-import type { CashSession, DiscountType, PosSnapshot, Sale, SaleChannel, SaleRequest } from '../lib/apiTypes'
+import type { CashSession, DiscountType, PosSnapshot, Sale, SaleChannel, SaleRequest, SaleShipping } from '../lib/apiTypes'
 
 /** Instantánea guardada en el equipo y cuándo se descargó (reloj del equipo). */
 export type StoredSnapshot = { snapshot: PosSnapshot; fetchedAtUtc: string }
@@ -62,6 +62,8 @@ export type CartDraft = {
   lines: CartLine[]
   channel: SaleChannel
   discount: DiscountInput | null
+  /** Envío en curso (si se agregó). */
+  shipping?: SaleShipping | null
   note: string
 }
 

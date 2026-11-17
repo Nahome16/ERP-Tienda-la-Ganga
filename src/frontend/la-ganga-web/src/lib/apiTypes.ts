@@ -78,6 +78,9 @@ export type CashTotals = {
   reviewCount: number
   grossTotalNio: number
   discountTotalNio: number
+  /** Envíos cobrados en las ventas confirmadas (incluidos en el total vendido). */
+  shippingCount?: number
+  shippingTotalNio?: number
   netTotalNio: number
   cashNioTendered: number
   cashUsdTendered: number
@@ -153,6 +156,15 @@ export type SaleRequestPayment = {
   reference: string | null
 }
 
+/** Envío de una venta: el costo se suma al total que paga el cliente. */
+export type SaleShipping = {
+  costNio: number
+  destination: string
+  recipient: string | null
+  phone: string | null
+  carrier: string | null
+}
+
 export type SaleRequest = {
   clientSaleId: string
   cashSessionId: string
@@ -165,6 +177,7 @@ export type SaleRequest = {
   payments: SaleRequestPayment[]
   note: string | null
   customerName?: string | null
+  shipping?: SaleShipping | null
 }
 
 export type SaleLine = {
@@ -211,6 +224,8 @@ export type Sale = {
   note: string | null
   /** Nombre del cliente (opcional), impreso en el recibo. */
   customerName?: string | null
+  /** Envío (si la venta lo lleva). */
+  shipping?: SaleShipping | null
   voidedAtUtc: string | null
   voidedByName: string | null
   voidReason: string | null
