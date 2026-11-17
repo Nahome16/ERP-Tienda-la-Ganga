@@ -241,4 +241,13 @@ describe('referencias y stock', () => {
     // p1 pendiente (2) + p2 enviada tras la instantánea (3); p3 no cuenta.
     expect(units.get('v1')).toBe(5)
   })
+
+  it('una venta rechazada por el servidor no aparta piezas', async () => {
+    await queue('r1', 'u1', 2)
+    const reject = vi.fn(async () => { throw new ApiError(422, 'price_changed', 'El precio cambió.', {}) })
+    await drainOutbox({ userId: 'u1', send: reject })
+    const entries = await listOutbox('u1')
+    expect(entries.find((entry) => entry.clientSaleId === 'r1')?.status).toBe('attention')
+    expect(pendingUnits(entries, { generatedAtUtc: '2026-11-10T15:00:00Z' }).get('v1')).toBeUndefined()
+  })
 })
