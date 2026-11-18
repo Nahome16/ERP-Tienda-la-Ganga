@@ -56,6 +56,8 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [session, setSession] = useState<CashSession | null>(null)
   const [panel, setPanel] = useState<PanelModal>(null)
+  // Recibo con el que se abre el cambio de talla desde «Ventas de esta caja».
+  const [exchangeNumber, setExchangeNumber] = useState<string | undefined>(undefined)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [soundEnabled, setSoundEnabled] = useState(readSoundPreference)
   const [printJob, setPrintJob] = useState<PrintJob | null>(null)
@@ -243,7 +245,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
         <nav className="pv-actions" aria-label="Acciones de la caja">
           {session && canExchange && (
             <button
-              type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => setPanel('exchange')}
+              type="button" className="pv-btn pv-btn-secondary pv-top-btn" onClick={() => { setExchangeNumber(undefined); setPanel('exchange') }}
               aria-label="Cambio de talla" title={connection === 'online' ? 'Cambio de talla con recibo' : 'Cambio de talla (necesita conexión)'}
               data-testid="exchange-button"
             >
@@ -358,6 +360,7 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
           onRetryAll={() => { void engine.retryAll() }}
           onClose={() => setPanel(null)}
           canVoidDirect={hasPermission(user, 'sale.void')}
+          onExchange={canExchange ? (sale) => { setExchangeNumber(sale.number); setPanel('exchange') } : undefined}
           onVoided={(sale, reload) => {
             notify(`Venta ${sale.number} anulada.`, 'ok')
             // Las prendas volvieron al inventario: se actualiza la caja y, si se pidió, pasan al carrito.
@@ -373,6 +376,8 @@ export function PosApp({ user, canReturnToAdmin, onNavigate, onLogout, offlineSt
 
       {panel === 'exchange' && session && (
         <ExchangeModal
+          key={exchangeNumber ?? 'nuevo'}
+          initialNumber={exchangeNumber}
           session={session}
           online={connection === 'online'}
           needsApproval={!hasPermission(user, 'sale.void')}

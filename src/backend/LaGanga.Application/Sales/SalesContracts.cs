@@ -289,16 +289,16 @@ public interface ISalesService
     /// <summary>Ventas de una caja (todas sus aperturas) entre dos fechas de Managua, de la más nueva a la más vieja.</summary>
     Task<ServiceResult<IReadOnlyList<SaleDto>>> ListByRegisterAsync(
         Guid registerId,
-        DateOnly from,
-        DateOnly to,
+        DateOnly fromDate,
+        DateOnly toDate,
         Actor actor,
         CancellationToken cancellationToken);
 
     /// <summary>Días con ventas confirmadas de una caja (para marcar el calendario).</summary>
     Task<ServiceResult<IReadOnlyList<SalesDayDto>>> SalesDaysByRegisterAsync(
         Guid registerId,
-        DateOnly from,
-        DateOnly to,
+        DateOnly fromDate,
+        DateOnly toDate,
         Actor actor,
         CancellationToken cancellationToken);
 

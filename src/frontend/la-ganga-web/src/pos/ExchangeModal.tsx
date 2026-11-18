@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowRight, CircleAlert, Printer, Repeat, Search } from 'lucide-react'
 import type { CashSession, Exchange, ExchangeLookup, ExchangeResult } from '../lib/apiTypes'
 import { formatNio } from '../lib/money'
@@ -19,15 +19,17 @@ type Props = {
   onPrint: (exchange: Exchange) => void
   onDone: (exchange: Exchange) => void
   onClose: () => void
+  /** Recibo ya elegido (desde «Ventas de esta caja»): se busca solo al abrir. */
+  initialNumber?: string
 }
 
 /**
  * Cambio de talla o color con el recibo: la prenda regresa al inventario y
  * sale otra talla/color del mismo producto. No mueve dinero ni cambia la venta.
  */
-export function ExchangeModal({ session, online, needsApproval, onPrint, onDone, onClose }: Props) {
+export function ExchangeModal({ session, online, needsApproval, onPrint, onDone, onClose, initialNumber }: Props) {
   const [approver, setApprover] = useState<Approver>(emptyApprover)
-  const [number, setNumber] = useState('')
+  const [number, setNumber] = useState(initialNumber ?? '')
   const [lookup, setLookup] = useState<ExchangeLookup | null>(null)
   const [choices, setChoices] = useState<ExchangeChoices>({})
   const [note, setNote] = useState('')
@@ -40,7 +42,11 @@ export function ExchangeModal({ session, online, needsApproval, onPrint, onDone,
 
   async function search(event: FormEvent) {
     event.preventDefault()
-    const digits = normalizeReceiptNumber(number)
+    await lookupNumber(number)
+  }
+
+  async function lookupNumber(value: string) {
+    const digits = normalizeReceiptNumber(value)
     if (!digits) {
       setError('Escribí el número del recibo (por ejemplo V-000123).')
       return
@@ -60,6 +66,14 @@ export function ExchangeModal({ session, online, needsApproval, onPrint, onDone,
       setBusy(false)
     }
   }
+
+  // Abierto desde una venta: busca ese recibo de una vez.
+  const searchedInitial = useRef(false)
+  useEffect(() => {
+    if (!initialNumber || searchedInitial.current || !online) return
+    searchedInitial.current = true
+    void lookupNumber(initialNumber)
+  })
 
   function choose(saleLineId: string, patch: Partial<{ quantity: number; newVariantId: string | null }>) {
     setChoices((current) => {

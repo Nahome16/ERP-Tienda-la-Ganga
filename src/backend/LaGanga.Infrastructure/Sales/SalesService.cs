@@ -388,20 +388,20 @@ public sealed class SalesService : ISalesService
 
     public async Task<ServiceResult<IReadOnlyList<SaleDto>>> ListByRegisterAsync(
         Guid registerId,
-        DateOnly from,
-        DateOnly to,
+        DateOnly fromDate,
+        DateOnly toDate,
         Actor actor,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        var check = await CheckRegisterRangeAsync(registerId, from, to, actor, cancellationToken);
+        var check = await CheckRegisterRangeAsync(registerId, fromDate, toDate, actor, cancellationToken);
         if (check is not null)
         {
             return Result.Fail<IReadOnlyList<SaleDto>>(check.Value.Kind, check.Value.Code, check.Value.Message);
         }
 
-        var start = BusinessTime.DayRangeUtc(from).StartUtc;
-        var end = BusinessTime.DayRangeUtc(to).EndUtc;
+        var start = BusinessTime.DayRangeUtc(fromDate).StartUtc;
+        var end = BusinessTime.DayRangeUtc(toDate).EndUtc;
         var sales = await dbContext.Sales.AsNoTracking()
             .Where(sale => sale.CashSession.RegisterId == registerId && sale.CreatedAtUtc >= start && sale.CreatedAtUtc < end)
             .OrderByDescending(sale => sale.CreatedAtUtc).ThenByDescending(sale => sale.Number)
@@ -414,20 +414,20 @@ public sealed class SalesService : ISalesService
 
     public async Task<ServiceResult<IReadOnlyList<SalesDayDto>>> SalesDaysByRegisterAsync(
         Guid registerId,
-        DateOnly from,
-        DateOnly to,
+        DateOnly fromDate,
+        DateOnly toDate,
         Actor actor,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        var check = await CheckRegisterRangeAsync(registerId, from, to, actor, cancellationToken);
+        var check = await CheckRegisterRangeAsync(registerId, fromDate, toDate, actor, cancellationToken);
         if (check is not null)
         {
             return Result.Fail<IReadOnlyList<SalesDayDto>>(check.Value.Kind, check.Value.Code, check.Value.Message);
         }
 
-        var start = BusinessTime.DayRangeUtc(from).StartUtc;
-        var end = BusinessTime.DayRangeUtc(to).EndUtc;
+        var start = BusinessTime.DayRangeUtc(fromDate).StartUtc;
+        var end = BusinessTime.DayRangeUtc(toDate).EndUtc;
         var rows = await dbContext.Sales.AsNoTracking()
             .Where(sale => sale.CashSession.RegisterId == registerId && sale.Status == SaleStatus.Confirmed
                 && sale.CreatedAtUtc >= start && sale.CreatedAtUtc < end)
@@ -447,17 +447,17 @@ public sealed class SalesService : ISalesService
     /// </summary>
     private async Task<(ServiceErrorKind Kind, string Code, string Message)?> CheckRegisterRangeAsync(
         Guid registerId,
-        DateOnly from,
-        DateOnly to,
+        DateOnly fromDate,
+        DateOnly toDate,
         Actor actor,
         CancellationToken cancellationToken)
     {
-        if (to < from)
+        if (toDate < fromDate)
         {
             return (ServiceErrorKind.Validation, "validation_error", "La fecha final no puede ser antes de la inicial.");
         }
 
-        if (to.DayNumber - from.DayNumber >= MaxRegisterRangeDays)
+        if (toDate.DayNumber - fromDate.DayNumber >= MaxRegisterRangeDays)
         {
             return (ServiceErrorKind.Validation, "validation_error", $"Elegí un rango de hasta {MaxRegisterRangeDays} días.");
         }
