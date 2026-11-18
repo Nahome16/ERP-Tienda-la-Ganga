@@ -66,7 +66,15 @@ kbd { font-family: inherit; }
 .pv-page label { display: flex; flex-direction: column; gap: 6px; color: #384a4c; font-weight: 650; font-size: .85rem; }
 .pv-form { display: grid; gap: 14px; }
 .pv-field { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
-.pv-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pv-row-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pv-page textarea, .pv-modal textarea { font-family: inherit; line-height: 1.4; }
+/* Ventana de envío: los campos ocupan el ancho de la ventana, nunca más. */
+.pv-shipping-form { min-width: 0; }
+.pv-shipping-form label { min-width: 0; }
+.pv-shipping-form input, .pv-shipping-form textarea { width: 100%; min-width: 0; }
+.pv-shipping-form textarea { min-height: 72px; }
+.pv-shipping-form .pv-note { margin: 0; }
+@media (max-width: 420px) { .pv-shipping-form .pv-row-2 { grid-template-columns: 1fr; } }
 .pv-note { margin: 0 0 12px; color: var(--muted, #6d6860); font-size: .9rem; line-height: 1.5; font-weight: 500; }
 .pv-hint { display: flex; align-items: flex-start; gap: 6px; margin: 4px 0 0; color: var(--muted, #6d6860); font-size: .8rem; line-height: 1.4; font-weight: 500; }
 .pv-hint svg { margin-top: 2px; }
