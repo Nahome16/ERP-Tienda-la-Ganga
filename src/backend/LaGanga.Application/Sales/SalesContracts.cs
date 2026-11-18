@@ -268,6 +268,9 @@ public sealed record SaleListQuery(
     int Page,
     int PageSize);
 
+/// <summary>Un día del calendario de ventas de una caja: cuántas ventas confirmadas y por cuánto.</summary>
+public sealed record SalesDayDto(DateOnly Date, int Count, decimal TotalNio);
+
 public sealed record VoidSaleRequest(string? Reason);
 
 public sealed record ResolveReviewRequest(string? Note);
@@ -280,6 +283,22 @@ public interface ISalesService
 
     Task<ServiceResult<IReadOnlyList<SaleDto>>> ListBySessionAsync(
         Guid sessionId,
+        Actor actor,
+        CancellationToken cancellationToken);
+
+    /// <summary>Ventas de una caja (todas sus aperturas) entre dos fechas de Managua, de la más nueva a la más vieja.</summary>
+    Task<ServiceResult<IReadOnlyList<SaleDto>>> ListByRegisterAsync(
+        Guid registerId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        Actor actor,
+        CancellationToken cancellationToken);
+
+    /// <summary>Días con ventas confirmadas de una caja (para marcar el calendario).</summary>
+    Task<ServiceResult<IReadOnlyList<SalesDayDto>>> SalesDaysByRegisterAsync(
+        Guid registerId,
+        DateOnly fromDate,
+        DateOnly toDate,
         Actor actor,
         CancellationToken cancellationToken);
 

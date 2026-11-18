@@ -383,6 +383,100 @@ public sealed class SalesService : ISalesService
         return Paging.Create(await MapAsync(page, cancellationToken), query.Page, query.PageSize, total);
     }
 
+    /// <summary>Rango máximo que se puede pedir de una vez (un mes con los días de la semana de los bordes).</summary>
+    public const int MaxRegisterRangeDays = 62;
+
+    public async Task<ServiceResult<IReadOnlyList<SaleDto>>> ListByRegisterAsync(
+        Guid registerId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        Actor actor,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        var check = await CheckRegisterRangeAsync(registerId, fromDate, toDate, actor, cancellationToken);
+        if (check is not null)
+        {
+            return Result.Fail<IReadOnlyList<SaleDto>>(check.Value.Kind, check.Value.Code, check.Value.Message);
+        }
+
+        var start = BusinessTime.DayRangeUtc(fromDate).StartUtc;
+        var end = BusinessTime.DayRangeUtc(toDate).EndUtc;
+        var sales = await dbContext.Sales.AsNoTracking()
+            .Where(sale => sale.CashSession.RegisterId == registerId && sale.CreatedAtUtc >= start && sale.CreatedAtUtc < end)
+            .OrderByDescending(sale => sale.CreatedAtUtc).ThenByDescending(sale => sale.Number)
+            .Take(2000)
+            .Include(sale => sale.Lines).Include(sale => sale.Payments).Include(sale => sale.CashSession)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+        return Result.Ok(await MapAsync(sales, cancellationToken));
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<SalesDayDto>>> SalesDaysByRegisterAsync(
+        Guid registerId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        Actor actor,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        var check = await CheckRegisterRangeAsync(registerId, fromDate, toDate, actor, cancellationToken);
+        if (check is not null)
+        {
+            return Result.Fail<IReadOnlyList<SalesDayDto>>(check.Value.Kind, check.Value.Code, check.Value.Message);
+        }
+
+        var start = BusinessTime.DayRangeUtc(fromDate).StartUtc;
+        var end = BusinessTime.DayRangeUtc(toDate).EndUtc;
+        var rows = await dbContext.Sales.AsNoTracking()
+            .Where(sale => sale.CashSession.RegisterId == registerId && sale.Status == SaleStatus.Confirmed
+                && sale.CreatedAtUtc >= start && sale.CreatedAtUtc < end)
+            .Select(sale => new { sale.CreatedAtUtc, sale.TotalNio })
+            .ToListAsync(cancellationToken);
+        IReadOnlyList<SalesDayDto> days = rows
+            .GroupBy(row => BusinessTime.ToBusinessDate(row.CreatedAtUtc))
+            .Select(group => new SalesDayDto(group.Key, group.Count(), group.Sum(row => row.TotalNio)))
+            .OrderBy(day => day.Date)
+            .ToList();
+        return Result.Ok(days);
+    }
+
+    /// <summary>
+    /// Quien vende en una caja puede ver todas sus ventas (de cualquier día y cajero) para
+    /// reimprimir o hacer cambios; quien lee reportes o ventas, las de cualquier caja.
+    /// </summary>
+    private async Task<(ServiceErrorKind Kind, string Code, string Message)?> CheckRegisterRangeAsync(
+        Guid registerId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        Actor actor,
+        CancellationToken cancellationToken)
+    {
+        if (toDate < fromDate)
+        {
+            return (ServiceErrorKind.Validation, "validation_error", "La fecha final no puede ser antes de la inicial.");
+        }
+
+        if (toDate.DayNumber - fromDate.DayNumber >= MaxRegisterRangeDays)
+        {
+            return (ServiceErrorKind.Validation, "validation_error", $"Elegí un rango de hasta {MaxRegisterRangeDays} días.");
+        }
+
+        if (!await dbContext.CashRegisters.AsNoTracking().AnyAsync(register => register.Id == registerId, cancellationToken))
+        {
+            return (ServiceErrorKind.NotFound, "not_found", "No encontramos esa caja.");
+        }
+
+        if (actor.Has(PermissionNames.SaleRead) || actor.Has(PermissionNames.CashReportRead))
+        {
+            return null;
+        }
+
+        var worksHere = await dbContext.CashSessions.AsNoTracking()
+            .AnyAsync(session => session.RegisterId == registerId && session.OpenedByUserId == actor.UserId, cancellationToken);
+        return worksHere ? null : (ServiceErrorKind.Forbidden, "forbidden", "Solo podés ver las ventas de una caja en la que trabajás.");
+    }
+
     public async Task<ServiceResult<IReadOnlyList<SaleDto>>> ListBySessionAsync(
         Guid sessionId,
         Actor actor,

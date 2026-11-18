@@ -140,6 +140,26 @@ public static class MvpEndpoints
             })
             .RequireAuthorization(MvpPolicies.SaleView);
 
+        group.MapGet("/registers/{id:guid}/sales", async (Guid id, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, ISalesService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                var today = BusinessTime.ToBusinessDate(DateTimeOffset.UtcNow);
+                return actor is null
+                    ? ApiHelpers.Unauthorized401()
+                    : (await service.ListByRegisterAsync(id, from ?? today, to ?? from ?? today, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(MvpPolicies.SaleView);
+
+        group.MapGet("/registers/{id:guid}/sales/days", async (Guid id, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, ISalesService service, HttpContext http, CancellationToken ct) =>
+            {
+                var actor = http.User.GetActor();
+                var today = BusinessTime.ToBusinessDate(DateTimeOffset.UtcNow);
+                return actor is null
+                    ? ApiHelpers.Unauthorized401()
+                    : (await service.SalesDaysByRegisterAsync(id, from ?? today.AddDays(-30), to ?? today, actor, ct)).ToHttp();
+            })
+            .RequireAuthorization(MvpPolicies.SaleView);
+
         group.MapGet("/sessions", async (
                 [FromQuery] DateOnly? from,
                 [FromQuery] DateOnly? to,
