@@ -44,19 +44,21 @@ const longDate = new Intl.DateTimeFormat('es-NI', { timeZone: 'UTC', weekday: 'l
 const shortDate = new Intl.DateTimeFormat('es-NI', { timeZone: 'UTC', day: 'numeric', month: 'short' })
 const asUtc = (date: string) => new Date(`${date}T12:00:00Z`)
 
-/** «Hoy», «Ayer», «martes 17 de noviembre» o «10 nov – 17 nov». */
+const capitalize = (text: string) => text.charAt(0).toLocaleUpperCase('es') + text.slice(1)
+
+/** «Hoy», «Ayer», «Martes, 17 de noviembre» o «10 nov – 17 nov». */
 export function describePeriod(period: SalesPeriod, today: string): string {
   if (period.kind === 'session') return 'Turno actual'
   if (period.from === period.to) {
     if (period.from === today) return 'Hoy'
     if (period.from === shiftDate(today, -1)) return 'Ayer'
-    return longDate.format(asUtc(period.from))
+    return capitalize(longDate.format(asUtc(period.from)))
   }
   return `${shortDate.format(asUtc(period.from))} – ${shortDate.format(asUtc(period.to))}`
 }
 
 export const monthName = (month: string) =>
-  new Intl.DateTimeFormat('es-NI', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(asUtc(`${month}-01`))
+  capitalize(new Intl.DateTimeFormat('es-NI', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(asUtc(`${month}-01`)))
 
 /** Semanas (lunes a domingo) que muestran un mes completo; los días de los bordes son de los meses vecinos. */
 export function monthGrid(month: string): string[][] {

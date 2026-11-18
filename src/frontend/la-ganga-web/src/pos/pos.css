@@ -578,12 +578,12 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
 .pv-sales-quick button { min-height: 36px; padding: 0 12px; color: #4d5a5b; border: 0; border-radius: 8px; background: transparent; font-size: .84rem; font-weight: 650; cursor: pointer; }
 .pv-sales-quick button.is-active { color: var(--teal-dark, #083f45); background: #fff; box-shadow: 0 1px 3px rgba(8,47,53,.16), inset 0 0 0 1px rgba(12,85,91,.18); font-weight: 750; }
 .pv-sales-date { display: flex; align-items: center; gap: 4px; }
-.pv-sales-date-label { min-width: 0; gap: 8px; text-transform: capitalize; }
+.pv-sales-date-label { min-width: 0; gap: 8px; }
 .pv-sales-date-label.is-open { border-color: var(--teal, #0c555b); background: rgba(12,85,91,.06); }
 .pv-calendar { margin-bottom: 12px; padding: 12px; border: 1px solid rgba(12,85,91,.18); border-radius: 14px; background: #fff; }
-.pv-calendar-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.pv-calendar-head strong { min-width: 150px; text-align: center; text-transform: capitalize; }
-.pv-calendar-range { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: .84rem; font-weight: 650; cursor: pointer; }
+.pv-calendar-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.pv-calendar-head strong { min-width: 150px; text-align: center; }
+.pv-modal .pv-calendar-range { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin-left: auto; font-size: .84rem; font-weight: 650; cursor: pointer; }
 .pv-calendar .pv-note { margin: 0 0 8px; }
 .pv-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .pv-calendar-weekday { padding: 2px 0; color: #6d6860; font-size: .72rem; font-weight: 750; text-align: center; text-transform: uppercase; }
@@ -598,9 +598,9 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
 .pv-calendar-day.is-selected { color: #fff; border-color: var(--teal, #0c555b); background: var(--teal, #0c555b); }
 .pv-calendar-day.is-selected .pv-calendar-total { color: #e5f3f1; }
 .pv-calendar-day.is-start { outline: 2px solid var(--orange, #f47b20); outline-offset: 1px; }
-.pv-sales-search { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 0 12px; color: #6d6860; border: 1px solid #e4d9c6; border-radius: 12px; background: #fff; }
-.pv-sales-search input { flex: 1; min-width: 0; min-height: 44px; padding: 0; color: var(--ink, #082f35); border: 0; outline: 0; background: transparent; font: inherit; }
-.pv-sales-search:focus-within { border-color: var(--teal, #0c555b); box-shadow: 0 0 0 3px rgba(12,85,91,.12); }
+.pv-modal .pv-sales-search { display: flex; flex-direction: row; align-items: center; gap: 8px; margin-bottom: 10px; padding: 0 12px; color: #6d6860; border: 1px solid #e4d9c6; border-radius: 12px; background: #fff; }
+.pv-modal .pv-sales-search input { flex: 1; min-width: 0; min-height: 44px; padding: 0; color: var(--ink, #082f35); border: 0; outline: 0; background: transparent; font: inherit; }
+.pv-modal .pv-sales-search:focus-within { border-color: var(--teal, #0c555b); box-shadow: 0 0 0 3px rgba(12,85,91,.12); }
 .pv-sales-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .pv-sales-kpi { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; border: 1px solid #efe6d6; border-radius: 12px; background: #fffdf9; }
 .pv-sales-kpi span { color: #6d6860; font-size: .72rem; font-weight: 750; letter-spacing: .03em; text-transform: uppercase; }
@@ -616,3 +616,5 @@ button.pv-pending:hover:not(:disabled) { border-color: var(--teal, #0c555b); bac
   .pv-calendar-total { display: none; }
   .pv-calendar-day.has-sales::after { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; opacity: .7; }
 }
+.pv-modal .pv-calendar-range input { width: 18px; min-height: 18px; height: 18px; flex: none; padding: 0; accent-color: var(--teal, #0c555b); box-shadow: none; }
+.pv-modal .pv-sales-search input { box-shadow: none; }
