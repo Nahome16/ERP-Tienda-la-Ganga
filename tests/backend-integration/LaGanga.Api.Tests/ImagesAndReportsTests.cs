@@ -167,16 +167,16 @@ public sealed class ImagesAndReportsTests(CatalogApiFixture fixture) : IClassFix
 
         // Ventas de la caja por fecha y días marcados del calendario (el cajero trabaja en esa caja).
         var registerId = register.GetProperty("id").GetGuid();
-        var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-6)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        var byDate = await GetAsync(seller, $"/api/v1/cash/registers/{registerId}/sales?from={today}&to={today}");
+        var salesDay = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-6)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var byDate = await GetAsync(seller, $"/api/v1/cash/registers/{registerId}/sales?from={salesDay}&to={salesDay}");
         Assert.Contains(byDate.EnumerateArray(), item => item.GetProperty("totalNio").GetDecimal() == 980m);
-        var days = await GetAsync(seller, $"/api/v1/cash/registers/{registerId}/sales/days?from={today}&to={today}");
+        var days = await GetAsync(seller, $"/api/v1/cash/registers/{registerId}/sales/days?from={salesDay}&to={salesDay}");
         var day = Assert.Single(days.EnumerateArray());
-        Assert.Equal(today, day.GetProperty("date").GetString());
+        Assert.Equal(salesDay, day.GetProperty("date").GetString());
         Assert.True(day.GetProperty("count").GetInt32() >= 1);
-        using (var tooLong = ApiTestHelpers.Build(HttpMethod.Get, $"/api/v1/cash/registers/{registerId}/sales?from=2026-01-01&to=2026-06-30", csrf, null))
+        using (var rangeTooLong = ApiTestHelpers.Build(HttpMethod.Get, $"/api/v1/cash/registers/{registerId}/sales?from=2026-01-01&to=2026-06-30", csrf, null))
         {
-            Assert.Equal(HttpStatusCode.BadRequest, (await seller.SendAsync(tooLong)).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await seller.SendAsync(rangeTooLong)).StatusCode);
         }
 
         var summaryTotals = await GetAsync(seller, $"/api/v1/cash/sessions/{sessionId}/summary");
